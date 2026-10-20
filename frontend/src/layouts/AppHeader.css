@@ -1,0 +1,213 @@
+.app-header {
+  height: var(--header-height);
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-8);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.mobile-menu-trigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+.mobile-menu-trigger:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.breadcrumb-list {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.breadcrumb-root {
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+}
+
+.breadcrumb-separator {
+  display: flex;
+  align-items: center;
+  color: var(--border-medium);
+}
+
+.breadcrumb-current {
+  color: var(--text-main);
+  font-weight: var(--font-semibold);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Quick Search */
+.header-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.header-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.header-search-input {
+  padding: 6px 12px 6px 32px;
+  font-size: var(--text-xs);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-app);
+  color: var(--text-secondary);
+  width: 220px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.header-search-input:hover {
+  background-color: var(--bg-card);
+  border-color: var(--border-medium);
+}
+
+/* API Status */
+.api-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+}
+
+.api-online {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
+}
+.api-online .api-dot {
+  background-color: var(--color-success-icon);
+}
+
+.api-standby {
+  background-color: var(--color-slate-100);
+  color: var(--color-slate-600);
+  border-color: var(--color-slate-300);
+}
+.api-standby .api-dot {
+  background-color: var(--color-slate-400);
+}
+
+.api-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+}
+
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+.header-icon-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* Auth Placeholder */
+.user-profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5, 10px);
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-app);
+  transition: all var(--transition-fast);
+}
+
+.user-profile-trigger:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-medium);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-slate-800);
+  color: var(--text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-profile-meta {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.user-display-name {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.auth-stage-tag {
+  font-size: 10px;
+  color: var(--color-primary-600);
+  font-weight: var(--font-semibold);
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    padding: 0 var(--space-4);
+  }
+  .mobile-menu-trigger {
+    display: flex;
+  }
+  .header-search-wrapper {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .user-profile-meta {
+    display: none;
+  }
+  .api-status-pill {
+    display: none;
+  }
+}

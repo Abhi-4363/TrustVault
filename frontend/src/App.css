@@ -1,0 +1,94 @@
+/* ==============================================================================
+   TrustVault — Main Application & Dashboard Styles
+   ============================================================================== */
+
+.dashboard-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-8);
+}
+
+.dashboard-main-split {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.table-column {
+  min-width: 0;
+}
+
+.activity-column {
+  min-width: 0;
+}
+
+/* Modal Content Styles */
+.modal-notice-box {
+  background-color: var(--color-slate-50);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.modal-notice-box h4 {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-1);
+}
+
+.modal-notice-box p {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal-meta-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.modal-meta-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  padding: var(--space-2) 0;
+  border-bottom: 1px dashed var(--border-light);
+}
+
+.modal-meta-item:last-child {
+  border-bottom: none;
+}
+
+.modal-meta-label {
+  color: var(--text-muted);
+}
+
+.modal-meta-val {
+  font-weight: var(--font-medium);
+  color: var(--text-main);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+  .dashboard-main-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+}

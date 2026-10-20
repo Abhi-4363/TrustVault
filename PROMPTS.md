@@ -79,6 +79,59 @@ This document records the exact progression of development prompts, implementati
   - None required.
 
 - **Real Git Commit Reference**:
-  - Commit Hash: `10b3684`
+  - Commit Hash: `1b720fd`
   - Commit Message: `feat: implement Express backend foundation and health-check service`
+
+---
+
+## Prompt Entry 3: Frontend Foundation & Polished Dashboard UI
+
+- **Date**: October 20, 2026
+- **Stage**: Stage 1 (Project Foundation & UI)
+- **Task Requested**:
+  - Establish the frontend foundation using React and Vite.
+  - Formulate an enterprise design system using CSS variables (inspired by Linear, Stripe Dashboard, and Notion).
+  - Implement a desktop-first responsive AppShell with a dark-navy sidebar, breadcrumbs, search trigger, and explicit authentication placeholder.
+  - Implement the initial dashboard screen with welcome section, demonstration summary metrics, recent documents table, and security activity feed.
+  - Implement accessible components: `Button`, `StatusBadge` (with icons, never relying on color alone), `EmptyState`, and accessible `Modal` dialogs explaining deferred stage capabilities.
+  - Explicitly identify all metrics and records as fictional demonstration data via a persistent `DemoDataBanner`.
+  - Connect the frontend to the live backend `/api/health` check endpoint.
+  - Verify production build (`npm run build`), test interactions in the browser, review git diff, and present checkpoint report.
+
+- **What the AI Actually Implemented**:
+  1. Initialized `frontend/package.json` with React 18, Vite 6, and `lucide-react` icons.
+  2. Created `frontend/src/index.css` defining the design token system: Slate/Navy neutrals, Royal Blue accents, functional semantic colors, typography scale, spacing tokens, and focus rings.
+  3. Created `frontend/src/mock/mockData.js` with realistic, fictional enterprise records (`DEMO_METRICS`, `DEMO_DOCUMENTS`, `DEMO_ACTIVITIES`).
+  4. Built reusable components in `frontend/src/components/common/`:
+     - `Button.jsx`: Variants, sizes, icon alignment, focus indicators.
+     - `StatusBadge.jsx`: Accessible badges pairing colors with semantic icons (`Shield`, `Edit3`, `Eye`, `Lock`, `Users`, `AlertCircle`).
+     - `EmptyState.jsx`: Accessible zero-state regions with guiding actions.
+     - `Modal.jsx`: Accessible dialog with focus trap, Escape key handling, and backdrop blur.
+  5. Built dashboard components in `frontend/src/components/dashboard/`:
+     - `PageHeader.jsx`: Welcome title, subtitle, zero-trust vault badge, and primary actions.
+     - `SummaryCard.jsx`: Metric cards with DEMO watermark badges and trend tags.
+     - `DocumentTable.jsx`: Accessible enterprise table with real-time in-memory search and format filter.
+     - `ActivityList.jsx`: Chronological security activity feed with action badges.
+     - `DemoDataBanner.jsx`: Persistent disclosure explaining Stage 1 boundaries with live backend health verification trigger.
+  6. Built application layouts in `frontend/src/layouts/`:
+     - `AppSidebar.jsx`: Deep-navy sidebar with TrustVault shield mark, navigation items, counts, and security status card.
+     - `AppHeader.jsx`: Breadcrumb navigation, quick search trigger, live API status pill, and Stage 2 auth placeholder.
+     - `AppShell.jsx`: Responsive layout container with mobile backdrop drawer and status footer.
+  7. Implemented `frontend/src/App.jsx` tying together navigation filtering, modals for all actions, and live `/api/health` integration.
+  8. Ran `npm run build`: built in 2.81s without warnings or errors.
+  9. Executed browser subagent testing: verified layout, table search filter, modal dialogues, sidebar drawer, and confirmed zero console errors.
+
+- **What the User Reviewed**:
+  - Inspected Checkpoint 3 frontend implementation, responsive layout, build outputs, browser inspection results, and design token architecture. Approved checkpoint for commit and push.
+
+- **Problems Actually Discovered**:
+  - None during frontend build and browser testing.
+
+- **Corrections Actually Made**:
+  - Adjusted table column padding to optimize horizontal spacing across standard desktop viewports.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `00202e3`
+  - Commit Message: `feat: create responsive dashboard UI and design token foundation`
+
 
