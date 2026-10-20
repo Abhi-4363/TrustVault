@@ -39,5 +39,46 @@ This document records the exact progression of development prompts, implementati
   - None required.
 
 - **Real Git Commit Reference**:
-  - Commit Hash: [Pending commit by user after checkpoint approval]
+  - Commit Hash: `fcc8b8b`
   - Commit Message: `chore: initialize repository hygiene and project documentation`
+
+---
+
+## Prompt Entry 2: Express Backend Foundation & Health Service
+
+- **Date**: October 20, 2026
+- **Stage**: Stage 1 (Project Foundation & UI)
+- **Task Requested**:
+  - Build the backend foundation using Node.js and Express.
+  - Implement a decoupled Express app factory (`createApp`) and server lifecycle entry point (`server.js`).
+  - Implement the health check endpoint `GET /api/health` with strict non-sensitive output.
+  - Implement centralized error handling middleware and 404 handler for unknown routes.
+  - Prepare a non-blocking MongoDB configuration module for Stage 2.
+  - Build automated integration test suite using Vitest and Supertest.
+  - Stop at this checkpoint, report test results, wait for approval, commit, and push to GitHub.
+
+- **What the AI Actually Implemented**:
+  1. Initialized `backend/package.json` with minimal dependencies (`express`, `cors`, `dotenv`) and devDependencies (`vitest`, `supertest`).
+  2. Created `backend/.env.example` with standard defaults (`PORT=5000`, `NODE_ENV=development`, `CLIENT_URL=http://localhost:5173`).
+  3. Created `backend/src/config/env.js` for centralized environment parsing and fallbacks.
+  4. Created `backend/src/config/database.js` stub for future Stage 2 MongoDB integration.
+  5. Implemented `backend/src/routes/health.routes.js` with operational status, timestamp, uptime, and environment reporting without exposing secrets.
+  6. Implemented `backend/src/app.js` with CORS configuration, JSON body parsing, route mounting, 404 handler, and central error handling middleware.
+  7. Implemented `backend/server.js` with graceful shutdown signal handlers (`SIGTERM`, `SIGINT`).
+  8. Created `backend/tests/health.test.js` validating HTTP 200, secret absence, and 404 handling.
+  9. Executed `npm test`: 3 of 3 automated tests passed.
+  10. Tested live process execution and verified `GET /api/health` returns valid JSON.
+
+- **What the User Reviewed**:
+  - Inspected Checkpoint 2 backend implementation, file structure, and test execution results (3/3 passing). Approved checkpoint for commit and push.
+
+- **Problems Actually Discovered**:
+  - None during backend testing.
+
+- **Corrections Actually Made**:
+  - None required.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `10b3684`
+  - Commit Message: `feat: implement Express backend foundation and health-check service`
+
