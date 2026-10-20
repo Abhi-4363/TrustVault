@@ -9,7 +9,8 @@ import {
   Download, 
   Info, 
   Search,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 import { StatusBadge } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
@@ -139,7 +140,14 @@ export function DocumentTable({ documents = [], onActionSelect }) {
                         {getFileIcon(doc.fileType)}
                       </div>
                       <div className="doc-meta">
-                        <span className="doc-title" title={doc.name}>{doc.name}</span>
+                        <div className="doc-title-row">
+                          <span className="doc-title" title={doc.name}>{doc.name}</span>
+                          {doc.isReal && (
+                            <span className="doc-vault-pill" title="Persisted in private vault storage">
+                              Vault File
+                            </span>
+                          )}
+                        </div>
                         <span className="doc-subtext">
                           {doc.fileType} • {doc.fileSize}
                         </span>
@@ -197,6 +205,17 @@ export function DocumentTable({ documents = [], onActionSelect }) {
                       >
                         <Info size={15} />
                       </button>
+                      {doc.isReal && (
+                        <button
+                          type="button"
+                          className="row-action-btn row-action-delete"
+                          onClick={() => onActionSelect('delete', doc)}
+                          title={`Delete ${doc.name}`}
+                          aria-label={`Delete ${doc.name}`}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

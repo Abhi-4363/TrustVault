@@ -248,3 +248,27 @@
   color: var(--text-main);
   border-color: var(--border-light);
 }
+
+.row-action-delete:hover {
+  color: var(--color-danger-icon);
+  background-color: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+}
+
+.doc-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.doc-vault-pill {
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid var(--color-success-border);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}

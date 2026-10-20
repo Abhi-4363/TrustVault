@@ -22,6 +22,7 @@ import { ActivityList } from './components/dashboard/ActivityList';
 import { DemoDataBanner } from './components/demo/DemoDataBanner';
 import { Modal } from './components/common/Modal';
 import { AuthModals } from './components/auth/AuthModals';
+import { UploadModal } from './components/dashboard/UploadModal';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
 import { 
@@ -30,15 +31,23 @@ import {
   DEMO_ACTIVITIES 
 } from './mock/mockData';
 import './App.css';
+import { useAuth } from './context/AuthContext';
 
 export function App() {
   const [activeNav, setActiveNav] = useState('overview');
   const [backendHealth, setBackendHealth] = useState(null);
   const [backendConnected, setBackendConnected] = useState(false);
 
-  // Auth Modal State
+  // Authentication Context
+  const { user, token, logout } = useAuth();
+
+  // Auth & Upload Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  // Private Vault Documents
+  const [vaultDocuments, setVaultDocuments] = useState([]);
 
   // Modal State
   const [modalConfig, setModalConfig] = useState({
@@ -62,14 +71,71 @@ export function App() {
         setBackendConnected(false);
       }
     } catch {
-      // Backend server is not running on localhost:5000 in this process
       setBackendConnected(false);
+    }
+  };
+
+  // Fetch real authenticated documents from private vault
+  const fetchVaultDocuments = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/documents', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const formatted = (data.documents || []).map((doc) => ({
+          id: doc._id,
+          name: doc.title,
+          originalName: doc.originalName,
+          description: doc.description || '',
+          fileType: (doc.originalName.split('.').pop() || 'FILE').toUpperCase(),
+          fileSize:
+            doc.fileSize > 1048576
+              ? `${(doc.fileSize / 1048576).toFixed(1)} MB`
+              : `${(doc.fileSize / 1024).toFixed(1)} KB`,
+          rawSize: doc.fileSize,
+          owner: {
+            name: user?.name || 'You',
+            email: user?.email || '',
+            initials: (user?.name || 'Y')
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .substring(0, 2)
+              .toUpperCase(),
+          },
+          accessLevel: 'Owner',
+          lastUpdated: doc.updatedAt || doc.createdAt,
+          formattedDate: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          tags: doc.tags || [],
+          isReal: true,
+        }));
+        setVaultDocuments(formatted);
+      }
+    } catch (err) {
+      console.error('[Document Fetch Error]:', err);
     }
   };
 
   useEffect(() => {
     checkBackendHealth();
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      fetchVaultDocuments();
+    } else {
+      setVaultDocuments([]);
+    }
+  }, [token]);
 
   const openModal = (config) => {
     setModalConfig({
@@ -86,35 +152,96 @@ export function App() {
     setModalConfig((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // Action handlers with transparent Stage 1 feedback
+  // Open interactive Stage 3 private storage upload modal
   const handleUploadClick = () => {
-    openModal({
-      title: 'Document Ingestion (Stage 3)',
-      subtitle: 'Upload handling and encrypted disk persistence',
-      badge: 'Scheduled for Stage 3',
-      content: (
-        <div>
-          <p>
-            In Stage 1, all document records are demonstration models. In <strong>Stage 3</strong>, you will be able to:
-          </p>
-          <div className="modal-notice-box">
-            <h4>Planned Stage 3 Capabilities</h4>
-            <p>
-              • Ingest PDF, Word, and Excel files with strict 25MB payload validation.<br />
-              • Quarantine files in an isolated private directory outside public web roots.<br />
-              • Generate cryptographic UUIDs and calculate file hashes for tamper prevention.
-            </p>
-          </div>
-          <p className="text-secondary" style={{ fontSize: '13px' }}>
-            No file was saved or transferred. To view the implementation plan, see <code>docs/DEVELOPMENT_PLAN.md</code>.
-          </p>
-        </div>
-      ),
-    });
+    setUploadModalOpen(true);
   };
 
-  const handleDocumentAction = (action, doc) => {
-    if (action === 'share') {
+  const handleDocumentAction = async (action, doc) => {
+    if (action === 'download') {
+      if (doc.isReal) {
+        try {
+          const response = await fetch(`http://localhost:5000/api/documents/${doc.id}/download`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || 'Download failed.');
+          }
+
+          const blob = await response.blob();
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = doc.originalName || doc.name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(downloadUrl);
+        } catch (err) {
+          openModal({
+            title: 'Download Streaming Error',
+            subtitle: 'Secure transfer failed',
+            type: 'notice',
+            content: <p>{err.message}</p>,
+          });
+        }
+        return;
+      }
+
+      openModal({
+        title: `Secure Stream: ${doc.name}`,
+        subtitle: 'Protected Byte Streaming',
+        badge: 'Scheduled for Stage 3',
+        content: (
+          <div>
+            <p>
+              TrustVault strictly prohibits public static file links.
+            </p>
+            <div className="modal-notice-box">
+              <h4>Zero-Leakage Streaming Design</h4>
+              <p>
+                In Stage 3, downloads are routed through <code>GET /api/documents/:id/download</code>. The server verifies user authentication and active ACL permissions in real-time before streaming bytes with <code>Content-Disposition: attachment</code> and <code>X-Content-Type-Options: nosniff</code>.
+              </p>
+            </div>
+            <p style={{ fontSize: '13px' }}>
+              Because this file is a fictional demonstration record, no raw file exists on disk to download. Upload your own file using the "Upload" button to test live streaming downloads!
+            </p>
+          </div>
+        ),
+      });
+    } else if (action === 'delete') {
+      if (doc.isReal) {
+        if (window.confirm(`Are you sure you want to permanently delete "${doc.name}" from private vault storage?`)) {
+          try {
+            const response = await fetch(`http://localhost:5000/api/documents/${doc.id}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            if (!response.ok) {
+              const errData = await response.json().catch(() => ({}));
+              throw new Error(errData.error?.message || 'Failed to remove document.');
+            }
+
+            setVaultDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+          } catch (err) {
+            openModal({
+              title: 'Deletion Failed',
+              subtitle: 'Vault error',
+              type: 'notice',
+              content: <p>{err.message}</p>,
+            });
+          }
+        }
+        return;
+      }
+    } else if (action === 'share') {
       openModal({
         title: `Manage Permissions: ${doc.name}`,
         subtitle: 'Access Control Lists & Granular Sharing',
@@ -149,33 +276,11 @@ export function App() {
           </div>
         ),
       });
-    } else if (action === 'download') {
-      openModal({
-        title: `Secure Stream: ${doc.name}`,
-        subtitle: 'Protected Byte Streaming',
-        badge: 'Scheduled for Stage 3',
-        content: (
-          <div>
-            <p>
-              TrustVault strictly prohibits public static file links.
-            </p>
-            <div className="modal-notice-box">
-              <h4>Zero-Leakage Streaming Design</h4>
-              <p>
-                In Stage 3, downloads are routed through <code>GET /api/documents/:id/download</code>. The server verifies user authentication and active ACL permissions in real-time before streaming bytes with <code>Content-Disposition: attachment</code> and <code>X-Content-Type-Options: nosniff</code>.
-              </p>
-            </div>
-            <p style={{ fontSize: '13px' }}>
-              Because this file is a fictional Stage 1 demonstration record, no raw file exists on disk to download.
-            </p>
-          </div>
-        ),
-      });
     } else if (action === 'details') {
       openModal({
         title: `Security Metadata: ${doc.name}`,
         subtitle: 'File integrity and classification details',
-        badge: 'Stage 1 Demo Record',
+        badge: doc.isReal ? 'Persisted Vault Record' : 'Demo Record',
         content: (
           <div>
             <ul className="modal-meta-list">
@@ -188,8 +293,8 @@ export function App() {
                 <span className="modal-meta-val">{doc.fileType} ({doc.fileSize})</span>
               </li>
               <li className="modal-meta-item">
-                <span className="modal-meta-label">Classification:</span>
-                <span className="modal-meta-val">{doc.status}</span>
+                <span className="modal-meta-label">Storage Location:</span>
+                <span className="modal-meta-val">{doc.isReal ? 'Isolated Private Storage (Non-web root)' : 'Demo Storage Model'}</span>
               </li>
               <li className="modal-meta-item">
                 <span className="modal-meta-label">Created By:</span>
@@ -207,29 +312,7 @@ export function App() {
   };
 
   const handleProfileClick = () => {
-    openModal({
-      title: 'Authentication & Session Architecture',
-      subtitle: 'User accounts, hashed passwords, and RBAC',
-      badge: 'Scheduled for Stage 2',
-      content: (
-        <div>
-          <p>
-            In Stage 1, TrustVault operates in anonymous preview mode without mock or fake authentication.
-          </p>
-          <div className="modal-notice-box">
-            <h4>Scheduled for Stage 2</h4>
-            <p>
-              • MongoDB User model with bcrypt password hashing (12 rounds).<br />
-              • JWT-based stateless session management with short expiration.<br />
-              • Role-based permissions: Administrator, Manager, and Standard Member.
-            </p>
-          </div>
-          <p style={{ fontSize: '13px' }}>
-            Current placeholder user: <strong>Demo User (Anonymous)</strong>.
-          </p>
-        </div>
-      ),
-    });
+    setActiveNav('profile');
   };
 
   const handleSearchFocus = () => {
@@ -260,7 +343,7 @@ export function App() {
     openModal({
       title: 'TrustVault — Engineering Guide',
       subtitle: 'Snovasys Fresher Challenge 2026',
-      badge: 'Stage 1 Specification',
+      badge: 'Stage 3 Specification',
       content: (
         <div>
           <p>
@@ -280,8 +363,8 @@ export function App() {
               <span className="modal-meta-val"><code>GET /api/health</code></span>
             </li>
             <li className="modal-meta-item">
-              <span className="modal-meta-label">Threat Model:</span>
-              <span className="modal-meta-val">12 enterprise vectors in <code>THREATS.md</code></span>
+              <span className="modal-meta-label">Document Ingestion:</span>
+              <span className="modal-meta-val">25MB Limit + Private Disk Quarantine</span>
             </li>
           </ul>
         </div>
@@ -291,13 +374,14 @@ export function App() {
 
   // Filter documents based on active navigation item
   const getNavFilteredDocuments = () => {
+    const combinedDocs = [...vaultDocuments, ...DEMO_DOCUMENTS];
     if (activeNav === 'my-documents') {
-      return DEMO_DOCUMENTS.filter((d) => d.accessLevel === 'Owner');
+      return combinedDocs.filter((d) => d.accessLevel === 'Owner');
     }
     if (activeNav === 'shared-with-me') {
-      return DEMO_DOCUMENTS.filter((d) => d.accessLevel !== 'Owner');
+      return combinedDocs.filter((d) => d.accessLevel !== 'Owner');
     }
-    return DEMO_DOCUMENTS;
+    return combinedDocs;
   };
 
   // Determine current page title
@@ -311,6 +395,8 @@ export function App() {
         return 'Security Activity & Audit';
       case 'settings':
         return 'Vault Configuration';
+      case 'profile':
+        return 'User Identity & Role';
       default:
         return 'Overview';
     }
@@ -409,11 +495,95 @@ export function App() {
       </section>
 
       {/* Main Content Split: Documents Table + Recent Activity */}
-      {activeNav === 'settings' ? (
+      {activeNav === 'profile' ? (
+        <div 
+          className="profile-preview-panel" 
+          style={{ 
+            backgroundColor: 'var(--bg-card)', 
+            padding: 'var(--space-6)', 
+            borderRadius: 'var(--radius-lg)', 
+            border: '1px solid var(--border-light)',
+            maxWidth: '680px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+            <div style={{ backgroundColor: 'var(--color-primary-100)', color: 'var(--color-primary-700)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }}>
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--text-main)' }}>
+                Identity & Access Governance
+              </h2>
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                Cryptographic session verification and tenant role assignment
+              </p>
+            </div>
+          </div>
+
+          {user ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <ul className="modal-meta-list">
+                <li className="modal-meta-item">
+                  <span className="modal-meta-label">Full Name:</span>
+                  <span className="modal-meta-val"><strong>{user.name}</strong></span>
+                </li>
+                <li className="modal-meta-item">
+                  <span className="modal-meta-label">Email Address:</span>
+                  <span className="modal-meta-val"><code>{user.email}</code></span>
+                </li>
+                <li className="modal-meta-item">
+                  <span className="modal-meta-label">Assigned Role:</span>
+                  <span className="modal-meta-val" style={{ textTransform: 'capitalize' }}>
+                    <span className="doc-vault-pill" style={{ fontSize: '11px' }}>
+                      {user.role || 'Member'}
+                    </span>
+                  </span>
+                </li>
+                <li className="modal-meta-item">
+                  <span className="modal-meta-label">Private Documents:</span>
+                  <span className="modal-meta-val">{vaultDocuments.length} files quarantined in vault storage</span>
+                </li>
+                <li className="modal-meta-item">
+                  <span className="modal-meta-label">Session Security:</span>
+                  <span className="modal-meta-val">HMAC SHA-256 JWT (Active)</span>
+                </li>
+              </ul>
+
+              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                <Button variant="secondary" onClick={logout}>
+                  Sign Out of Session
+                </Button>
+                <Button variant="primary" onClick={() => setUploadModalOpen(true)}>
+                  Upload Document
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
+              <Lock size={36} style={{ color: 'var(--color-warning-icon)', margin: '0 auto var(--space-3)' }} />
+              <h3 style={{ fontSize: 'var(--text-base)', margin: '0 0 var(--space-2)' }}>
+                Anonymous Vault Session
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', maxWidth: '420px', margin: '0 auto var(--space-4)' }}>
+                You are currently exploring TrustVault in public preview mode. Sign in to your corporate identity to manage your private vault documents.
+              </p>
+              <Button 
+                variant="primary" 
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setAuthModalOpen(true);
+                }}
+              >
+                Sign In to Vault
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : activeNav === 'settings' ? (
         <div className="settings-preview-panel" style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Stage 1 Baseline)</h2>
+          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Stage 3 Baseline)</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
-            These parameters represent the planned security baseline. Active configuration mutation will be enabled in Stage 8.
+            These parameters represent the active security baseline. Active configuration mutation will be enabled in Stage 8.
           </p>
           <ul className="modal-meta-list">
             <li className="modal-meta-item">
@@ -488,6 +658,19 @@ export function App() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         initialMode={authModalMode}
+      />
+
+      {/* Stage 3 Document Upload Dialog */}
+      <UploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onUploadSuccess={(doc) => {
+          fetchVaultDocuments();
+        }}
+        onOpenAuth={() => {
+          setAuthModalMode('login');
+          setAuthModalOpen(true);
+        }}
       />
     </AppShell>
   );

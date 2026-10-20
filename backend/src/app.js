@@ -9,6 +9,7 @@ import cors from 'cors';
 import { config } from './config/env.js';
 import healthRoutes from './routes/health.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import documentRoutes from './routes/document.routes.js';
 
 export function createApp() {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp() {
   // Mount API route modules
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/documents', documentRoutes);
 
   // 404 Not Found Handler for unmatched routes
   app.use((req, res) => {

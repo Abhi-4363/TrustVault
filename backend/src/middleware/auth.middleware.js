@@ -13,6 +13,23 @@ export async function requireAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const contentType = req.headers['content-type'] || '';
+      if (contentType.includes('multipart/form-data')) {
+        req.on('data', () => {});
+        req.on('end', () => {
+          if (!res.headersSent) {
+            res.status(401).json({
+              error: {
+                code: 'UNAUTHORIZED',
+                message: 'Authentication token is required. Please include Authorization: Bearer <token>',
+              },
+            });
+          }
+        });
+        req.resume();
+        return;
+      }
+
       return res.status(401).json({
         error: {
           code: 'UNAUTHORIZED',
