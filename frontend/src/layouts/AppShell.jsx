@@ -18,6 +18,8 @@ export function AppShell({
   onProfileClick,
   onSearchFocus,
   onHelpClick,
+  onOpenLogin,
+  onOpenRegister,
 }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -38,6 +40,8 @@ export function AppShell({
           onProfileClick={onProfileClick}
           onSearchFocus={onSearchFocus}
           onHelpClick={onHelpClick}
+          onOpenLogin={onOpenLogin}
+          onOpenRegister={onOpenRegister}
         />
 
         <main className="app-content-container" id="main-content" tabIndex="-1">

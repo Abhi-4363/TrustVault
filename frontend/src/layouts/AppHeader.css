@@ -144,15 +144,26 @@
   color: var(--text-main);
 }
 
-/* Auth Placeholder */
+/* Auth & Profile Controls */
+.auth-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.profile-dropdown-container {
+  position: relative;
+}
+
 .user-profile-trigger {
   display: flex;
   align-items: center;
-  gap: var(--space-2-5, 10px);
-  padding: 4px 8px 4px 4px;
+  gap: var(--space-2);
+  padding: 4px 10px 4px 4px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-light);
   background-color: var(--bg-app);
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -165,8 +176,10 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-full);
-  background-color: var(--color-slate-800);
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-800));
   color: var(--text-inverse);
+  font-size: 11px;
+  font-weight: var(--font-bold);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,15 +193,91 @@
 
 .user-display-name {
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-semibold);
   color: var(--text-main);
   line-height: 1.2;
 }
 
-.auth-stage-tag {
-  font-size: 10px;
-  color: var(--color-primary-600);
+.user-role-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--color-primary-700);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.05em;
+}
+
+.dropdown-caret {
+  color: var(--text-muted);
+}
+
+/* Profile Dropdown Menu */
+.profile-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-2);
+  z-index: 50;
+  animation: slideUp 150ms ease-out;
+}
+
+.dropdown-user-header {
+  padding: var(--space-2) var(--space-3);
+}
+
+.dropdown-user-name {
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
+  color: var(--text-main);
+}
+
+.dropdown-user-email {
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+  margin-bottom: var(--space-1);
+}
+
+.dropdown-role-tag {
+  font-size: 10px;
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-medium);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--border-light);
+  margin: var(--space-1) 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--text-xs);
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.dropdown-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.dropdown-logout-btn {
+  color: var(--color-danger-text);
+}
+.dropdown-logout-btn:hover {
+  background-color: var(--color-danger-bg);
 }
 
 @media (max-width: 900px) {

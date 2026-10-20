@@ -1,28 +1,42 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Menu, 
   Search, 
   User, 
-  ShieldCheck, 
   ChevronRight, 
   HelpCircle,
-  Activity
+  LogOut,
+  Shield,
+  ChevronDown
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/common/Button';
 import './AppHeader.css';
 
 /**
  * AppHeader Component
  * Desktop & mobile header with breadcrumbs, search trigger,
- * live backend health status, and explicitly labelled auth placeholder.
+ * live backend health status, and active user session profile controls.
  */
 export function AppHeader({
   pageTitle = 'Overview',
   onMenuToggle,
-  onProfileClick,
   onSearchFocus,
   onHelpClick,
   backendConnected = false,
+  onOpenLogin,
+  onOpenRegister,
 }) {
+  const { user, isAuthenticated, logout } = useAuth();
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  const getInitials = (fullName) => {
+    if (!fullName) return 'U';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   return (
     <header className="app-header" aria-label="Application Header">
       <div className="header-left">
@@ -77,33 +91,71 @@ export function AppHeader({
           </span>
         </div>
 
-        {/* Stage 1 Help Documentation Link */}
+        {/* Help Documentation Link */}
         <button
           type="button"
           className="header-icon-btn"
           onClick={onHelpClick}
-          title="TrustVault Stage 1 Guide & Architecture"
-          aria-label="View Stage 1 documentation guide"
+          title="TrustVault Architecture & Guide"
+          aria-label="View documentation guide"
         >
           <HelpCircle size={18} />
         </button>
 
-        {/* Explicitly Labelled Authentication Placeholder */}
-        <button
-          type="button"
-          className="user-profile-trigger"
-          onClick={onProfileClick}
-          aria-label="User profile — Placeholder for Stage 2 Authentication"
-          title="Authentication scheduled for Stage 2"
-        >
-          <div className="user-avatar" aria-hidden="true">
-            <User size={16} />
+        {/* Active Session / Authentication Trigger */}
+        {isAuthenticated && user ? (
+          <div className="profile-dropdown-container">
+            <button
+              type="button"
+              className="user-profile-trigger"
+              onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+              aria-expanded={profileDropdownOpen}
+              aria-haspopup="true"
+              aria-label={`User menu for ${user.name}`}
+            >
+              <div className="user-avatar" aria-hidden="true">
+                {getInitials(user.name)}
+              </div>
+              <div className="user-profile-meta">
+                <span className="user-display-name">{user.name}</span>
+                <span className="user-role-badge">{user.role}</span>
+              </div>
+              <ChevronDown size={14} className="dropdown-caret" />
+            </button>
+
+            {profileDropdownOpen && (
+              <div className="profile-dropdown-menu" role="menu">
+                <div className="dropdown-user-header">
+                  <p className="dropdown-user-name">{user.name}</p>
+                  <p className="dropdown-user-email">{user.email}</p>
+                  <span className="dropdown-role-tag">Role: {user.role}</span>
+                </div>
+                <div className="dropdown-divider" />
+                <button
+                  type="button"
+                  className="dropdown-item dropdown-logout-btn"
+                  role="menuitem"
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    logout();
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>Sign out</span>
+                </button>
+              </div>
+            )}
           </div>
-          <div className="user-profile-meta">
-            <span className="user-display-name">Demo User</span>
-            <span className="auth-stage-tag">Auth: Stage 2</span>
+        ) : (
+          <div className="auth-header-actions">
+            <Button variant="ghost" size="sm" onClick={onOpenLogin}>
+              Sign in
+            </Button>
+            <Button variant="primary" size="sm" onClick={onOpenRegister}>
+              Create account
+            </Button>
           </div>
-        </button>
+        )}
       </div>
     </header>
   );

@@ -21,6 +21,7 @@ import { DocumentTable } from './components/dashboard/DocumentTable';
 import { ActivityList } from './components/dashboard/ActivityList';
 import { DemoDataBanner } from './components/demo/DemoDataBanner';
 import { Modal } from './components/common/Modal';
+import { AuthModals } from './components/auth/AuthModals';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
 import { 
@@ -34,6 +35,10 @@ export function App() {
   const [activeNav, setActiveNav] = useState('overview');
   const [backendHealth, setBackendHealth] = useState(null);
   const [backendConnected, setBackendConnected] = useState(false);
+
+  // Auth Modal State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
 
   // Modal State
   const [modalConfig, setModalConfig] = useState({
@@ -320,6 +325,14 @@ export function App() {
       onProfileClick={handleProfileClick}
       onSearchFocus={handleSearchFocus}
       onHelpClick={handleHelpClick}
+      onOpenLogin={() => {
+        setAuthModalMode('login');
+        setAuthModalOpen(true);
+      }}
+      onOpenRegister={() => {
+        setAuthModalMode('register');
+        setAuthModalOpen(true);
+      }}
     >
       {/* Explicit Demonstration Banner */}
       <DemoDataBanner
@@ -469,6 +482,13 @@ export function App() {
       >
         {modalConfig.content}
       </Modal>
+
+      {/* Authentication Dialog (Login & Registration) */}
+      <AuthModals
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
     </AppShell>
   );
 }
