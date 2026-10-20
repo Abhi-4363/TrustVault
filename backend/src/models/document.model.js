@@ -1,11 +1,50 @@
 /**
- * TrustVault Backend - Document Model
+ * TrustVault Backend - Document Model (Stage 4 Enhanced)
  * Defines Document metadata schema and resilient in-memory fallback.
- * Strictly separates metadata from physical file binary storage.
+ * Incorporates fine-grained Access Control Lists (ACLs) per document.
  */
 
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+
+// Granular ACL subdocument schema
+const aclEntrySchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.Mixed,
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+    name: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    permissionLevel: {
+      type: String,
+      enum: {
+        values: ['read', 'edit'],
+        message: 'Permission level must be read or edit',
+      },
+      required: true,
+      default: 'read',
+    },
+    grantedBy: {
+      type: mongoose.Schema.Types.Mixed,
+      required: true,
+    },
+    grantedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
 
 // Standard Mongoose Schema
 const documentSchema = new mongoose.Schema(
@@ -46,6 +85,10 @@ const documentSchema = new mongoose.Schema(
     },
     tags: {
       type: [String],
+      default: [],
+    },
+    acl: {
+      type: [aclEntrySchema],
       default: [],
     },
     readers: {
@@ -90,6 +133,7 @@ class InMemoryDocumentRepository {
       storagePath: data.storagePath,
       ownerId: data.ownerId,
       tags: Array.isArray(data.tags) ? data.tags : [],
+      acl: Array.isArray(data.acl) ? data.acl : [],
       readers: Array.isArray(data.readers) ? data.readers : [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -115,6 +159,44 @@ class InMemoryDocumentRepository {
 
   async findById(id) {
     return this.documents.get(id) || null;
+  }
+
+  async findByIdAndUpdate(id, update, options = {}) {
+    const doc = this.documents.get(id);
+    if (!doc) return null;
+
+    // Handle Mongoose-style atomic operations or plain object updates
+    if (update.$set) {
+      Object.assign(doc, update.$set);
+    }
+    if (update.$push) {
+      for (const [key, val] of Object.entries(update.$push)) {
+        if (!Array.isArray(doc[key])) doc[key] = [];
+        doc[key].push(val);
+      }
+    }
+    if (update.$pull) {
+      for (const [key, filter] of Object.entries(update.$pull)) {
+        if (Array.isArray(doc[key])) {
+          doc[key] = doc[key].filter((item) => {
+            for (const [filterKey, filterVal] of Object.entries(filter)) {
+              if (String(item[filterKey]) === String(filterVal)) return false;
+            }
+            return true;
+          });
+        }
+      }
+    }
+
+    // Direct object updates
+    for (const [key, val] of Object.entries(update)) {
+      if (!key.startsWith('$')) {
+        doc[key] = val;
+      }
+    }
+
+    doc.updatedAt = new Date();
+    return doc;
   }
 
   async findByIdAndDelete(id) {
@@ -158,6 +240,13 @@ export const Document = {
       return inMemoryDocumentStore.findById(id);
     }
     return MongooseDocumentModel.findById(id).exec();
+  },
+
+  async findByIdAndUpdate(id, update, options = { new: true }) {
+    if (!this.isMongooseActive()) {
+      return inMemoryDocumentStore.findByIdAndUpdate(id, update, options);
+    }
+    return MongooseDocumentModel.findByIdAndUpdate(id, update, options).exec();
   },
 
   async findByIdAndDelete(id) {

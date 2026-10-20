@@ -23,6 +23,7 @@ import { DemoDataBanner } from './components/demo/DemoDataBanner';
 import { Modal } from './components/common/Modal';
 import { AuthModals } from './components/auth/AuthModals';
 import { UploadModal } from './components/dashboard/UploadModal';
+import { ShareModal } from './components/dashboard/ShareModal';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
 import { 
@@ -41,10 +42,11 @@ export function App() {
   // Authentication Context
   const { user, token, logout } = useAuth();
 
-  // Auth & Upload Modals
+  // Auth, Upload & Share Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [shareModalConfig, setShareModalConfig] = useState({ isOpen: false, document: null });
 
   // Private Vault Documents
   const [vaultDocuments, setVaultDocuments] = useState([]);
@@ -242,40 +244,12 @@ export function App() {
         return;
       }
     } else if (action === 'share') {
-      openModal({
-        title: `Manage Permissions: ${doc.name}`,
-        subtitle: 'Access Control Lists & Granular Sharing',
-        badge: 'Scheduled for Stage 4 & 5',
-        content: (
-          <div>
-            <p>
-              Permission assignment and immediate revocation will be implemented in <strong>Stage 4 & 5</strong>.
-            </p>
-            <div className="modal-notice-box">
-              <h4>Target Authorization Architecture</h4>
-              <p>
-                • Grant <strong>Can Read</strong> or <strong>Can Edit</strong> rights to specific named users.<br />
-                • Immediately revoke access: authorization is re-checked on every single byte stream request without token caching lag.<br />
-                • Automatically record all permission changes in the immutable audit log.
-              </p>
-            </div>
-            <ul className="modal-meta-list">
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Selected Document:</span>
-                <span className="modal-meta-val">{doc.name}</span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Current Owner:</span>
-                <span className="modal-meta-val">{doc.owner.name}</span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Effective Permission:</span>
-                <span className="modal-meta-val">{doc.accessLevel}</span>
-              </li>
-            </ul>
-          </div>
-        ),
-      });
+      if (!user) {
+        setAuthModalMode('login');
+        setAuthModalOpen(true);
+        return;
+      }
+      setShareModalConfig({ isOpen: true, document: doc });
     } else if (action === 'details') {
       openModal({
         title: `Security Metadata: ${doc.name}`,
@@ -671,6 +645,14 @@ export function App() {
           setAuthModalMode('login');
           setAuthModalOpen(true);
         }}
+      />
+
+      {/* Stage 4 Per-Document Access Sharing Dialog */}
+      <ShareModal
+        isOpen={shareModalConfig.isOpen}
+        onClose={() => setShareModalConfig({ isOpen: false, document: null })}
+        document={shareModalConfig.document}
+        onPermissionsUpdated={fetchVaultDocuments}
       />
     </AppShell>
   );

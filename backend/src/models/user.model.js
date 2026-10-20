@@ -127,6 +127,15 @@ class InMemoryUserRepository {
   async findById(id) {
     return this.findOne({ _id: id });
   }
+
+  async find(query = {}) {
+    let list = Array.from(this.users.values());
+    if (query.$or) {
+      // Basic search support
+      return list;
+    }
+    return list;
+  }
 }
 
 export const inMemoryUserStore = new InMemoryUserRepository();
@@ -157,6 +166,17 @@ export const User = {
 
     await user.save();
     return user;
+  },
+
+  async find(query = {}, selectFields = '-passwordHash') {
+    if (!this.isMongooseActive()) {
+      return inMemoryUserStore.find(query);
+    }
+    let q = MongooseUserModel.find(query);
+    if (selectFields) {
+      q = q.select(selectFields);
+    }
+    return q.exec();
   },
 
   async findOne(query, selectFields) {
