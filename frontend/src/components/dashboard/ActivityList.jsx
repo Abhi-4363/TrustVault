@@ -31,7 +31,7 @@ function getActivityIcon(type) {
  * ActivityList Component
  * Displays a chronological demonstration audit trail with clear plain-English wording.
  */
-export function ActivityList({ activities = [], onViewAllClick }) {
+export function ActivityList({ activities = [], onViewAllClick, isLive = false }) {
   return (
     <div className="activity-panel">
       <div className="activity-panel-header">
@@ -39,8 +39,11 @@ export function ActivityList({ activities = [], onViewAllClick }) {
           <ShieldCheck size={16} className="audit-shield-icon" aria-hidden="true" />
           <h2 className="activity-title">Recent security activity</h2>
         </div>
-        <span className="demo-indicator-pill" title="Simulated audit events for Stage 1">
-          Demo trail
+        <span 
+          className={`demo-indicator-pill ${isLive ? 'live-ledger-pill' : ''}`} 
+          title={isLive ? 'Immutable append-only audit trail' : 'Simulated audit events'}
+        >
+          {isLive ? 'Live Ledger' : 'Demo trail'}
         </span>
       </div>
 

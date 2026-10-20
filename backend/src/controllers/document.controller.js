@@ -1,13 +1,20 @@
 /**
- * TrustVault Backend - Document Controller (Stage 4 Enhanced)
+ * TrustVault Backend - Document Controller (Stage 5 & 6 Enhanced)
  * Handles document ingestion, metadata indexing, secure streaming download,
- * lifecycle management, and fine-grained Per-Document Read and Edit Permissions.
+ * lifecycle management, fine-grained ACL permissions, immediate revocation engine,
+ * and immutable append-only audit trail event tracking.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { Document } from '../models/document.model.js';
 import { User } from '../models/user.model.js';
+import { AuditLog } from '../models/audit.model.js';
+import { logAuditEvent } from '../services/audit.service.js';
+import {
+  registerImmediateRevocation,
+  isAccessImmediatelyRevoked,
+} from '../services/revocation.service.js';
 
 /**
  * Sanitises document object for client responses, stripping internal server storage paths
@@ -100,7 +107,6 @@ export async function uploadDocument(req, res) {
     const title = (req.body.title || req.file.originalname).trim();
     const description = (req.body.description || '').trim();
 
-    // Parse optional tags (array or comma-delimited string)
     let tags = [];
     if (req.body.tags) {
       if (Array.isArray(req.body.tags)) {
@@ -131,6 +137,18 @@ export async function uploadDocument(req, res) {
     };
 
     const createdDoc = await Document.create(documentData);
+
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_UPLOAD',
+      documentId: createdDoc._id,
+      documentTitle: createdDoc.title,
+      metadata: {
+        fileSize: createdDoc.fileSize,
+        mimeType: createdDoc.mimeType,
+      },
+    });
 
     return res.status(201).json({
       message: 'Document uploaded and metadata indexed securely.',
@@ -213,7 +231,10 @@ export async function getDocumentById(req, res) {
       });
     }
 
-    if (!canReadDocument(doc, req.user)) {
+    const userId = String(req.user.id || req.user._id);
+
+    // Stage 5 check: immediate revocation validation
+    if (isAccessImmediatelyRevoked(id, userId) || !canReadDocument(doc, req.user)) {
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -222,9 +243,7 @@ export async function getDocumentById(req, res) {
       });
     }
 
-    const userId = String(req.user.id || req.user._id);
     const ownerId = String(doc.ownerId);
-
     let accessLevel = 'Reader';
     if (userId === ownerId) {
       accessLevel = 'Owner';
@@ -234,6 +253,14 @@ export async function getDocumentById(req, res) {
       const entry = doc.acl.find((a) => String(a.userId) === userId);
       if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
     }
+
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_READ',
+      documentId: doc._id,
+      documentTitle: doc.title,
+    });
 
     return res.status(200).json({
       document: {
@@ -270,7 +297,10 @@ export async function updateDocument(req, res) {
       });
     }
 
-    if (!canEditDocument(doc, req.user)) {
+    const userId = String(req.user.id || req.user._id);
+
+    // Stage 5 check: immediate revocation validation
+    if (isAccessImmediatelyRevoked(id, userId) || !canEditDocument(doc, req.user)) {
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -290,6 +320,15 @@ export async function updateDocument(req, res) {
 
     const updatedDoc = await Document.findByIdAndUpdate(id, updates, { new: true });
 
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_UPDATED',
+      documentId: id,
+      documentTitle: updatedDoc.title,
+      metadata: { updatedFields: Object.keys(updates) },
+    });
+
     return res.status(200).json({
       message: 'Document metadata successfully updated.',
       document: sanitizeDocument(updatedDoc),
@@ -308,6 +347,7 @@ export async function updateDocument(req, res) {
 /**
  * GET /api/documents/:id/download
  * Securely streams the private document binary with forced attachment headers
+ * Direct-to-database live permission checks enforcing zero-lag immediate revocation.
  */
 export async function downloadDocument(req, res) {
   try {
@@ -323,11 +363,14 @@ export async function downloadDocument(req, res) {
       });
     }
 
-    if (!canReadDocument(doc, req.user)) {
+    const userId = String(req.user.id || req.user._id);
+
+    // Stage 5: Immediate revocation engine validation
+    if (isAccessImmediatelyRevoked(id, userId) || !canReadDocument(doc, req.user)) {
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
-          message: 'You do not have permission to download this document.',
+          message: 'Access to download this document has been revoked or denied.',
         },
       });
     }
@@ -340,6 +383,15 @@ export async function downloadDocument(req, res) {
         },
       });
     }
+
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_DOWNLOAD',
+      documentId: doc._id,
+      documentTitle: doc.title,
+      metadata: { fileSize: doc.fileSize },
+    });
 
     const safeFilename = path.basename(doc.originalName).replace(/"/g, '');
     res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
@@ -400,6 +452,14 @@ export async function deleteDocument(req, res) {
         },
       });
     }
+
+    // Audit log recording (Stage 6) before deletion
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_DELETED',
+      documentId: doc._id,
+      documentTitle: doc.title,
+    });
 
     await Document.findByIdAndDelete(id);
 
@@ -497,7 +557,6 @@ export async function grantDocumentPermission(req, res) {
       });
     }
 
-    // Only owner or admin can grant permissions
     if (!canManageDocument(doc, req.user)) {
       return res.status(403).json({
         error: {
@@ -507,7 +566,6 @@ export async function grantDocumentPermission(req, res) {
       });
     }
 
-    // Resolve target user
     let targetUser = null;
     if (email) {
       targetUser = await User.findOne({ email: email.toLowerCase().trim() });
@@ -536,10 +594,8 @@ export async function grantDocumentPermission(req, res) {
       });
     }
 
-    // Update existing ACL entry or insert new entry
     let currentAcl = Array.isArray(doc.acl) ? [...doc.acl] : [];
     const existingIndex = currentAcl.findIndex((entry) => String(entry.userId) === targetUserId);
-
     const callerId = String(req.user.id || req.user._id);
 
     if (existingIndex >= 0) {
@@ -557,7 +613,6 @@ export async function grantDocumentPermission(req, res) {
       });
     }
 
-    // Also update readers array for fallback
     let currentReaders = Array.isArray(doc.readers) ? [...doc.readers] : [];
     if (!currentReaders.some((r) => String(r) === targetUserId)) {
       currentReaders.push(targetUserId);
@@ -568,6 +623,19 @@ export async function grantDocumentPermission(req, res) {
       { acl: currentAcl, readers: currentReaders },
       { new: true }
     );
+
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'PERMISSION_GRANTED',
+      documentId: doc._id,
+      documentTitle: doc.title,
+      metadata: {
+        targetUserId,
+        targetEmail: targetUser.email,
+        permissionLevel,
+      },
+    });
 
     return res.status(200).json({
       message: `Successfully granted '${permissionLevel}' access to ${targetUser.email}.`,
@@ -586,7 +654,7 @@ export async function grantDocumentPermission(req, res) {
 
 /**
  * DELETE /api/documents/:id/permissions/:targetUserId
- * Immediately revokes document access from a designated user
+ * Immediately revokes document access from a designated user (Stage 5 Revocation Engine)
  */
 export async function revokeDocumentPermission(req, res) {
   try {
@@ -611,7 +679,9 @@ export async function revokeDocumentPermission(req, res) {
       });
     }
 
-    // Filter target user out of ACL and readers
+    // Stage 5: Register immediate revocation marker
+    registerImmediateRevocation(id, targetUserId);
+
     const updatedAcl = (doc.acl || []).filter((entry) => String(entry.userId) !== String(targetUserId));
     const updatedReaders = (doc.readers || []).filter((r) => String(r) !== String(targetUserId));
 
@@ -620,6 +690,15 @@ export async function revokeDocumentPermission(req, res) {
       { acl: updatedAcl, readers: updatedReaders },
       { new: true }
     );
+
+    // Audit log recording (Stage 6)
+    await logAuditEvent({
+      req,
+      action: 'PERMISSION_REVOKED',
+      documentId: doc._id,
+      documentTitle: doc.title,
+      metadata: { targetUserId },
+    });
 
     return res.status(200).json({
       message: 'Document access permission immediately revoked.',
@@ -637,6 +716,86 @@ export async function revokeDocumentPermission(req, res) {
 }
 
 /**
+ * GET /api/documents/:id/audit
+ * Retrieves immutable audit history for a single document (Owner or Admin only)
+ */
+export async function getDocumentAuditTrail(req, res) {
+  try {
+    const { id } = req.params;
+    const doc = await Document.findById(id);
+
+    if (!doc) {
+      return res.status(404).json({
+        error: {
+          code: 'DOCUMENT_NOT_FOUND',
+          message: 'Requested document does not exist.',
+        },
+      });
+    }
+
+    if (!canManageDocument(doc, req.user)) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only the document owner or an administrator can inspect the document audit trail.',
+        },
+      });
+    }
+
+    const logs = await AuditLog.find({ targetDocumentId: id });
+
+    return res.status(200).json({
+      documentId: id,
+      documentTitle: doc.title,
+      auditLogs: logs,
+    });
+  } catch (error) {
+    console.error('[Document Audit Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'AUDIT_FETCH_ERROR',
+        message: 'Failed to retrieve document audit trail.',
+      },
+    });
+  }
+}
+
+/**
+ * GET /api/documents/audit/activity
+ * Lists recent activity logs across the vault
+ */
+export async function getRecentAuditActivity(req, res) {
+  try {
+    let logs = [];
+    if (req.user.role === 'admin') {
+      logs = await AuditLog.find();
+    } else {
+      // Return logs involving the user as actor or documents owned by the user
+      const userDocs = await Document.find({ ownerId: req.user.id || req.user._id });
+      const docIds = new Set(userDocs.map((d) => String(d._id)));
+      const allLogs = await AuditLog.find();
+      logs = allLogs.filter(
+        (l) =>
+          String(l.actorId) === String(req.user.id || req.user._id) ||
+          docIds.has(String(l.targetDocumentId))
+      );
+    }
+
+    return res.status(200).json({
+      activities: logs.slice(0, 50),
+    });
+  } catch (error) {
+    console.error('[Audit Activity Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'AUDIT_ACTIVITY_ERROR',
+        message: 'Failed to retrieve audit activity.',
+      },
+    });
+  }
+}
+
+/**
  * GET /api/documents/users/directory
  * Lists organization team members for collaborator selection in sharing dialogs
  */
@@ -645,7 +804,6 @@ export async function getDirectoryUsers(req, res) {
     const currentUserId = String(req.user.id || req.user._id);
     const users = await User.find({}, 'name email role');
 
-    // Return users excluding current requester
     const directory = users
       .filter((u) => String(u._id || u.id) !== currentUserId)
       .map((u) => ({

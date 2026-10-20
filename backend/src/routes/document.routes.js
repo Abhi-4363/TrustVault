@@ -1,7 +1,7 @@
 /**
- * TrustVault Backend - Document Routes (Stage 4 Enhanced)
+ * TrustVault Backend - Document Routes (Stage 5 & 6 Enhanced)
  * Provides authenticated routes for ingestion, listing, streaming download,
- * metadata editing, and granular ACL permission sharing/revocation.
+ * metadata editing, ACL permissions, and immutable audit trail inspection.
  */
 
 import { Router } from 'express';
@@ -18,6 +18,8 @@ import {
   grantDocumentPermission,
   revokeDocumentPermission,
   getDirectoryUsers,
+  getDocumentAuditTrail,
+  getRecentAuditActivity,
 } from '../controllers/document.controller.js';
 
 const router = Router();
@@ -30,6 +32,9 @@ router.get('/', requireAuth, listDocuments);
 
 // User directory lookup for collaborator selection (placed before /:id)
 router.get('/users/directory', requireAuth, getDirectoryUsers);
+
+// Recent activity audit logs across documents (placed before /:id)
+router.get('/audit/activity', requireAuth, getRecentAuditActivity);
 
 // Retrieve document metadata
 router.get('/:id', requireAuth, getDocumentById);
@@ -51,5 +56,8 @@ router.post('/:id/permissions', requireAuth, grantDocumentPermission);
 
 // Revoke access permission (Requires Ownership or Admin)
 router.delete('/:id/permissions/:targetUserId', requireAuth, revokeDocumentPermission);
+
+// Retrieve immutable audit trail for a specific document (Owner or Admin only)
+router.get('/:id/audit', requireAuth, getDocumentAuditTrail);
 
 export default router;

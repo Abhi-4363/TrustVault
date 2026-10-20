@@ -50,6 +50,7 @@ export function App() {
 
   // Private Vault Documents
   const [vaultDocuments, setVaultDocuments] = useState([]);
+  const [liveActivities, setLiveActivities] = useState([]);
 
   // Modal State
   const [modalConfig, setModalConfig] = useState({
@@ -127,6 +128,68 @@ export function App() {
     }
   };
 
+  // Fetch real immutable audit activity records (Stage 6)
+  const fetchLiveActivities = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('http://localhost:5000/api/documents/audit/activity', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = (data.activities || []).map((log) => {
+          let type = 'clock';
+          let badgeVariant = 'primary';
+          let actionText = 'accessed';
+
+          switch (log.action) {
+            case 'DOCUMENT_UPLOAD':
+              type = 'upload';
+              badgeVariant = 'primary';
+              actionText = 'quarantined & uploaded';
+              break;
+            case 'DOCUMENT_DOWNLOAD':
+              type = 'update';
+              badgeVariant = 'success';
+              actionText = 'streamed download of';
+              break;
+            case 'PERMISSION_GRANTED':
+              type = 'grant';
+              badgeVariant = 'warning';
+              actionText = 'granted permissions for';
+              break;
+            case 'PERMISSION_REVOKED':
+              type = 'revoke';
+              badgeVariant = 'danger';
+              actionText = 'immediately revoked access to';
+              break;
+            case 'DOCUMENT_DELETED':
+              type = 'revoke';
+              badgeVariant = 'danger';
+              actionText = 'permanently purged';
+              break;
+            default:
+              actionText = 'inspected';
+          }
+
+          return {
+            id: log._id,
+            type,
+            badgeVariant,
+            actor: { name: log.actorName || log.actorEmail },
+            actionText,
+            documentName: log.targetDocumentTitle || 'Confidential File',
+            formattedDate: new Date(log.timestamp).toLocaleString(),
+            timestamp: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+        });
+        setLiveActivities(formatted);
+      }
+    } catch (err) {
+      console.error('[Activity Fetch Error]', err);
+    }
+  };
+
   useEffect(() => {
     checkBackendHealth();
   }, []);
@@ -134,8 +197,10 @@ export function App() {
   useEffect(() => {
     if (token) {
       fetchVaultDocuments();
+      fetchLiveActivities();
     } else {
       setVaultDocuments([]);
+      setLiveActivities([]);
     }
   }, [token]);
 
@@ -251,10 +316,73 @@ export function App() {
       }
       setShareModalConfig({ isOpen: true, document: doc });
     } else if (action === 'details') {
+      if (doc.isReal) {
+        // Fetch real immutable audit trail for this document
+        fetch(`http://localhost:5000/api/documents/${doc.id}/audit`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            const logs = data.auditLogs || [];
+            openModal({
+              title: `Security Metadata: ${doc.name}`,
+              subtitle: 'File integrity and tamper-resistant audit ledger',
+              badge: 'Stage 6 Audit Trail',
+              content: (
+                <div>
+                  <ul className="modal-meta-list" style={{ marginBottom: 'var(--space-4)' }}>
+                    <li className="modal-meta-item">
+                      <span className="modal-meta-label">Document ID:</span>
+                      <span className="modal-meta-val"><code>{doc.id}</code></span>
+                    </li>
+                    <li className="modal-meta-item">
+                      <span className="modal-meta-label">File Format:</span>
+                      <span className="modal-meta-val">{doc.fileType} ({doc.fileSize})</span>
+                    </li>
+                    <li className="modal-meta-item">
+                      <span className="modal-meta-label">Storage Location:</span>
+                      <span className="modal-meta-val">Isolated Private Storage (Non-web root)</span>
+                    </li>
+                    <li className="modal-meta-item">
+                      <span className="modal-meta-label">Current Owner:</span>
+                      <span className="modal-meta-val">{doc.owner.name} ({doc.owner.email})</span>
+                    </li>
+                  </ul>
+
+                  <h4 style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
+                    Immutable Audit Trail ({logs.length} events)
+                  </h4>
+                  {logs.length === 0 ? (
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>No audit events logged yet.</p>
+                  ) : (
+                    <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2)' }}>
+                      {logs.map((log) => (
+                        <div key={log._id} style={{ fontSize: '11px', padding: '4px 0', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span><strong>{log.action}</strong> by {log.actorEmail}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ),
+            });
+          })
+          .catch(() => {
+            openModal({
+              title: `Security Metadata: ${doc.name}`,
+              subtitle: 'Private storage metadata',
+              badge: 'Persisted Vault Record',
+              content: <p>Document ID: {doc.id}</p>,
+            });
+          });
+        return;
+      }
+
       openModal({
         title: `Security Metadata: ${doc.name}`,
         subtitle: 'File integrity and classification details',
-        badge: doc.isReal ? 'Persisted Vault Record' : 'Demo Record',
+        badge: 'Demo Record',
         content: (
           <div>
             <ul className="modal-meta-list">
@@ -268,7 +396,7 @@ export function App() {
               </li>
               <li className="modal-meta-item">
                 <span className="modal-meta-label">Storage Location:</span>
-                <span className="modal-meta-val">{doc.isReal ? 'Isolated Private Storage (Non-web root)' : 'Demo Storage Model'}</span>
+                <span className="modal-meta-val">Demo Storage Model</span>
               </li>
               <li className="modal-meta-item">
                 <span className="modal-meta-label">Created By:</span>
@@ -581,12 +709,13 @@ export function App() {
       ) : activeNav === 'activity' ? (
         <div style={{ maxWidth: '800px' }}>
           <ActivityList
-            activities={DEMO_ACTIVITIES}
+            activities={liveActivities.length > 0 ? liveActivities : DEMO_ACTIVITIES}
+            isLive={liveActivities.length > 0}
             onViewAllClick={() => openModal({
               title: 'Complete Audit Log Stream',
               subtitle: 'System-wide compliance audit records',
-              badge: 'Scheduled for Stage 6 & 8',
-              content: <p>Comprehensive audit stream filtering by actor, IP address, and date range is scheduled for Stages 6 & 8.</p>
+              badge: 'Stage 6 Immutable Ledger',
+              content: <p>All document uploads, reads, downloads, permission grants, and revocations are permanently logged with actor ID and IP.</p>
             })}
           />
         </div>
@@ -601,12 +730,13 @@ export function App() {
 
           <aside className="activity-column" aria-label="Security Audit Trail">
             <ActivityList
-              activities={DEMO_ACTIVITIES}
+              activities={liveActivities.length > 0 ? liveActivities : DEMO_ACTIVITIES}
+              isLive={liveActivities.length > 0}
               onViewAllClick={() => openModal({
                 title: 'Audit Trail Explorer',
                 subtitle: 'Full activity and compliance ledger',
-                badge: 'Scheduled for Stage 6',
-                content: <p>Complete audit ledger export (JSON/CSV) and filter by document ID will be available in Stage 6.</p>
+                badge: 'Stage 6 Immutable Ledger',
+                content: <p>All document lifecycle events are cryptographically captured in the append-only ledger.</p>
               })}
             />
           </aside>
@@ -640,6 +770,7 @@ export function App() {
         onClose={() => setUploadModalOpen(false)}
         onUploadSuccess={(doc) => {
           fetchVaultDocuments();
+          fetchLiveActivities();
         }}
         onOpenAuth={() => {
           setAuthModalMode('login');
@@ -652,7 +783,10 @@ export function App() {
         isOpen={shareModalConfig.isOpen}
         onClose={() => setShareModalConfig({ isOpen: false, document: null })}
         document={shareModalConfig.document}
-        onPermissionsUpdated={fetchVaultDocuments}
+        onPermissionsUpdated={() => {
+          fetchVaultDocuments();
+          fetchLiveActivities();
+        }}
       />
     </AppShell>
   );

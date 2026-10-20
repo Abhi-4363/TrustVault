@@ -45,6 +45,12 @@
   letter-spacing: 0.04em;
 }
 
+.demo-indicator-pill.live-ledger-pill {
+  color: var(--color-success-text);
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+}
+
 .activity-panel-body {
   padding: var(--space-4) var(--space-5);
 }
