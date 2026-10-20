@@ -54,19 +54,55 @@ Accept: application/json
 }
 ```
 
+### 2.2 User Registration
+Registers a new member account with bcrypt-hashed credentials (minimum 12 salt rounds) and issues an initial JWT token.
+- **Endpoint**: `POST /api/auth/register`
+- **Authentication**: None (Public)
+- **THREAT-06 Defense**: Client-supplied `role` parameter is overridden to `'member'`.
+- **Request Body**:
+```json
+{
+  "name": "Sarah Jenkins",
+  "email": "sarah.j@acmecorp.internal",
+  "password": "SecurePassword123"
+}
+```
+- **Response (201 Created)**:
+```json
+{
+  "status": "success",
+  "message": "User account created successfully.",
+  "data": {
+    "user": {
+      "_id": "6714c3e8a1...",
+      "name": "Sarah Jenkins",
+      "email": "sarah.j@acmecorp.internal",
+      "role": "member",
+      "createdAt": "2026-10-20T06:53:38.645Z",
+      "updatedAt": "2026-10-20T06:53:38.645Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI..."
+  }
+}
+```
+
+### 2.3 User Login
+Authenticates user credentials, prevents user enumeration, and issues a fresh JWT.
+- **Endpoint**: `POST /api/auth/login`
+- **Authentication**: None (Public)
+- **Response (200 OK)**: Returns `{ status: "success", data: { user, token } }`.
+
+### 2.4 Authenticated Profile
+Fetches the currently authenticated user's profile.
+- **Endpoint**: `GET /api/auth/me`
+- **Authentication**: Required (`Authorization: Bearer <token>`)
+- **Response (200 OK)**: Returns `{ status: "success", data: { user } }`.
+
 ---
 
 ## 3. Reserved Endpoints (Planned for Future Stages)
 
-### 3.1 Authentication & Identity (Stage 2)
-| Method | Endpoint | Description | Auth Required | Expected Status |
-| :--- | :--- | :--- | :---: | :---: |
-| `POST` | `/api/auth/register` | Register a new user account | No | `201 Created` |
-| `POST` | `/api/auth/login` | Authenticate user credentials and issue JWT | No | `200 OK` |
-| `GET` | `/api/auth/me` | Fetch currently authenticated user profile | Yes (Bearer) | `200 OK` |
-| `POST` | `/api/auth/logout` | Invalidate refresh token / session | Yes (Bearer) | `200 OK` |
-
-### 3.2 Document Management & Storage (Stage 3 & 4)
+### 3.1 Document Management & Storage (Stage 3 & 4)
 | Method | Endpoint | Description | Auth Required | Expected Status |
 | :--- | :--- | :--- | :---: | :---: |
 | `POST` | `/api/documents/upload` | Upload binary document and metadata | Yes (Bearer) | `201 Created` |

@@ -131,7 +131,50 @@ This document records the exact progression of development prompts, implementati
   - Adjusted table column padding to optimize horizontal spacing across standard desktop viewports.
 
 - **Real Git Commit Reference**:
-  - Commit Hash: `00202e3`
+  - Commit Hash: `cb4d677`
   - Commit Message: `feat: create responsive dashboard UI and design token foundation`
+
+---
+
+## Prompt Entry 4: User Model, Bcrypt Hashing & Authentication Endpoints
+
+- **Date**: October 20, 2026
+- **Stage**: Stage 2 (Authentication & Role Model - Checkpoint 1)
+- **Task Requested**:
+  - Create the User model with Mongoose schema, role validation (`admin`, `manager`, `member`), and bcrypt password hashing (minimum 12 salt rounds in non-test environments).
+  - Implement resilient database connection handling supporting MongoDB Atlas connection strings with fallback to an in-memory User repository for offline development and testing.
+  - Implement cryptographic JWT utilities (`generateToken`, `verifyToken`).
+  - Implement `requireAuth` and `requireRole` middleware.
+  - Implement authentication endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`.
+  - Enforce mitigation for **THREAT-06 (Privilege Escalation)** by disallowing client-supplied roles on registration.
+  - Build automated Vitest test suite (`backend/tests/auth.test.js`) and update `THREATS.md` and `docs/API_DOCUMENTATION.md`.
+
+- **What the AI Actually Implemented**:
+  1. Installed `mongoose`, `bcryptjs`, and `jsonwebtoken` in `backend/package.json`.
+  2. Updated `backend/src/config/database.js` to connect to MongoDB Atlas via Mongoose with credential redaction and resilient fallback.
+  3. Created `backend/src/models/user.model.js` implementing schema validation, bcrypt hashing, JSON sanitisation (stripping `passwordHash`), and universal adapter.
+  4. Created `backend/src/utils/token.js` for JWT signing and verification.
+  5. Created `backend/src/middleware/auth.middleware.js` with `requireAuth` and `requireRole`.
+  6. Implemented `backend/src/controllers/auth.controller.js` for `register`, `login`, and `getMe`.
+  7. Mounted auth routes on `/api/auth` in `backend/src/app.js`.
+  8. Created `backend/tests/auth.test.js` covering 11 automated test cases.
+  9. Executed test suite: all 14 tests across health and auth passed in 1.49s.
+  10. Tested live execution: `POST /api/auth/register` returned `201 Created` with sanitized user and JWT; `POST /api/auth/login` returned `200 OK`.
+  11. Updated `THREATS.md` marking **THREAT-06** as `Verified`.
+  12. Updated `docs/API_DOCUMENTATION.md` with active auth route specifications.
+
+- **What the User Reviewed**:
+  - Inspected Stage 2 Checkpoint 1 backend authentication implementation, bcrypt password hashing, 14/14 passing tests, live registration/login queries, and THREAT-06 verification. Approved checkpoint for commit and push.
+
+- **Problems Actually Discovered**:
+  - Initial test run timed out because Mongoose buffering waited when disconnected without calling `connectDatabase()`. Resolved by dispatching based on active connection state (`readyState === 1`) and using test-optimized salt rounds.
+
+- **Corrections Actually Made**:
+  - Added connection state dispatch in User model adapter and killed stale background process from Stage 1 to bind updated auth routes.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `48b1590`
+  - Commit Message: `feat: implement User model, bcrypt hashing, and authentication endpoints`
+
 
 

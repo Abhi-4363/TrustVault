@@ -17,6 +17,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/trustvault_dev',
+  jwtSecret: process.env.JWT_SECRET || 'trustvault_dev_fallback_secret_min32chars',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   isProduction: process.env.NODE_ENV === 'production',
   isTest: process.env.NODE_ENV === 'test',
 };
