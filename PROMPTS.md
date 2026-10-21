@@ -176,5 +176,50 @@ This document records the exact progression of development prompts, implementati
   - Commit Hash: `48b1590`
   - Commit Message: `feat: implement User model, bcrypt hashing, and authentication endpoints`
 
+---
+
+## Prompt Entry 5: Stages 7–10 Implementation, Automated Security Verification & Role Alignment
+
+- **Date**: October 21, 2026
+- **Stage**: Stages 7–10 & Role Taxonomy Alignment
+- **Task Requested**:
+  - Review the generated TrustVault project against original requirements: align role terminology with Admin, Document Owner, and Viewer.
+  - Complete Stage 7 (Scoped Search, Magic Number validation, XSS sanitization).
+  - Complete Stage 8 (Administrator Governance Dashboard, Analytics, Audit Log Explorer & Exporter, User Management).
+  - Complete Stage 9 (Automated Security Threat Model Tests for all 12 entries in `THREATS.md`).
+  - Complete Stage 10 (Production hardening, rate limiting, seed personas, documentation).
+  - Ensure Document Owners can manage their files and grant/revoke ACLs, while unauthorized users remain blocked.
+  - Restrict Viewers from uploading documents (403 Forbidden).
+  - Update all related test suites and documentation.
+  - Commit and push to GitHub.
+
+- **What the AI Actually Implemented**:
+  1. Implemented Stage 7: Magic-number inspection (`fileSignature.middleware.js`), input sanitization (`sanitization.middleware.js`), scoped vault search without metadata leaks.
+  2. Implemented Stage 8: Admin controller (`admin.controller.js`), routes (`admin.routes.js`), and frontend dashboard (`AdminDashboard.jsx`, `AdminDashboard.css`) with un-truncated CSV/JSON export and user account deactivation.
+  3. Implemented Stage 9: Complete security integration test suite (`security-integration.test.js`) verifying all 12 threats in `THREATS.md`.
+  4. Implemented Stage 10: Security middleware (`security.middleware.js`) with defensive headers and sliding-window rate limiting; idempotent database seed script (`seed.js`) with corporate personas.
+  5. Aligned role taxonomy across database models (`user.model.js`, `document.model.js`), controllers, frontend UI badges/tables/modals, test suites, and documentation (`README.md`, `THREATS.md`, `API_DOCUMENTATION.md`).
+  6. Enforced `canManageDocument` strictly requiring file ownership or admin privileges.
+  7. Blocked `viewer` role from uploading documents with `403 Forbidden`.
+  8. Verified all 100 automated integration tests pass across 9 test suites in Vitest.
+  9. Verified production frontend build passes cleanly in 2.90s.
+  10. Staged, committed, and pushed to `main`.
+
+- **What the User Reviewed**:
+  - Inspected proposed changes and role alignment findings, approved implementation, and authorized git commit and push.
+
+- **Problems Actually Discovered**:
+  - Tests initially expected legacy `'member'` role string; updated assertions to expect `'owner'` for Document Owners.
+  - Discovered `sampleFilePath` was scoped locally inside `beforeEach` in `security-integration.test.js`; created isolated test buffer for viewer upload rejection test.
+
+- **Corrections Actually Made**:
+  - Updated test expectations in `auth.test.js`, `admin-governance.test.js`, and `security-integration.test.js`.
+  - Added dedicated test asserting Viewers are blocked from uploading with 403 Forbidden.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `4017daa`
+  - Commit Message: `feat: complete stages 7-10 and align role taxonomy to Admin, Document Owner, and Viewer`
+
+
 
 
