@@ -43,6 +43,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
   const [usersList, setUsersList] = useState([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [deactivatingUserId, setDeactivatingUserId] = useState(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState(null);
 
   const isAdmin = user && user.role === 'admin';
 
@@ -185,12 +186,13 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
   // Toggle user activation state
   const handleToggleUserStatus = async (targetUser) => {
     if (!token) return;
+    const targetId = targetUser.id || targetUser._id;
     const isDeactivating = targetUser.isActive;
     const endpoint = isDeactivating
-      ? `http://localhost:5000/api/admin/users/${targetUser.id}/deactivate`
-      : `http://localhost:5000/api/admin/users/${targetUser.id}/reactivate`;
+      ? `http://localhost:5000/api/admin/users/${targetId}/deactivate`
+      : `http://localhost:5000/api/admin/users/${targetId}/reactivate`;
 
-    setDeactivatingUserId(targetUser.id);
+    setDeactivatingUserId(targetId);
     try {
       const res = await fetch(endpoint, {
         method: 'PATCH',
@@ -210,6 +212,33 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
       setErrorMsg('Network error executing user status change.');
     } finally {
       setDeactivatingUserId(null);
+    }
+  };
+
+  // Update user role (Viewer, Document Owner, Administrator)
+  const handleUpdateUserRole = async (targetUserId, newRole) => {
+    if (!token) return;
+    setUpdatingRoleId(targetUserId);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/users/${targetUserId}/role`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `User role updated to ${newRole}.`);
+        fetchUsers();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to update user role.');
+      }
+    } catch {
+      setErrorMsg('Network error executing user role update.');
+    } finally {
+      setUpdatingRoleId(null);
     }
   };
 
@@ -678,37 +707,55 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
             <table className="admin-data-table" aria-label="User Governance Directory Table">
               <thead>
                 <tr>
-                  <th>Identity</th>
-                  <th>Enterprise Role</th>
-                  <th>Status</th>
-                  <th>Docs Owned</th>
-                  <th>Joined Date</th>
-                  <th>Access Governance</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Current Role</th>
+                  <th>Account Status</th>
+                  <th>Registration Date</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((targetUser) => {
-                    const isSelf = user && targetUser.id === user.id;
+                    const targetId = targetUser.id || targetUser._id;
+                    const isSelf = user && (String(targetId) === String(user.id || user._id) || targetUser.email === user.email);
                     const isActive = targetUser.isActive !== false;
 
+                    const r = targetUser.role || 'owner';
+                    const label = r === 'admin' ? 'Admin' : (r === 'viewer' || r === 'member') ? 'Viewer' : 'Document Owner';
+                    const roleClass = r === 'admin' ? 'role-admin' : (r === 'viewer' || r === 'member') ? 'role-viewer' : 'role-owner';
+
                     return (
-                      <tr key={targetUser.id}>
+                      <tr key={targetId}>
                         <td>
-                          <div className="actor-primary">{targetUser.name}</div>
+                          <div className="actor-primary"><strong>{targetUser.name}</strong></div>
+                        </td>
+                        <td>
                           <div className="actor-secondary"><code>{targetUser.email}</code></div>
                         </td>
                         <td>
-                          {(() => {
-                            const r = targetUser.role || 'owner';
-                            const label = r === 'admin' ? 'Admin' : (r === 'viewer' || r === 'member') ? 'Viewer' : 'Document Owner';
-                            const roleClass = r === 'admin' ? 'role-admin' : (r === 'viewer' || r === 'member') ? 'role-viewer' : 'role-owner';
-                            return (
-                              <span className={`user-role-pill ${roleClass}`}>
-                                {label}
-                              </span>
-                            );
-                          })()}
+                          <div className="user-role-cell">
+                            <span className={`user-role-pill ${roleClass}`}>
+                              {label}
+                            </span>
+                            {!isSelf ? (
+                              <select
+                                className="user-role-select"
+                                value={r}
+                                disabled={updatingRoleId === targetId}
+                                onChange={(e) => handleUpdateUserRole(targetId, e.target.value)}
+                                title={`Update role for ${targetUser.name}`}
+                                aria-label={`Update role for ${targetUser.name}`}
+                              >
+                                <option value="viewer">Viewer</option>
+                                <option value="owner">Document Owner</option>
+                                <option value="admin">Administrator</option>
+                              </select>
+                            ) : (
+                              <span className="self-tag">(Locked)</span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           {isActive ? (
@@ -717,33 +764,35 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                             <span className="status-badge status-suspended">Suspended</span>
                           )}
                         </td>
-                        <td className="cell-num">{targetUser.documentsOwned || 0}</td>
                         <td className="cell-timestamp">
                           {new Date(targetUser.createdAt || Date.now()).toLocaleDateString()}
                         </td>
                         <td>
-                          {isSelf ? (
-                            <span className="self-tag">(Current Admin)</span>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`user-action-btn ${isActive ? 'btn-deactivate' : 'btn-reactivate'}`}
-                              onClick={() => handleToggleUserStatus(targetUser)}
-                              disabled={deactivatingUserId === targetUser.id}
-                            >
-                              {isActive ? (
-                                <>
-                                  <UserX size={14} />
-                                  <span>Deactivate Account</span>
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck size={14} />
-                                  <span>Reactivate Account</span>
-                                </>
-                              )}
-                            </button>
-                          )}
+                          <div className="user-actions-group">
+                            {isSelf ? (
+                              <span className="self-tag">(Current Admin)</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`user-action-btn ${isActive ? 'btn-deactivate' : 'btn-reactivate'}`}
+                                onClick={() => handleToggleUserStatus(targetUser)}
+                                disabled={deactivatingUserId === targetId}
+                                title={isActive ? 'Deactivate this user account' : 'Reactivate this user account'}
+                              >
+                                {isActive ? (
+                                  <>
+                                    <UserX size={14} />
+                                    <span>Deactivate Account</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck size={14} />
+                                    <span>Reactivate Account</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

@@ -18,6 +18,15 @@ import './AppSidebar.css';
  * Enterprise sidebar with brand mark, primary navigation links,
  * and security status indicator.
  */
+function formatRoleLabel(role) {
+  if (!role) return 'Viewer';
+  const r = String(role).toLowerCase().trim();
+  if (r === 'admin') return 'Administrator';
+  if (r === 'owner' || r === 'document_owner') return 'Document Owner';
+  if (r === 'viewer' || r === 'member') return 'Viewer';
+  return role;
+}
+
 export function AppSidebar({
   activeNav = 'overview',
   onNavSelect,
@@ -27,30 +36,40 @@ export function AppSidebar({
   sharedDocsCount = null,
   userRole = null,
 }) {
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
-    { 
-      id: 'my-documents', 
-      label: 'My Documents', 
-      icon: Files, 
-      tag: myDocsCount !== null ? String(myDocsCount) : null 
-    },
-    { 
-      id: 'shared-with-me', 
-      label: 'Shared with Me', 
-      icon: Share2, 
-      tag: sharedDocsCount !== null ? String(sharedDocsCount) : null 
-    },
-    { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
-    { 
-      id: 'admin', 
-      label: 'Admin Governance', 
-      icon: ShieldAlert, 
-      tag: userRole === 'admin' ? 'ADMIN' : null 
-    },
-    { id: 'settings', label: 'Settings', icon: Settings, tag: null },
-    { id: 'profile', label: 'Profile', icon: User, tag: null },
-  ];
+  const normalizedRole = String(userRole || '').toLowerCase().trim();
+  const isAdmin = normalizedRole === 'admin';
+  const isViewer = normalizedRole === 'viewer' || normalizedRole === 'member';
+
+  let navItems = [];
+  if (isAdmin) {
+    navItems = [
+      { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: 'ADMIN' },
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
+      { id: 'my-documents', label: 'My Documents', icon: Files, tag: myDocsCount !== null ? String(myDocsCount) : null },
+      { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: sharedDocsCount !== null ? String(sharedDocsCount) : null },
+      { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
+      { id: 'settings', label: 'Settings', icon: Settings, tag: null },
+      { id: 'profile', label: 'Profile', icon: User, tag: null },
+    ];
+  } else if (isViewer) {
+    navItems = [
+      { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: sharedDocsCount !== null ? String(sharedDocsCount) : null },
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
+      { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
+      { id: 'settings', label: 'Settings', icon: Settings, tag: null },
+      { id: 'profile', label: 'Profile', icon: User, tag: null },
+    ];
+  } else {
+    // Document Owner
+    navItems = [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
+      { id: 'my-documents', label: 'My Documents', icon: Files, tag: myDocsCount !== null ? String(myDocsCount) : null },
+      { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: sharedDocsCount !== null ? String(sharedDocsCount) : null },
+      { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
+      { id: 'settings', label: 'Settings', icon: Settings, tag: null },
+      { id: 'profile', label: 'Profile', icon: User, tag: null },
+    ];
+  }
 
   return (
     <>
@@ -72,7 +91,7 @@ export function AppSidebar({
             </div>
             <div className="brand-text-group">
               <span className="brand-name">TrustVault</span>
-              <span className="brand-badge">SECURE</span>
+              <span className="brand-badge">{formatRoleLabel(userRole)}</span>
             </div>
           </div>
 

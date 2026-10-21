@@ -126,6 +126,30 @@ export function validateAndSanitizeSearchInput(req, res, next) {
     if (req.query.tags !== undefined) {
       req.query.tags = sanitizeTags(req.query.tags);
     }
+
+    if (req.query.owner !== undefined) {
+      req.query.owner = sanitizeString(String(req.query.owner)).slice(0, 100);
+    }
+
+    if (req.query.category !== undefined) {
+      req.query.category = sanitizeString(String(req.query.category)).slice(0, 50);
+    }
+
+    if (req.query.format !== undefined) {
+      req.query.format = sanitizeString(String(req.query.format)).slice(0, 20);
+    }
+
+    if (req.query.date !== undefined) {
+      req.query.date = sanitizeString(String(req.query.date)).slice(0, 30);
+    }
+
+    if (req.query.dateFrom !== undefined) {
+      req.query.dateFrom = sanitizeString(String(req.query.dateFrom)).slice(0, 30);
+    }
+
+    if (req.query.dateTo !== undefined) {
+      req.query.dateTo = sanitizeString(String(req.query.dateTo)).slice(0, 30);
+    }
   }
 
   next();

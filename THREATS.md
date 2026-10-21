@@ -43,3 +43,26 @@ TrustVault handles sensitive corporate records. The platform's security architec
 1. **Before Any Feature Development**: Review relevant threats above and implement required mitigations as part of the feature, not as an afterthought.
 2. **After Feature Completion**: Execute automated security test suite and update status from `Planned` to `Verified`.
 3. **Audit Trail**: Every change to this threat model must be recorded in Git with rationale and reviewer approval.
+
+---
+
+## 4. Honest Accepted Risks & Deliberate Architectural Trade-Offs
+
+While TrustVault mitigates all 12 primary threat vectors through comprehensive code guards and automated test coverage, the following architectural trade-offs and residual environmental risks are transparently documented:
+
+1. **Local Disk Ephemeral Storage on Stateless Cloud Hosts**:
+   - *Risk*: When running on ephemeral cloud platforms (such as Render or Heroku free containers), uploaded files stored in the local disk directory (`storage/uploads`) will be lost if the container restarts or redeploys unless persistent disk mounts or external S3-compatible cloud object storage (e.g., AWS S3, Cloudflare R2) is configured.
+   - *Mitigation & Recommended Production Architecture*: In cloud production, the private disk storage layer should be backed by an S3/Blob storage adapter with encrypted at-rest private buckets, keeping all downloads proxied through our streaming authorization controller.
+
+2. **In-Memory Store as Fail-Safe Development Fallback**:
+   - *Risk*: If no `MONGODB_URI` environment variable is defined or the database is temporarily unreachable, TrustVault falls back to an isolated in-memory repository to guarantee zero-friction local development and fast CI test execution. However, in-memory state is transient across process restarts.
+   - *Mitigation*: In production (`NODE_ENV=production`), the application enforces a strict requirement for a persistent MongoDB Atlas cluster connection, preventing silent fallback to in-memory mode in live deployments.
+
+3. **Application-Level vs Cloud-Infrastructure Audit Immutability**:
+   - *Risk*: Within the application layer, the audit trail is strictly append-only: Mongoose pre-save hooks and repository guards explicitly reject all `UPDATE`, `PATCH`, and `DELETE` queries. However, a cloud database administrator with direct root shell access to the underlying MongoDB Atlas cluster could theoretically modify records directly via the database driver.
+   - *Mitigation*: In enterprise production, MongoDB Atlas append-only IAM user privileges (write-only roles without delete/update permissions) and cloud Write-Once-Read-Many (WORM) storage or cryptographic hash-chaining should be enabled.
+
+4. **Stateless JWT Lifetime vs Inactive Account Session Termination**:
+   - *Risk*: JWTs are stateless and signed cryptographically with HMAC SHA-256. If an administrator deactivates an account, the user is immediately blocked from logging in again or accessing any document route (since `canReadDocument`, `canEditDocument`, and `requireAuth` query user state and deny inactive users). However, any hypothetical route that does not verify active database user state would trust an unexpired JWT until its expiration window passes.
+   - *Mitigation*: All sensitive endpoints in TrustVault perform live state validation, and tokens have a short validity period. Production deployments can additionally maintain a Redis-backed distributed token revocation blocklist.
+

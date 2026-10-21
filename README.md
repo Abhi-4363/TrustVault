@@ -3,7 +3,7 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-110%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-116%20passed-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-12%2F12%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
@@ -63,7 +63,7 @@ graph TD
 - **File Ingestion**: Multer, private encrypted disk quarantine, magic-number binary signature inspection
 - **File Download**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; blob-URL fallback for Firefox/Safari
 - **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic)
-- **Testing**: Vitest 5, Supertest (9 test suites, 105 automated integration tests)
+- **Testing**: Vitest 5, Supertest (9 test suites, 116 automated integration tests)
 
 ---
 
@@ -103,6 +103,10 @@ graph TD
 ## 5. Demonstration Credentials
 
 The seed script (`npm run seed`) automatically creates four corporate personas ready for evaluation:
+
+> [!WARNING]
+> **PRODUCTION SECURITY ADVISORY**:
+> The default demonstration credentials and passwords (`TrustVault2026!`) listed below are intended strictly for local development, reviewer evaluation, and automated testing. In production environments, credentials must be generated with cryptographically strong randomness, stored in environment secrets managers, and never shared or checked into source control.
 
 | Persona | Role | Email | Password | Permissions & Purpose |
 | :--- | :---: | :--- | :--- | :--- |
@@ -145,19 +149,19 @@ npm test
 
 ### Test Suite Summary:
 ```text
- ✓ tests/auth.test.js                    (11 tests) - Password hashing, JWT issuance, role enforcement
+ ✓ tests/auth.test.js                    (12 tests) - Password hashing, JWT issuance, deactivated user block, role enforcement
  ✓ tests/document.test.js                (16 tests) - File upload limits, private storage, binary stream, download filename
  ✓ tests/permissions.test.js             (17 tests) - Granular read/edit ACLs, Shared with Me workflow, metadata editing
  ✓ tests/revocation.test.js              (2 tests)  - Immediate revocation with zero caching delay
- ✓ tests/audit.test.js                   (6 tests)  - Immutable audit trail & pre-hook tamper prevention
- ✓ tests/search-validation.test.js       (14 tests) - Magic numbers, disguised executables, XSS sanitization
+ ✓ tests/audit.test.js                   (7 tests)  - Immutable audit trail, refused access logging, & pre-hook tamper prevention
+ ✓ tests/search-validation.test.js       (18 tests) - Name, owner, category, date filters, magic numbers, XSS sanitization
  ✓ tests/admin-governance.test.js        (23 tests) - RBAC enforcement, analytics, un-truncated CSV/JSON export
  ✓ tests/security-integration.test.js    (18 tests) - End-to-end verification of all 12 THREATS.md entries
  ✓ tests/health.test.js                  (3 tests)  - Public health endpoint without secret leakage
 
 Test Files:  9 passed (9)
-Tests:       110 passed (110)
-Duration:    5.05s
+Tests:       116 passed (116)
+Duration:    5.65s
 Vulnerabilities: 0
 ```
 

@@ -346,6 +346,71 @@ describe('Stage 7: Search, Metadata Indexing, and Upload Validation', () => {
       expect(res.body.documents[0].title).toBe('Employee Security Onboarding');
     });
 
+    it('should support search by document name (name filter)', async () => {
+      const res = await request(app)
+        .get('/api/documents/search?name=Security')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.documents[0].title).toBe('Employee Security Onboarding');
+
+      // Unauthorized document name query must return 0 results
+      const resSecret = await request(app)
+        .get('/api/documents/search?name=Pegasus')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(resSecret.status).toBe(200);
+      expect(resSecret.body.total).toBe(0);
+    });
+
+    it('should support search by document owner (owner filter)', async () => {
+      const res = await request(app)
+        .get('/api/documents/search?owner=Alice')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.documents[0].title).toBe('Employee Security Onboarding');
+      expect(res.body.documents[0].owner.name).toBe('Alice Lead');
+    });
+
+    it('should support search by category (category filter)', async () => {
+      const res = await request(app)
+        .get('/api/documents/search?category=handbook')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.documents[0].title).toBe('Employee Security Onboarding');
+
+      const resNone = await request(app)
+        .get('/api/documents/search?category=NonExistentCategory')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(resNone.status).toBe(200);
+      expect(resNone.body.total).toBe(0);
+    });
+
+    it('should support search by date and date range (date filter)', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await request(app)
+        .get(`/api/documents/search?date=${today}`)
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.documents[0].title).toBe('Employee Security Onboarding');
+
+      // Non-matching future date
+      const resFuture = await request(app)
+        .get('/api/documents/search?date=2099-01-01')
+        .set('Authorization', `Bearer ${userBToken}`);
+
+      expect(resFuture.status).toBe(200);
+      expect(resFuture.body.total).toBe(0);
+    });
+
     it('should allow Administrator governance access to search across all vault documents', async () => {
       const res = await request(app)
         .get('/api/documents/search?q=Pegasus')

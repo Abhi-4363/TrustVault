@@ -45,14 +45,15 @@
 | `POST` | `/api/auth/login` | Authenticate credentials and receive short-lived JWT | Public |
 | `GET` | `/api/auth/me` | Fetch authenticated identity profile | Bearer |
 
-### 2.3 Private Document Storage & Search
+### 2.3 Private Document Storage, Search & Metadata Editing
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :---: |
 | `POST` | `/api/documents` | Upload document to isolated private storage (Multer + Magic Number inspection) | Bearer (Owner/Admin) |
 | `GET` | `/api/documents` | List documents accessible to current user (Owned + Shared) | Bearer |
-| `GET` | `/api/documents/search?q=...` | Scoped search strictly bounded to user's access boundaries | Bearer |
+| `GET` | `/api/documents/search` | Scoped search filtering by `q`, `name`, `owner`, `category`, `date`, `format`, `tags` | Bearer |
 | `GET` | `/api/documents/:id` | Fetch document metadata (Requires Owner or Read ACL) | Bearer |
-| `GET` | `/api/documents/:id/download` | Stream binary document with forced attachment headers | Bearer |
+| `PATCH` | `/api/documents/:id` | Update document metadata (`title`, `description`, `category`, `tags`) | Bearer (Owner/Editor/Admin) |
+| `GET` | `/api/documents/:id/download` | Stream binary document with forced attachment headers | Bearer (Owner/Reader/Editor/Admin) |
 | `DELETE` | `/api/documents/:id` | Permanently purge document binary and record audit event | Bearer (Owner/Admin) |
 
 ### 2.4 Granular ACL & Immediate Revocation

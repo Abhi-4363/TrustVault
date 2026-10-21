@@ -142,6 +142,15 @@ export async function login(req, res, next) {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(403).json({
+        error: {
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'Your account has been deactivated. Please contact an administrator.',
+        },
+      });
+    }
+
     const token = generateToken(user);
 
     return res.status(200).json({

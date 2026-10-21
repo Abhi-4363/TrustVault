@@ -301,11 +301,53 @@ This document records the exact progression of development prompts, implementati
   - Inspected implementation and requested git commit.
 
 - **Real Git Commit Reference**:
-  - Commit Hash: `093f640`
+  - Commit Hash: `07036e3`
   - Commit Message: `feat(sharing): enable Edit permission, Shared with Me editing options, and metadata updates`
 
+---
 
+## Prompt Entry 8 — Dynamic Tenant Role Governance, Advanced Metadata Filtering, and Security Hardening
 
+- **Date / Timestamp**: 2026-10-21T17:05:00+05:30
+- **User Prompt / Instructions**:
+  - Continue development, ensure all tests pass (100% test pass rate), and harden platform capabilities.
+  - Implement dynamic administrator user role assignment (`PATCH /api/admin/users/:userId/role`) with self-demotion and last-admin protections, and append-only audit logging (`USER_ROLE_UPDATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`).
+  - Extend scoped search with advanced metadata filters (`name`, `owner`, `category`, and `date`/`dateFrom`/`dateTo` range filtering) with strict input sanitization.
+  - Capture all unauthorized / refused document actions in the immutable audit ledger with `ACCESS_DENIED` action events.
+  - Enhance the Auth Landing Portal with intuitive mode switching and 1-click evaluation demo personas (`Administrator`, `Document Owner`, `Viewer`).
+  - Align UI presentation with role-based routing (Admins to Governance, Viewers to Shared with Me with contextual onboarding alerts, Document Owners to Overview) and clear role badge labeling.
+  - Transparently document accepted architectural risks and production advisories in `THREATS.md` and `README.md`.
+  - Validate all automated test suites and verify production frontend bundle compilation.
 
+- **What the AI Actually Implemented**:
+  1. **Dynamic User Role Management Endpoint & RBAC Guards**:
+     - Added `updateUserRole` in `backend/src/controllers/admin.controller.js` and registered route `PATCH /api/admin/users/:userId/role` guarded by `requireRole('admin')`.
+     - Enforced `SELF_ROLE_MODIFICATION` prevention (administrators cannot alter their own role directly).
+     - Enforced `CANNOT_DEMOTE_LAST_ADMIN` guard (checks remaining active administrators before allowing demotion).
+     - Added `USER_ROLE_UPDATED`, `USER_DEACTIVATED`, and `USER_REACTIVATED` to `VALID_ACTIONS` in `backend/src/models/audit.model.js` and logged comprehensive audit events.
+     - Updated `frontend/src/components/admin/AdminDashboard.jsx` with an interactive role selection dropdown and inline status feedback.
+  2. **Advanced Scoped Search & Metadata Filtering**:
+     - Extended `searchDocuments` in `backend/src/controllers/document.controller.js` to support `name` (title/filename), `owner` (name/email/ID), `category`, and `date`/`dateFrom`/`dateTo` range parameters while maintaining zero-trust access boundaries.
+     - Extended `validateAndSanitizeSearchInput` in `backend/src/middleware/sanitization.middleware.js` to sanitize and clamp all query parameters.
+     - Added 4 new automated regression tests in `backend/tests/search-validation.test.js` validating name, owner, category, and date filtering.
+  3. **Comprehensive Refused Access & Security Denials Auditing (`ACCESS_DENIED`)**:
+     - Enhanced `downloadDocument`, `deleteDocument`, `grantDocumentPermission`, and `revokeDocumentPermission` in `backend/src/controllers/document.controller.js` to log `ACCESS_DENIED` audit events on forbidden access attempts.
+     - Added critical security integration test in `backend/tests/audit.test.js` verifying refused actions are immutably captured.
+  4. **Frontend Auth Landing Portal & Role-Adaptive UX**:
+     - Refactored `AuthLandingPortal.jsx` and CSS with clean tabbed switching between Login and Registration, alongside 1-click quick-fill demo cards for all three personas.
+     - Added role-based initial dashboard routing upon sign-in in `frontend/src/App.jsx`.
+     - Tailored `AppSidebar.jsx` navigation order and badges to user role, with contextual guidance for Viewers restricted from uploading.
+     - Enhanced `DocumentTable.jsx` search input to filter by name, owner, category, or date.
+  5. **Security Threat Model & Risk Transparency**:
+     - Added Section 4 "Honest Accepted Risks & Deliberate Architectural Trade-Offs" to `THREATS.md` documenting ephemeral cloud storage, development in-memory fallback, application-level audit immutability vs cloud root DBA access, and JWT lifetimes.
+     - Added production security advisory callout to `README.md` and updated badge metrics to 116 passed tests.
+  6. **Automated Verification**:
+     - All 116 tests passing across 9 test suites in `backend` (100% pass rate).
+     - Verified Vite production build (`dist/`) completes cleanly in ~3.28s without warnings.
 
+- **What the User Reviewed**:
+  - Inspected end-to-end test execution, verified zero test regressions, confirmed build artifacts, and approved changes.
 
+- **Real Git Commit Reference**:
+  - Commit Hash: Pending Commit
+  - Commit Message: `feat: implement tenant role governance, metadata search filters, and security threat mitigations`

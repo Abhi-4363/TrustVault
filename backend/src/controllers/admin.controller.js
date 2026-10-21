@@ -9,6 +9,7 @@
 import { User } from '../models/user.model.js';
 import { Document } from '../models/document.model.js';
 import { AuditLog } from '../models/audit.model.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. System Analytics Dashboard
@@ -335,6 +336,7 @@ export async function listAllUsers(req, res) {
     const users = allUsers.map((u) => {
       const userId = String(u._id || u.id);
       return {
+        id: userId,
         _id: userId,
         name: u.name,
         email: u.email,
@@ -475,9 +477,25 @@ export async function deactivateUser(req, res) {
       { new: true }
     );
 
+    // Record immutable audit event for account deactivation
+    await logAuditEvent({
+      req,
+      action: 'USER_DEACTIVATED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        previousStatus: 'active',
+        newStatus: 'deactivated',
+        changedBy: req.user.email,
+      },
+    });
+
     return res.status(200).json({
       message: `User account "${targetUser.name}" has been deactivated.`,
       user: {
+        id: String(updatedUser._id || updatedUser.id),
         _id: String(updatedUser._id || updatedUser.id),
         name: updatedUser.name,
         email: updatedUser.email,
@@ -529,9 +547,25 @@ export async function reactivateUser(req, res) {
       { new: true }
     );
 
+    // Record immutable audit event for account reactivation
+    await logAuditEvent({
+      req,
+      action: 'USER_REACTIVATED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        previousStatus: 'deactivated',
+        newStatus: 'active',
+        changedBy: req.user.email,
+      },
+    });
+
     return res.status(200).json({
       message: `User account "${targetUser.name}" has been reactivated.`,
       user: {
+        id: String(updatedUser._id || updatedUser.id),
         _id: String(updatedUser._id || updatedUser.id),
         name: updatedUser.name,
         email: updatedUser.email,
@@ -545,6 +579,122 @@ export async function reactivateUser(req, res) {
       error: {
         code: 'REACTIVATION_ERROR',
         message: 'Failed to reactivate user account.',
+      },
+    });
+  }
+}
+
+/**
+ * PATCH /api/admin/users/:userId/role
+ * Updates a user's global account role ('admin', 'owner', 'viewer').
+ * Enforces:
+ *   - Caller must be an authenticated administrator (enforced by route middleware)
+ *   - Cannot change own role
+ *   - Target role must be one of ['admin', 'owner', 'viewer']
+ *   - Target user must exist
+ *   - Cannot demote the last remaining active administrator
+ *   - Records immutable audit log with previousRole, newRole, actor admin
+ *   - Returns sanitized user record without password hash
+ */
+export async function updateUserRole(req, res) {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+    const callerId = String(req.user.id || req.user._id);
+
+    // 1. Prevent self-role modification
+    if (String(userId) === callerId) {
+      return res.status(400).json({
+        error: {
+          code: 'SELF_ROLE_MODIFICATION',
+          message: 'Administrators cannot modify their own role directly.',
+        },
+      });
+    }
+
+    // 2. Validate allowed roles
+    const ALLOWED_ROLES = ['admin', 'owner', 'viewer'];
+    const normalizedRole = String(role || '').toLowerCase().trim();
+    if (!normalizedRole || !ALLOWED_ROLES.includes(normalizedRole)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_ROLE',
+          message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}.`,
+        },
+      });
+    }
+
+    // 3. Find target user
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    const previousRole = targetUser.role;
+
+    // 4. Prevent demoting the last active administrator
+    if (previousRole === 'admin' && normalizedRole !== 'admin') {
+      const allUsers = await User.find();
+      const activeAdmins = allUsers.filter(
+        (u) => u.role === 'admin' && u.isActive !== false
+      );
+      if (activeAdmins.length <= 1) {
+        return res.status(400).json({
+          error: {
+            code: 'CANNOT_DEMOTE_LAST_ADMIN',
+            message: 'Cannot demote the last remaining active administrator.',
+          },
+        });
+      }
+    }
+
+    // 5. Update user role
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { role: normalizedRole },
+      { new: true }
+    );
+
+    // 6. Record immutable audit log
+    await logAuditEvent({
+      req,
+      action: 'USER_ROLE_UPDATED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        affectedUserName: targetUser.name,
+        previousRole,
+        newRole: normalizedRole,
+        changedBy: req.user.email,
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `User "${targetUser.name}" role updated from ${previousRole} to ${normalizedRole}.`,
+      user: {
+        id: String(updatedUser._id || updatedUser.id),
+        _id: String(updatedUser._id || updatedUser.id),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        isActive: updatedUser.isActive !== false,
+        createdAt: updatedUser.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Update User Role Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'ROLE_UPDATE_ERROR',
+        message: 'Failed to update user role.',
       },
     });
   }

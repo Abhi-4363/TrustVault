@@ -31,6 +31,15 @@ export function AppHeader({
   const { user, isAuthenticated, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
+  const formatRoleLabel = (role) => {
+    if (!role) return 'Viewer';
+    const r = String(role).toLowerCase().trim();
+    if (r === 'admin') return 'Administrator';
+    if (r === 'owner' || r === 'document_owner') return 'Document Owner';
+    if (r === 'viewer' || r === 'member') return 'Viewer';
+    return role;
+  };
+
   const getInitials = (fullName) => {
     if (!fullName) return 'U';
     const parts = fullName.trim().split(/\s+/);
@@ -130,7 +139,7 @@ export function AppHeader({
               </div>
               <div className="user-profile-meta">
                 <span className="user-display-name">{user.name}</span>
-                <span className="user-role-badge">{user.role}</span>
+                <span className="user-role-badge">{formatRoleLabel(user.role)}</span>
               </div>
               <ChevronDown size={14} className="dropdown-caret" />
             </button>
@@ -140,7 +149,7 @@ export function AppHeader({
                 <div className="dropdown-user-header">
                   <p className="dropdown-user-name">{user.name}</p>
                   <p className="dropdown-user-email">{user.email}</p>
-                  <span className="dropdown-role-tag">Role: {user.role}</span>
+                  <span className="dropdown-role-tag">Role: {formatRoleLabel(user.role)}</span>
                 </div>
                 <div className="dropdown-divider" />
                 <button

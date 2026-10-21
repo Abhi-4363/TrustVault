@@ -99,6 +99,11 @@ const documentSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    category: {
+      type: String,
+      trim: true,
+      default: 'General',
+    },
     acl: {
       type: [aclEntrySchema],
       default: [],
@@ -147,6 +152,7 @@ class InMemoryDocumentRepository {
       ownerName: data.ownerName || '',
       ownerEmail: data.ownerEmail || '',
       tags: Array.isArray(data.tags) ? data.tags : [],
+      category: data.category ? String(data.category).trim() : (Array.isArray(data.tags) && data.tags[0] ? String(data.tags[0]).trim() : 'General'),
       acl: Array.isArray(data.acl) ? data.acl : [],
       readers: Array.isArray(data.readers) ? data.readers : [],
       createdAt: new Date(),

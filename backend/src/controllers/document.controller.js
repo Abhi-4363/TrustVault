@@ -148,7 +148,6 @@ export async function uploadDocument(req, res) {
 
     const title = (req.body.title || req.file.originalname).trim();
     const description = (req.body.description || '').trim();
-
     let tags = [];
     if (req.body.tags) {
       if (Array.isArray(req.body.tags)) {
@@ -163,11 +162,14 @@ export async function uploadDocument(req, res) {
       }
     }
 
+    const category = (req.body.category || (tags.length > 0 ? tags[0] : '') || 'General').trim() || 'General';
+
     const userId = req.user.id || req.user._id;
 
     const documentData = {
       title,
       description,
+      category,
       originalName: req.file.originalname,
       fileSize: req.file.size,
       mimeType: req.file.mimetype || 'application/octet-stream',
@@ -191,6 +193,7 @@ export async function uploadDocument(req, res) {
       metadata: {
         fileSize: createdDoc.fileSize,
         mimeType: createdDoc.mimeType,
+        category: createdDoc.category,
       },
     });
 
@@ -316,7 +319,22 @@ export async function getDocumentById(req, res) {
     const userEmail = (req.user.email || '').toLowerCase().trim();
 
     // Stage 5 check: immediate revocation validation
-    if (isAccessImmediatelyRevoked(id, userId) || !canReadDocument(doc, req.user)) {
+    if (
+      isAccessImmediatelyRevoked(id, userId) ||
+      (userEmail && isAccessImmediatelyRevoked(id, userEmail)) ||
+      !canReadDocument(doc, req.user)
+    ) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'DOCUMENT_READ',
+          reason: 'User lacks required read permissions or access has been revoked.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -436,6 +454,7 @@ export async function updateDocument(req, res) {
     const updates = {};
     if (req.body.title !== undefined) updates.title = String(req.body.title).trim();
     if (req.body.description !== undefined) updates.description = String(req.body.description).trim();
+    if (req.body.category !== undefined) updates.category = String(req.body.category).trim();
     if (req.body.tags !== undefined) {
       updates.tags = Array.isArray(req.body.tags)
         ? req.body.tags
@@ -496,6 +515,17 @@ export async function downloadDocument(req, res) {
       (userEmail && isAccessImmediatelyRevoked(id, userEmail)) ||
       !canReadDocument(doc, req.user)
     ) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'DOCUMENT_DOWNLOAD',
+          reason: 'Access to download this document has been revoked or denied.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -609,6 +639,17 @@ export async function deleteDocument(req, res) {
     }
 
     if (!canManageDocument(doc, req.user)) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'DOCUMENT_DELETE',
+          reason: 'Only the document owner or an administrator can delete this document.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -725,6 +766,17 @@ export async function grantDocumentPermission(req, res) {
     }
 
     if (!canManageDocument(doc, req.user)) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'PERMISSION_GRANT',
+          reason: 'Only the document owner or an administrator can grant permissions.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -855,6 +907,17 @@ export async function revokeDocumentPermission(req, res) {
     }
 
     if (!canManageDocument(doc, req.user)) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'PERMISSION_REVOKE',
+          reason: 'Only the document owner or an administrator can revoke permissions.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -1047,6 +1110,12 @@ export async function getDirectoryUsers(req, res) {
 export async function searchDocuments(req, res) {
   try {
     const rawQuery = (req.query.q || '').trim().toLowerCase();
+    const nameFilter = (req.query.name || '').trim().toLowerCase();
+    const ownerFilter = (req.query.owner || '').trim().toLowerCase();
+    const categoryFilter = (req.query.category || '').trim().toLowerCase();
+    const dateFilter = (req.query.date || '').trim();
+    const dateFromFilter = (req.query.dateFrom || '').trim();
+    const dateToFilter = (req.query.dateTo || '').trim();
     const filterTags = Array.isArray(req.query.tags)
       ? req.query.tags
       : req.query.tags
@@ -1060,18 +1129,78 @@ export async function searchDocuments(req, res) {
     // 2. Strict Zero-Trust Authorization Filter: Only documents accessible to requesting user
     const accessibleDocs = allDocs.filter((doc) => canReadDocument(doc, req.user));
 
-    // 3. Search matching across title, description, originalName, and tags
+    // 3. Search matching across title, description, originalName, tags, owner, category, and date
     const matchedDocs = accessibleDocs.filter((doc) => {
-      // If query provided, check text fields and tags
+      // If query provided, check text fields, tags, category, and owner
       if (rawQuery) {
         const titleMatch = (doc.title || '').toLowerCase().includes(rawQuery);
         const descMatch = (doc.description || '').toLowerCase().includes(rawQuery);
         const nameMatch = (doc.originalName || '').toLowerCase().includes(rawQuery);
+        const catMatch = (doc.category || '').toLowerCase().includes(rawQuery);
+        const ownerMatch =
+          (doc.ownerName || '').toLowerCase().includes(rawQuery) ||
+          (doc.ownerEmail || '').toLowerCase().includes(rawQuery);
         const tagMatch =
           Array.isArray(doc.tags) &&
           doc.tags.some((t) => (t || '').toLowerCase().includes(rawQuery));
 
-        if (!titleMatch && !descMatch && !nameMatch && !tagMatch) {
+        if (!titleMatch && !descMatch && !nameMatch && !catMatch && !ownerMatch && !tagMatch) {
+          return false;
+        }
+      }
+
+      // Filter by document name (title or original filename)
+      if (nameFilter) {
+        const titleMatch = (doc.title || '').toLowerCase().includes(nameFilter);
+        const originalNameMatch = (doc.originalName || '').toLowerCase().includes(nameFilter);
+        if (!titleMatch && !originalNameMatch) {
+          return false;
+        }
+      }
+
+      // Filter by owner (name, email, or id)
+      if (ownerFilter) {
+        const ownerNameMatch = (doc.ownerName || '').toLowerCase().includes(ownerFilter);
+        const ownerEmailMatch = (doc.ownerEmail || '').toLowerCase().includes(ownerFilter);
+        const ownerIdMatch = String(doc.ownerId || '').toLowerCase().includes(ownerFilter);
+        if (!ownerNameMatch && !ownerEmailMatch && !ownerIdMatch) {
+          return false;
+        }
+      }
+
+      // Filter by category
+      if (categoryFilter && categoryFilter !== 'all') {
+        const docCat = (doc.category || 'General').toLowerCase();
+        if (docCat !== categoryFilter && !docCat.includes(categoryFilter)) {
+          return false;
+        }
+      }
+
+      // Filter by specific date (YYYY-MM-DD)
+      if (dateFilter) {
+        const docDateStr = doc.createdAt ? new Date(doc.createdAt).toISOString().slice(0, 10) : '';
+        if (docDateStr !== dateFilter) {
+          return false;
+        }
+      }
+
+      // Filter by date range (from)
+      if (dateFromFilter) {
+        const docDate = doc.createdAt ? new Date(doc.createdAt) : null;
+        const fromDate = new Date(dateFromFilter);
+        if (!docDate || isNaN(docDate.getTime()) || docDate < fromDate) {
+          return false;
+        }
+      }
+
+      // Filter by date range (to)
+      if (dateToFilter) {
+        const docDate = doc.createdAt ? new Date(doc.createdAt) : null;
+        const toDate = new Date(dateToFilter);
+        if (dateToFilter.length === 10) {
+          toDate.setHours(23, 59, 59, 999);
+        }
+        if (!docDate || isNaN(docDate.getTime()) || docDate > toDate) {
           return false;
         }
       }
@@ -1098,6 +1227,18 @@ export async function searchDocuments(req, res) {
 
     const userId = String(req.user.id || req.user._id);
     const userEmail = (req.user.email || '').toLowerCase().trim();
+
+    let userMap = new Map();
+    try {
+      const allUsers = await User.find();
+      (allUsers || []).forEach((u) => {
+        const uid = String(u._id || u.id);
+        userMap.set(uid, u);
+        if (u.email) userMap.set(u.email.toLowerCase().trim(), u);
+      });
+    } catch {
+      // Non-blocking in-memory fallback
+    }
 
     return res.status(200).json({
       query: req.query.q || '',
@@ -1127,10 +1268,11 @@ export async function searchDocuments(req, res) {
           accessLevel = 'Admin';
         }
 
+        const ownerUser = userMap.get(ownerId) || (ownerEmail ? userMap.get(ownerEmail) : null);
         const owner = {
           id: ownerId,
-          name: doc.ownerName || 'Document Owner',
-          email: doc.ownerEmail || '',
+          name: doc.ownerName || ownerUser?.name || 'Document Owner',
+          email: doc.ownerEmail || ownerUser?.email || '',
         };
 
         return { ...sanitized, accessLevel, owner };

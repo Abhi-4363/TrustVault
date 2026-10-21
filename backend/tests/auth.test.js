@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
+import bcrypt from 'bcryptjs';
 import { createApp } from '../src/app.js';
 import { User } from '../src/models/user.model.js';
 
@@ -78,7 +79,7 @@ describe('Authentication & Identity Security Suite', () => {
         .post('/api/auth/register')
         .send({
           ...validPayload,
-          role: 'admin', // Malicious attempt to self-promote
+          role: 'admin', // Malicious attempt to self-promote to admin
         });
 
       expect(response.status).toBe(201);
@@ -134,6 +135,28 @@ describe('Authentication & Identity Security Suite', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+    });
+
+    it('should reject login for deactivated user accounts with 403 Forbidden', async () => {
+      const passwordHash = await bcrypt.hash('StrongPass123!', 10);
+      await User.create({
+        name: 'Deactivated User',
+        email: 'deactivated@company.com',
+        passwordHash,
+        role: 'owner',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'deactivated@company.com',
+          password: 'StrongPass123!',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('ACCOUNT_DEACTIVATED');
+      expect(response.body.error.message).toMatch(/account.*deactivated/i);
     });
   });
 

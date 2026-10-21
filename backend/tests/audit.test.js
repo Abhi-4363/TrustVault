@@ -134,6 +134,53 @@ describe('Stage 6: Audit Trail and Integrity Protection', () => {
       expect(downloadLog.ipAddress).toBeDefined();
       expect(downloadLog.timestamp).toBeInstanceOf(Date);
     });
+
+    it('CRITICAL: should record ACCESS_DENIED audit events when unauthorized users attempt refused actions', async () => {
+      // 1. Bob attempts unauthorized read of Alice's document
+      const readRes = await request(app)
+        .get(`/api/documents/${testDocId}`)
+        .set('Authorization', `Bearer ${userBToken}`);
+      expect(readRes.status).toBe(403);
+
+      // 2. Bob attempts unauthorized download
+      const downloadRes = await request(app)
+        .get(`/api/documents/${testDocId}/download`)
+        .set('Authorization', `Bearer ${userBToken}`);
+      expect(downloadRes.status).toBe(403);
+
+      // 3. Bob attempts unauthorized deletion
+      const deleteRes = await request(app)
+        .delete(`/api/documents/${testDocId}`)
+        .set('Authorization', `Bearer ${userBToken}`);
+      expect(deleteRes.status).toBe(403);
+
+      // 4. Bob attempts unauthorized permission grant
+      const grantRes = await request(app)
+        .post(`/api/documents/${testDocId}/permissions`)
+        .set('Authorization', `Bearer ${userBToken}`)
+        .send({
+          email: 'mallory@evil.internal',
+          permissionLevel: 'edit',
+        });
+      expect(grantRes.status).toBe(403);
+
+      // 5. Inspect recorded ACCESS_DENIED audit events
+      const allEvents = await AuditLog.find({ targetDocumentId: testDocId });
+      const deniedLogs = allEvents.filter((e) => e.action === 'ACCESS_DENIED');
+
+      expect(deniedLogs.length).toBeGreaterThanOrEqual(4);
+      deniedLogs.forEach((log) => {
+        expect(log.actorEmail).toBe('bob.operator@vault.internal');
+        expect(log.actorId).toBe(userBId);
+        expect(log.metadata).toHaveProperty('attemptedAction');
+      });
+
+      const attemptedActions = deniedLogs.map((l) => l.metadata.attemptedAction);
+      expect(attemptedActions).toContain('DOCUMENT_READ');
+      expect(attemptedActions).toContain('DOCUMENT_DOWNLOAD');
+      expect(attemptedActions).toContain('DOCUMENT_DELETE');
+      expect(attemptedActions).toContain('PERMISSION_GRANT');
+    });
   });
 
   describe('Audit Query Endpoint Access Control', () => {

@@ -15,6 +15,7 @@ import {
   getUserDetail,
   deactivateUser,
   reactivateUser,
+  updateUserRole,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -35,6 +36,7 @@ router.get('/audit-logs/export', exportAuditLogs);
 // User management console
 router.get('/users', listAllUsers);
 router.get('/users/:userId', getUserDetail);
+router.patch('/users/:userId/role', updateUserRole);
 router.patch('/users/:userId/deactivate', deactivateUser);
 router.patch('/users/:userId/reactivate', reactivateUser);
 

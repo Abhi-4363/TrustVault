@@ -138,6 +138,7 @@ export function App() {
               year: 'numeric',
             }),
             tags: doc.tags || [],
+            category: doc.category || 'General',
             isReal: true,
           };
         });
@@ -223,6 +224,21 @@ export function App() {
       setLiveActivities([]);
     }
   }, [token]);
+
+  // Role-based dashboard routing upon authentication
+  useEffect(() => {
+    if (user && user.role) {
+      const normalizedRole = String(user.role).toLowerCase().trim();
+      if (normalizedRole === 'admin') {
+        setActiveNav('admin');
+      } else if (normalizedRole === 'viewer' || normalizedRole === 'member') {
+        setActiveNav('shared-with-me');
+      } else {
+        // Document Owner
+        setActiveNav('overview');
+      }
+    }
+  }, [user?.role, user?.id || user?._id]);
 
   const openModal = (config) => {
     setModalConfig({
@@ -603,16 +619,7 @@ export function App() {
       isAuthenticated={Boolean(user)}
     >
       {!user ? (
-        <AuthLandingPortal
-          onOpenLogin={() => {
-            setAuthModalMode('login');
-            setAuthModalOpen(true);
-          }}
-          onOpenRegister={() => {
-            setAuthModalMode('register');
-            setAuthModalOpen(true);
-          }}
-        />
+        <AuthLandingPortal initialMode={authModalMode} />
       ) : activeNav === 'profile' ? (
         <div 
           className="profile-preview-panel" 
@@ -740,7 +747,11 @@ export function App() {
               activeNav === 'my-documents'
                 ? 'View and manage confidential corporate files where you are designated as the owner.'
                 : activeNav === 'shared-with-me'
-                ? 'Review files where another team member has granted you read or edit privileges.'
+                ? user.role === 'viewer'
+                  ? 'Review files where a Document Owner has granted you read or edit privileges. Uploading and document ownership require an Owner account.'
+                  : 'Review files where another team member has granted you read or edit privileges.'
+                : user.role === 'viewer'
+                ? 'Review confidential documents shared with your account. Document uploads and ownership require a Document Owner account.'
                 : 'Manage, share, and track confidential enterprise documents with fine-grained access policies.'
             }
             onUploadClick={handleUploadClick}

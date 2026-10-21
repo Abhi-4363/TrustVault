@@ -79,7 +79,7 @@ class InMemoryUserRepository {
     this.users.clear();
   }
 
-  async create({ name, email, password, role = 'owner', passwordHash: suppliedHash }) {
+  async create({ name, email, password, role = 'owner', passwordHash: suppliedHash, isActive = true }) {
     const normalizedEmail = email.toLowerCase().trim();
     if (this.users.has(normalizedEmail)) {
       const err = new Error('Email address is already registered');
@@ -103,6 +103,7 @@ class InMemoryUserRepository {
       email: normalizedEmail,
       passwordHash,
       role,
+      isActive: isActive !== false,
       createdAt: new Date(),
       updatedAt: new Date(),
       async comparePassword(candidatePassword) {
@@ -176,13 +177,13 @@ export const User = {
     return mongoose.connection && mongoose.connection.readyState === 1;
   },
 
-  async create({ name, email, password, passwordHash, role = 'owner' }) {
+  async create({ name, email, password, passwordHash, role = 'owner', isActive = true }) {
     // Support seeding a user with a pre‑hashed password (e.g., admin bootstrap).
     // If a passwordHash is provided directly, we skip bcrypt hashing to avoid
     // errors when `password` is undefined (as in the test suite).
     if (!this.isMongooseActive()) {
       // Forward the appropriate fields to the in‑memory repo.
-      return inMemoryUserStore.create({ name, email, password, role, passwordHash });
+      return inMemoryUserStore.create({ name, email, password, role, passwordHash, isActive });
     }
 
     let finalHash;
@@ -198,6 +199,7 @@ export const User = {
       email,
       passwordHash: finalHash,
       role,
+      isActive: isActive !== false,
     });
 
     await user.save();

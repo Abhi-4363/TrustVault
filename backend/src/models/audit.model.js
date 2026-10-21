@@ -15,6 +15,9 @@ const VALID_ACTIONS = [
   'PERMISSION_GRANTED',
   'PERMISSION_REVOKED',
   'ACCESS_DENIED',
+  'USER_ROLE_UPDATED',
+  'USER_DEACTIVATED',
+  'USER_REACTIVATED',
 ];
 
 const auditLogSchema = new mongoose.Schema(
@@ -53,7 +56,8 @@ const auditLogSchema = new mongoose.Schema(
     },
     targetDocumentId: {
       type: mongoose.Schema.Types.Mixed,
-      required: [true, 'Target document ID is required'],
+      required: false,
+      default: 'SYSTEM',
       immutable: true,
       index: true,
     },
@@ -126,7 +130,7 @@ class InMemoryAuditRepository {
       actorEmail: data.actorEmail,
       actorName: data.actorName || 'User',
       action: data.action,
-      targetDocumentId: String(data.targetDocumentId),
+      targetDocumentId: String(data.targetDocumentId || 'SYSTEM'),
       targetDocumentTitle: data.targetDocumentTitle || '',
       ipAddress: data.ipAddress || '127.0.0.1',
       userAgent: data.userAgent || 'TrustVault Client',

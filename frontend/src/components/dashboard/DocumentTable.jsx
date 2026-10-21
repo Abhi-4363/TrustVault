@@ -46,13 +46,18 @@ export function DocumentTable({ documents = [], onActionSelect, userRole }) {
 
   // Filter documents in memory
   const filteredDocs = documents.filter((doc) => {
+    const query = (searchQuery || '').toLowerCase().trim();
     const matchesSearch =
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.owner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.description.toLowerCase().includes(searchQuery.toLowerCase());
+      !query ||
+      (doc.name || '').toLowerCase().includes(query) ||
+      (doc.owner?.name || '').toLowerCase().includes(query) ||
+      (doc.description || '').toLowerCase().includes(query) ||
+      (doc.category || '').toLowerCase().includes(query) ||
+      (doc.formattedDate || '').toLowerCase().includes(query) ||
+      (doc.lastUpdated || '').toLowerCase().includes(query);
     
     const matchesType =
-      filterType === 'ALL' || doc.fileType.toUpperCase() === filterType.toUpperCase();
+      filterType === 'ALL' || (doc.fileType || '').toUpperCase() === filterType.toUpperCase();
 
     return matchesSearch && matchesType;
   });
@@ -76,11 +81,11 @@ export function DocumentTable({ documents = [], onActionSelect, userRole }) {
             <Search size={15} className="search-icon" aria-hidden="true" />
             <input
               type="search"
-              placeholder="Filter by name or owner..."
+              placeholder="Search by name, owner, category, or date..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="table-search-input"
-              aria-label="Filter documents by name or owner"
+              aria-label="Filter documents by name, owner, category, or date"
             />
           </div>
 
