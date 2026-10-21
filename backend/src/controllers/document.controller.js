@@ -104,6 +104,18 @@ export async function uploadDocument(req, res) {
       });
     }
 
+    if (req.user && req.user.role === 'viewer') {
+      if (req.file && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch {}
+      }
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied. Viewers are restricted to read-only access and cannot upload documents.',
+        },
+      });
+    }
+
     const title = (req.body.title || req.file.originalname).trim();
     const description = (req.body.description || '').trim();
 
@@ -824,3 +836,93 @@ export async function getDirectoryUsers(req, res) {
     });
   }
 }
+
+/**
+ * GET /api/documents/search
+ * Full-text and metadata search strictly restricted to documents the requesting user
+ * has authorization to read. Enforces zero metadata leakage across isolation boundaries.
+ */
+export async function searchDocuments(req, res) {
+  try {
+    const rawQuery = (req.query.q || '').trim().toLowerCase();
+    const filterTags = Array.isArray(req.query.tags)
+      ? req.query.tags
+      : req.query.tags
+      ? req.query.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+      : [];
+    const formatFilter = (req.query.format || '').trim().toLowerCase();
+
+    // 1. Fetch documents
+    const allDocs = await Document.find();
+
+    // 2. Strict Zero-Trust Authorization Filter: Only documents accessible to requesting user
+    const accessibleDocs = allDocs.filter((doc) => canReadDocument(doc, req.user));
+
+    // 3. Search matching across title, description, originalName, and tags
+    const matchedDocs = accessibleDocs.filter((doc) => {
+      // If query provided, check text fields and tags
+      if (rawQuery) {
+        const titleMatch = (doc.title || '').toLowerCase().includes(rawQuery);
+        const descMatch = (doc.description || '').toLowerCase().includes(rawQuery);
+        const nameMatch = (doc.originalName || '').toLowerCase().includes(rawQuery);
+        const tagMatch =
+          Array.isArray(doc.tags) &&
+          doc.tags.some((t) => (t || '').toLowerCase().includes(rawQuery));
+
+        if (!titleMatch && !descMatch && !nameMatch && !tagMatch) {
+          return false;
+        }
+      }
+
+      // If format filter provided (e.g. 'pdf', 'png', etc.)
+      if (formatFilter && formatFilter !== 'all') {
+        const ext = path.extname(doc.originalName || '').replace('.', '').toLowerCase();
+        if (ext !== formatFilter) {
+          return false;
+        }
+      }
+
+      // If tags filter provided, doc must include all requested filter tags
+      if (filterTags.length > 0) {
+        const docTagsLower = (doc.tags || []).map((t) => (t || '').toLowerCase());
+        const hasAllTags = filterTags.every((reqTag) => docTagsLower.includes(reqTag));
+        if (!hasAllTags) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const userId = String(req.user.id || req.user._id);
+
+    return res.status(200).json({
+      query: req.query.q || '',
+      total: matchedDocs.length,
+      documents: matchedDocs.map((doc) => {
+        const sanitized = sanitizeDocument(doc);
+        const ownerId = String(doc.ownerId);
+
+        let accessLevel = 'Reader';
+        if (userId === ownerId) {
+          accessLevel = 'Owner';
+        } else if (req.user.role === 'admin') {
+          accessLevel = 'Admin';
+        } else if (Array.isArray(doc.acl)) {
+          const entry = doc.acl.find((a) => String(a.userId) === userId);
+          if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
+        }
+        return { ...sanitized, accessLevel };
+      }),
+    });
+  } catch (error) {
+    console.error('[Document Search Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'SEARCH_ERROR',
+        message: 'An error occurred while executing vault search.',
+      },
+    });
+  }
+}
+

@@ -24,6 +24,7 @@ import { Modal } from './components/common/Modal';
 import { AuthModals } from './components/auth/AuthModals';
 import { UploadModal } from './components/dashboard/UploadModal';
 import { ShareModal } from './components/dashboard/ShareModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
 import { 
@@ -495,6 +496,8 @@ export function App() {
         return 'Shared with Me';
       case 'activity':
         return 'Security Activity & Audit';
+      case 'admin':
+        return 'Administrator Governance & Compliance';
       case 'settings':
         return 'Vault Configuration';
       case 'profile':
@@ -537,6 +540,8 @@ export function App() {
             ? 'Documents shared with me'
             : activeNav === 'activity'
             ? 'Audit trail & event log'
+            : activeNav === 'admin'
+            ? 'Enterprise governance & compliance console'
             : activeNav === 'settings'
             ? 'Vault security settings'
             : 'Document overview'
@@ -548,6 +553,8 @@ export function App() {
             ? 'Review files where another team member has granted you read or edit privileges.'
             : activeNav === 'activity'
             ? 'Chronological record of document access, permissions changes, and administrative events.'
+            : activeNav === 'admin'
+            ? 'Real-time organizational analytics, tamper-resistant global audit trail with export, and identity governance.'
             : activeNav === 'settings'
             ? 'Manage encryption policies, access revocation parameters, and compliance standards.'
             : 'Manage, share, and track confidential enterprise documents with fine-grained access policies.'
@@ -637,7 +644,7 @@ export function App() {
                   <span className="modal-meta-label">Assigned Role:</span>
                   <span className="modal-meta-val" style={{ textTransform: 'capitalize' }}>
                     <span className="doc-vault-pill" style={{ fontSize: '11px' }}>
-                      {user.role || 'Member'}
+                      {user.role === 'admin' ? 'Administrator' : (user.role === 'viewer' || user.role === 'member') ? 'Viewer' : 'Document Owner'}
                     </span>
                   </span>
                 </li>
@@ -681,6 +688,15 @@ export function App() {
             </div>
           )}
         </div>
+      ) : activeNav === 'admin' ? (
+        <AdminDashboard
+          user={user}
+          token={token}
+          onNavigateToLogin={() => {
+            setAuthModalMode('login');
+            setAuthModalOpen(true);
+          }}
+        />
       ) : activeNav === 'settings' ? (
         <div className="settings-preview-panel" style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
           <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Stage 3 Baseline)</h2>

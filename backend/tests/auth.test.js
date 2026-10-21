@@ -36,7 +36,7 @@ describe('Authentication & Identity Security Suite', () => {
       const user = response.body.data.user;
       expect(user.name).toBe('Alice Developer');
       expect(user.email).toBe('alice@company.com');
-      expect(user.role).toBe('member');
+      expect(user.role).toBe('owner');
 
       // CRITICAL SECURITY ASSERTION: passwordHash must NEVER be returned in response
       expect(user).not.toHaveProperty('passwordHash');
@@ -82,8 +82,8 @@ describe('Authentication & Identity Security Suite', () => {
         });
 
       expect(response.status).toBe(201);
-      // Assert that role strictly defaults to 'member'
-      expect(response.body.data.user.role).toBe('member');
+      // Assert that role strictly defaults to 'owner' (Document Owner)
+      expect(response.body.data.user.role).toBe('owner');
     });
   });
 
@@ -142,7 +142,7 @@ describe('Authentication & Identity Security Suite', () => {
 
     beforeEach(async () => {
       const reg = await request(app).post('/api/auth/register').send({
-        name: 'Charlie Member',
+        name: 'Charlie Owner',
         email: 'charlie@company.com',
         password: 'StrongPassword1',
       });
@@ -156,8 +156,8 @@ describe('Authentication & Identity Security Suite', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.user).toHaveProperty('email', 'charlie@company.com');
-      expect(response.body.data.user).toHaveProperty('name', 'Charlie Member');
-      expect(response.body.data.user).toHaveProperty('role', 'member');
+      expect(response.body.data.user).toHaveProperty('name', 'Charlie Owner');
+      expect(response.body.data.user).toHaveProperty('role', 'owner');
     });
 
     it('should return 401 Unauthorized when Authorization header is missing', async () => {

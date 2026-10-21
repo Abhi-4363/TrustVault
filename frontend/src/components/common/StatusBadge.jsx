@@ -16,6 +16,7 @@ export function StatusBadge({ status, variant }) {
 
   switch (cleanStatus.toLowerCase()) {
     case 'owner':
+    case 'document owner':
       icon = <Shield size={12} aria-hidden="true" />;
       resolvedVariant = 'owner';
       break;
@@ -26,6 +27,7 @@ export function StatusBadge({ status, variant }) {
       break;
     case 'can read':
     case 'read':
+    case 'viewer':
       icon = <Eye size={12} aria-hidden="true" />;
       resolvedVariant = 'read';
       break;

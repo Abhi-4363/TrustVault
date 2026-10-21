@@ -6,6 +6,7 @@ import {
   Activity, 
   Settings, 
   ShieldCheck, 
+  ShieldAlert,
   Lock, 
   User, 
   X 
@@ -28,6 +29,7 @@ export function AppSidebar({
     { id: 'my-documents', label: 'My Documents', icon: Files, tag: '24' },
     { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: '6' },
     { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
+    { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: 'ADMIN' },
     { id: 'settings', label: 'Settings', icon: Settings, tag: null },
     { id: 'profile', label: 'Profile', icon: User, tag: null },
   ];

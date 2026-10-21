@@ -161,6 +161,20 @@ class InMemoryDocumentRepository {
     return this.documents.get(id) || null;
   }
 
+  async findOne(query = {}) {
+    for (const doc of this.documents.values()) {
+      let matches = true;
+      for (const [key, val] of Object.entries(query)) {
+        if (doc[key] !== val) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) return doc;
+    }
+    return null;
+  }
+
   async findByIdAndUpdate(id, update, options = {}) {
     const doc = this.documents.get(id);
     if (!doc) return null;
@@ -240,6 +254,13 @@ export const Document = {
       return inMemoryDocumentStore.findById(id);
     }
     return MongooseDocumentModel.findById(id).exec();
+  },
+
+  async findOne(query = {}) {
+    if (!this.isMongooseActive()) {
+      return inMemoryDocumentStore.findOne(query);
+    }
+    return MongooseDocumentModel.findOne(query).exec();
   },
 
   async findByIdAndUpdate(id, update, options = { new: true }) {

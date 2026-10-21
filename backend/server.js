@@ -6,11 +6,15 @@
 import { createApp } from './src/app.js';
 import { config } from './src/config/env.js';
 import { connectDatabase } from './src/config/database.js';
+import { runSeed } from './scripts/seed.js';
 
 async function startServer() {
   try {
     // Initialize database configuration stub
     await connectDatabase();
+
+    // Auto-seed demo personas and documents
+    await runSeed(false);
 
     const app = createApp();
 

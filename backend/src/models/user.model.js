@@ -36,10 +36,14 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: {
-        values: ['admin', 'manager', 'member'],
-        message: 'Role must be admin, manager, or member',
+        values: ['admin', 'owner', 'document_owner', 'viewer', 'manager', 'member'],
+        message: 'Role must be admin, owner (Document Owner), or viewer',
       },
-      default: 'member',
+      default: 'owner',
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   {
@@ -75,7 +79,7 @@ class InMemoryUserRepository {
     this.users.clear();
   }
 
-  async create({ name, email, password, role = 'member' }) {
+  async create({ name, email, password, role = 'owner', passwordHash: suppliedHash }) {
     const normalizedEmail = email.toLowerCase().trim();
     if (this.users.has(normalizedEmail)) {
       const err = new Error('Email address is already registered');
@@ -83,8 +87,15 @@ class InMemoryUserRepository {
       throw err;
     }
 
-    const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
-    const passwordHash = await bcrypt.hash(password, salt);
+    // If a pre-hashed password was supplied (e.g. admin seeding), use it directly.
+    // Otherwise hash the plaintext password via bcrypt as usual.
+    let passwordHash;
+    if (suppliedHash) {
+      passwordHash = suppliedHash;
+    } else {
+      const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
+      passwordHash = await bcrypt.hash(password, salt);
+    }
 
     const userObj = {
       _id: `mem_user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -108,6 +119,22 @@ class InMemoryUserRepository {
 
     this.users.set(normalizedEmail, userObj);
     return userObj;
+  }
+
+  async findByIdAndUpdate(id, updateData, options = {}) {
+    for (const [email, user] of this.users.entries()) {
+      if (user._id === id) {
+        // Apply updates
+        Object.keys(updateData).forEach((key) => {
+          if (key !== '_id' && key !== 'email') {
+            user[key] = updateData[key];
+          }
+        });
+        user.updatedAt = new Date();
+        return options.new ? user : user;
+      }
+    }
+    return null;
   }
 
   async findOne(query) {
@@ -149,18 +176,27 @@ export const User = {
     return mongoose.connection && mongoose.connection.readyState === 1;
   },
 
-  async create({ name, email, password, role = 'member' }) {
+  async create({ name, email, password, passwordHash, role = 'owner' }) {
+    // Support seeding a user with a pre‑hashed password (e.g., admin bootstrap).
+    // If a passwordHash is provided directly, we skip bcrypt hashing to avoid
+    // errors when `password` is undefined (as in the test suite).
     if (!this.isMongooseActive()) {
-      return inMemoryUserStore.create({ name, email, password, role });
+      // Forward the appropriate fields to the in‑memory repo.
+      return inMemoryUserStore.create({ name, email, password, role, passwordHash });
     }
 
-    const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
-    const passwordHash = await bcrypt.hash(password, salt);
+    let finalHash;
+    if (passwordHash) {
+      finalHash = passwordHash; // Use the supplied hash verbatim.
+    } else {
+      const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
+      finalHash = await bcrypt.hash(password, salt);
+    }
 
     const user = new MongooseUserModel({
       name,
       email,
-      passwordHash,
+      passwordHash: finalHash,
       role,
     });
 
@@ -199,6 +235,13 @@ export const User = {
       q = q.select(selectFields);
     }
     return q.exec();
+  },
+
+  async findByIdAndUpdate(id, updateData, options = {}) {
+    if (!this.isMongooseActive()) {
+      return inMemoryUserStore.findByIdAndUpdate(id, updateData, options);
+    }
+    return MongooseUserModel.findByIdAndUpdate(id, updateData, options).exec();
   },
 
   clearInMemory() {

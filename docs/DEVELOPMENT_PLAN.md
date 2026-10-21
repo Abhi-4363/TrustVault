@@ -112,8 +112,8 @@ graph TD
   2. File signature / magic number validation (disallowing executables renamed with `.pdf` extension).
   3. Input sanitisation and schema validation using Joi or Zod to prevent XSS payloads in titles and notes.
 - **Completion Checks**:
-  - [ ] Searching a confidential term present only in User A's private doc returns 0 results for User B.
-  - [ ] Uploading a malicious shell script disguised as `.png` is rejected with `415 Unsupported Media Type`.
+  - [x] Searching a confidential term present only in User A's private doc returns 0 results for User B.
+  - [x] Uploading a malicious shell script disguised as `.png` is rejected with `415 Unsupported Media Type`.
 
 ---
 
@@ -125,8 +125,8 @@ graph TD
   3. User management console to deactivate accounts or view organization-wide permissions.
   4. Frontend Admin dashboard page with tabular data views and export capabilities (CSV/JSON audit export).
 - **Completion Checks**:
-  - [ ] Non-admin users attempting to access `/api/admin/*` receive `403 Forbidden`.
-  - [ ] Audit logs export accurately reflects historical event data without data truncation.
+  - [x] Non-admin users attempting to access `/api/admin/*` receive `403 Forbidden`.
+  - [x] Audit logs export accurately reflects historical event data without data truncation.
 
 ---
 
@@ -137,8 +137,8 @@ graph TD
   2. Automated concurrency tests verifying rapid revocation handling.
   3. Security regression test runner integrated into project test script (`npm test`).
 - **Completion Checks**:
-  - [ ] 100% of planned security tests in `THREATS.md` pass consistently.
-  - [ ] Zero unhandled errors or unescaped outputs detected during automated fuzzing.
+  - [x] 100% of planned security tests in `THREATS.md` pass consistently.
+  - [x] Zero unhandled errors or unescaped outputs detected during automated fuzzing.
 
 ---
 
@@ -150,6 +150,6 @@ graph TD
   3. Production build optimization and deployment documentation.
   4. Step-by-step evaluator walkthrough script and video presentation guide.
 - **Completion Checks**:
-  - [ ] Seed script executes idempotently and populates clean test data.
-  - [ ] Security audit (`npm audit`) shows 0 critical or high vulnerabilities.
-  - [ ] Final documentation completely reflects the verified implementation.
+  - [x] Seed script executes idempotently and populates clean test data.
+  - [x] Security audit (`npm audit`) shows 0 critical or high vulnerabilities.
+  - [x] Final documentation completely reflects the verified implementation.

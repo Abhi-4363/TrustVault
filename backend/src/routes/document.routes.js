@@ -7,9 +7,15 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { handleFileUpload } from '../middleware/upload.middleware.js';
+import { validateFileSignature } from '../middleware/fileSignature.middleware.js';
+import {
+  validateAndSanitizeDocumentInput,
+  validateAndSanitizeSearchInput,
+} from '../middleware/sanitization.middleware.js';
 import {
   uploadDocument,
   listDocuments,
+  searchDocuments,
   getDocumentById,
   updateDocument,
   downloadDocument,
@@ -24,11 +30,21 @@ import {
 
 const router = Router();
 
-// Ingest new document (multipart/form-data)
-router.post('/', requireAuth, handleFileUpload, uploadDocument);
+// Ingest new document (multipart/form-data) with signature and sanitization validation
+router.post(
+  '/',
+  requireAuth,
+  handleFileUpload,
+  validateFileSignature,
+  validateAndSanitizeDocumentInput,
+  uploadDocument
+);
 
 // List accessible documents for authenticated user
 router.get('/', requireAuth, listDocuments);
+
+// Scoped search endpoint (placed before /:id)
+router.get('/search', requireAuth, validateAndSanitizeSearchInput, searchDocuments);
 
 // User directory lookup for collaborator selection (placed before /:id)
 router.get('/users/directory', requireAuth, getDirectoryUsers);
@@ -39,8 +55,8 @@ router.get('/audit/activity', requireAuth, getRecentAuditActivity);
 // Retrieve document metadata
 router.get('/:id', requireAuth, getDocumentById);
 
-// Update document metadata (Requires Edit Permission)
-router.patch('/:id', requireAuth, updateDocument);
+// Update document metadata (Requires Edit Permission and Input Sanitization)
+router.patch('/:id', requireAuth, validateAndSanitizeDocumentInput, updateDocument);
 
 // Secure streaming download with forced attachment disposition
 router.get('/:id/download', requireAuth, downloadDocument);

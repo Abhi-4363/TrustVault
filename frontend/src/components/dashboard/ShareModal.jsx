@@ -244,11 +244,14 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
                     disabled={granting}
                   />
                   <datalist id="directory-emails">
-                    {directoryUsers.map((u) => (
-                      <option key={u.id} value={u.email}>
-                        {u.name} ({u.role})
-                      </option>
-                    ))}
+                    {directoryUsers.map((u) => {
+                      const roleLabel = u.role === 'admin' ? 'Admin' : (u.role === 'viewer' || u.role === 'member') ? 'Viewer' : 'Document Owner';
+                      return (
+                        <option key={u.id} value={u.email}>
+                          {u.name} ({roleLabel})
+                        </option>
+                      );
+                    })}
                   </datalist>
                 </div>
 

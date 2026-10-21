@@ -72,8 +72,8 @@ export async function register(req, res, next) {
       });
     }
 
-    // 3. THREAT-06 Mitigation: Enforce default 'member' role regardless of client payload
-    const role = 'member';
+    // 3. THREAT-06 Mitigation: Enforce default 'owner' (Document Owner) role regardless of client payload
+    const role = 'owner';
 
     // 4. Create user record with hashed password
     const user = await User.create({
