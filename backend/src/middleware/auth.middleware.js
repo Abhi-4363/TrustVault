@@ -52,11 +52,21 @@ export async function requireAuth(req, res, next) {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(403).json({
+        error: {
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'This user account has been deactivated by an administrator.',
+        },
+      });
+    }
+
     req.user = {
       id: user._id.toString ? user._id.toString() : user._id,
       email: user.email,
       name: user.name,
       role: user.role,
+      isActive: user.isActive !== false,
     };
 
     next();

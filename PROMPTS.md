@@ -251,8 +251,59 @@ This document records the exact progression of development prompts, implementati
   - Utilized `showSaveFilePicker()` for modern browsers so the user activation is captured immediately with the original filename pre-filled, bypassing Chromium's blob UUID naming quirk.
   - Retained strict Bearer-token authentication without placing secrets in URLs.
 - **Real Git Commit Reference**:
-  - Commit Hash: `da1d98e`
+  - Commit Hash: `1cfb75d`
   - Commit Message: `fix(download): preserve original filename and extension using File System Access API`
+
+---
+
+## Prompt Entry 7 — End-to-End Shared with Me & Document Metadata Editing Workflow
+
+- **Date / Timestamp**: 2026-10-21T15:05:00+05:30
+- **User Prompt / Instructions**:
+  - Fix document sharing with Edit permission and recipient access in TrustVault.
+  - When shared with View/Read, document appears in "Shared with Me". When shared with Edit, recipient must get the expected shared document and editing options.
+  - Persist correct permissions in ACL schema (`read` / `view` and `edit`).
+  - Update Shared with Me UI to display documents regardless of View or Edit permission, showing Owner, Permission Level, and appropriate actions.
+  - Implement actual editing functionality: Edit action button, Metadata Editor dialog (title, description, tags), backend saving (`PATCH /api/documents/:id`), instant reflection.
+  - Enforce permissions strictly on backend: authenticate user, verify document exists, check owner or active edit permission in ACL, check active user account, reject view-only or revoked users with HTTP 403, log successful and denied editing attempts (`ACCESS_DENIED`).
+  - Provide sharing confirmation with recipient and granted permission.
+  - Add regression tests covering all 13 workflow requirements.
+  - Commit changes upon verification.
+
+- **What the AI Actually Implemented**:
+  1. **Root-Cause Investigation**:
+     - The backend had a `PATCH /api/documents/:id` endpoint, but `DocumentTable.jsx` never rendered an Edit action button for shared editors (only rendered Share for Owner/Admin, Download, Details, and Delete for Owner/Admin).
+     - There was no metadata editing modal component in the frontend to trigger metadata updates.
+     - `grantDocumentPermission` threw 400 if client passed `'view'` instead of `'read'`.
+     - `updateDocument` did not check email-based revocation or record `ACCESS_DENIED` in audit logs for blocked edit attempts.
+     - `requireAuth` did not verify `user.isActive !== false` for deactivated accounts.
+  2. **Schema & Model Updates**:
+     - `backend/src/models/document.model.js`: Updated `aclEntrySchema` to accept `read`, `view`, and `edit`, normalizing `view` to `read`.
+     - `backend/src/models/audit.model.js`: Added `ACCESS_DENIED` to `VALID_ACTIONS`.
+     - `backend/src/middleware/auth.middleware.js`: Verified `user.isActive !== false` in `requireAuth`.
+  3. **Backend Authorization & Audit Enforcement**:
+     - `backend/src/controllers/document.controller.js`:
+       - Normalized `permissionLevel` in `grantDocumentPermission` supporting `read`/`view` and `edit`.
+       - Updated `canReadDocument` and `canEditDocument` to evaluate permissions case-insensitively and verify user account is active.
+       - Enhanced `updateDocument` to check both user ID and email revocation, enforce edit ACL, audit-log `ACCESS_DENIED` on forbidden attempts, and record `DOCUMENT_UPDATED` upon success.
+       - Refined `accessLevel` resolution across `listDocuments`, `getDocumentById`, and `searchDocuments` to accurately return `Editor` for edit ACL recipients and `Reader` for read ACL recipients.
+  4. **Frontend UI & Components**:
+     - Created `frontend/src/components/dashboard/EditModal.jsx` and `EditModal.css`: An accessible, responsive Metadata Editor modal with live validation, character limits, immutable document context banner, and error/success feedback.
+     - Updated `frontend/src/components/dashboard/DocumentTable.jsx`: Added the `Edit3` action button to table rows for users with `Owner`, `Can Edit`, or `Admin` privileges. View recipients (`Can Read`) see no edit button.
+     - Updated `frontend/src/App.jsx`: Wired `EditModal` state, added `action === 'edit'` handler in `handleDocumentAction`, and auto-refreshed document and activity stores.
+     - Updated `ShareModal.jsx`: Enhanced confirmation notification to display clear permission labels (`Can Edit` / `Can Read`).
+  5. **Regression Tests**:
+     - Added 5 comprehensive integration tests in `backend/tests/permissions.test.js` validating all 13 workflow requirements: View recipient isolation/download/403 edit block, Edit recipient metadata update persistence, outsider access denial, immediate revocation, permission downgrade to View, unauthenticated request rejection, and `ACCESS_DENIED` audit logging.
+     - All 110 automated tests passing across 9 test suites.
+     - Verified production Vite frontend build succeeds in 3.00s.
+
+- **What the User Reviewed**:
+  - Inspected implementation and requested git commit.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `093f640`
+  - Commit Message: `feat(sharing): enable Edit permission, Shared with Me editing options, and metadata updates`
+
 
 
 

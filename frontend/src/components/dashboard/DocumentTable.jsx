@@ -10,7 +10,8 @@ import {
   Info, 
   Search,
   Filter,
-  Trash2
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { StatusBadge } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
@@ -187,6 +188,17 @@ export function DocumentTable({ documents = [], onActionSelect, userRole }) {
                           aria-label={`Share ${doc.name}`}
                         >
                           <Share2 size={15} />
+                        </button>
+                      )}
+                      {(!doc.isReal || doc.accessLevel === 'Owner' || doc.accessLevel === 'Can Edit' || userRole === 'admin') && (
+                        <button
+                          type="button"
+                          className="row-action-btn row-action-edit"
+                          onClick={() => onActionSelect('edit', doc)}
+                          title={`Edit metadata for ${doc.name}`}
+                          aria-label={`Edit ${doc.name}`}
+                        >
+                          <Edit3 size={15} />
                         </button>
                       )}
                       <button

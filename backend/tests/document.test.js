@@ -56,10 +56,14 @@ describe('Stage 3: Document Metadata and Private Storage', () => {
     userBId = resB.body.data.user._id || resB.body.data.user.id;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Clean up temporary test files
     if (fs.existsSync(testFilesDir)) {
-      fs.rmSync(testFilesDir, { recursive: true, force: true });
+      try {
+        fs.rmSync(testFilesDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        // Safe non-blocking cleanup on Windows
+      }
     }
   });
 

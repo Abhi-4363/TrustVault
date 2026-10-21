@@ -14,6 +14,7 @@ const VALID_ACTIONS = [
   'DOCUMENT_DELETED',
   'PERMISSION_GRANTED',
   'PERMISSION_REVOKED',
+  'ACCESS_DENIED',
 ];
 
 const auditLogSchema = new mongoose.Schema(

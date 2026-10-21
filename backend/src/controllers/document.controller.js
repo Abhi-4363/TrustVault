@@ -31,6 +31,7 @@ function sanitizeDocument(doc) {
  */
 export function canReadDocument(doc, user) {
   if (!doc || !user) return false;
+  if (user.isActive === false) return false;
   const userId = String(user.id || user._id);
   const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);
@@ -45,10 +46,14 @@ export function canReadDocument(doc, user) {
   // Check granular ACL entry (by userId or userEmail)
   if (Array.isArray(doc.acl)) {
     const hasAclAccess = doc.acl.some(
-      (entry) =>
-        (String(entry.userId) === userId ||
-          (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
-        (entry.permissionLevel === 'read' || entry.permissionLevel === 'edit')
+      (entry) => {
+        const level = String(entry.permissionLevel || '').toLowerCase().trim();
+        return (
+          (String(entry.userId) === userId ||
+            (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
+          (level === 'read' || level === 'view' || level === 'edit')
+        );
+      }
     );
     if (hasAclAccess) return true;
   }
@@ -71,6 +76,7 @@ export function canReadDocument(doc, user) {
  */
 export function canEditDocument(doc, user) {
   if (!doc || !user) return false;
+  if (user.isActive === false) return false;
   const userId = String(user.id || user._id);
   const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);
@@ -81,10 +87,14 @@ export function canEditDocument(doc, user) {
 
   if (Array.isArray(doc.acl)) {
     const hasEditAcl = doc.acl.some(
-      (entry) =>
-        (String(entry.userId) === userId ||
-          (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
-        entry.permissionLevel === 'edit'
+      (entry) => {
+        const level = String(entry.permissionLevel || '').toLowerCase().trim();
+        return (
+          (String(entry.userId) === userId ||
+            (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
+          level === 'edit'
+        );
+      }
     );
     if (hasEditAcl) return true;
   }
@@ -247,17 +257,20 @@ export async function listDocuments(req, res) {
         let accessLevel = 'Reader';
         if (isOwner) {
           accessLevel = 'Owner';
-        } else if (req.user.role === 'admin') {
-          accessLevel = 'Admin';
         } else if (Array.isArray(doc.acl)) {
           const entry = doc.acl.find(
             (a) =>
               String(a.userId) === userId ||
               (a.email && a.email.toLowerCase().trim() === userEmail)
           );
-          if (entry?.permissionLevel === 'edit') {
-            accessLevel = 'Editor';
+          if (entry) {
+            const lvl = String(entry.permissionLevel || '').toLowerCase().trim();
+            accessLevel = lvl === 'edit' ? 'Editor' : 'Reader';
+          } else if (req.user.role === 'admin') {
+            accessLevel = 'Admin';
           }
+        } else if (req.user.role === 'admin') {
+          accessLevel = 'Admin';
         }
 
         const ownerUser = userMap.get(ownerId) || (ownerEmail ? userMap.get(ownerEmail) : null);
@@ -319,15 +332,20 @@ export async function getDocumentById(req, res) {
     let accessLevel = 'Reader';
     if (isOwner) {
       accessLevel = 'Owner';
-    } else if (req.user.role === 'admin') {
-      accessLevel = 'Admin';
     } else if (Array.isArray(doc.acl)) {
       const entry = doc.acl.find(
         (a) =>
           String(a.userId) === userId ||
           (a.email && a.email.toLowerCase().trim() === userEmail)
       );
-      if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
+      if (entry) {
+        const lvl = String(entry.permissionLevel || '').toLowerCase().trim();
+        accessLevel = lvl === 'edit' ? 'Editor' : 'Reader';
+      } else if (req.user.role === 'admin') {
+        accessLevel = 'Admin';
+      }
+    } else if (req.user.role === 'admin') {
+      accessLevel = 'Admin';
     }
 
     let ownerUser = null;
@@ -387,9 +405,26 @@ export async function updateDocument(req, res) {
     }
 
     const userId = String(req.user.id || req.user._id);
+    const userEmail = (req.user.email || '').toLowerCase().trim();
 
-    // Stage 5 check: immediate revocation validation
-    if (isAccessImmediatelyRevoked(id, userId) || !canEditDocument(doc, req.user)) {
+    // Stage 5 check: immediate revocation and authorization validation
+    if (
+      isAccessImmediatelyRevoked(id, userId) ||
+      (userEmail && isAccessImmediatelyRevoked(id, userEmail)) ||
+      !canEditDocument(doc, req.user)
+    ) {
+      // Audit log denied edit attempt (Stage 6/9)
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'DOCUMENT_METADATA_UPDATE',
+          reason: 'User lacks required edit permissions or access has been revoked.',
+        },
+      });
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -665,16 +700,19 @@ export async function getDocumentPermissions(req, res) {
 export async function grantDocumentPermission(req, res) {
   try {
     const { id } = req.params;
-    const { email, userId, permissionLevel = 'read' } = req.body;
+    let { email, userId, permissionLevel = 'read' } = req.body;
+    let normLevel = String(permissionLevel || '').toLowerCase().trim();
+    if (normLevel === 'view') normLevel = 'read';
 
-    if (!['read', 'edit'].includes(permissionLevel)) {
+    if (!['read', 'edit'].includes(normLevel)) {
       return res.status(400).json({
         error: {
           code: 'INVALID_PERMISSION_LEVEL',
-          message: "Permission level must be either 'read' or 'edit'.",
+          message: "Permission level must be either 'read' (or 'view') or 'edit'.",
         },
       });
     }
+    permissionLevel = normLevel;
 
     const doc = await Document.findById(id);
     if (!doc) {
@@ -1073,15 +1111,20 @@ export async function searchDocuments(req, res) {
         let accessLevel = 'Reader';
         if (isOwner) {
           accessLevel = 'Owner';
-        } else if (req.user.role === 'admin') {
-          accessLevel = 'Admin';
         } else if (Array.isArray(doc.acl)) {
           const entry = doc.acl.find(
             (a) =>
               String(a.userId) === userId ||
               (a.email && a.email.toLowerCase().trim() === userEmail)
           );
-          if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
+          if (entry) {
+            const lvl = String(entry.permissionLevel || '').toLowerCase().trim();
+            accessLevel = lvl === 'edit' ? 'Editor' : 'Reader';
+          } else if (req.user.role === 'admin') {
+            accessLevel = 'Admin';
+          }
+        } else if (req.user.role === 'admin') {
+          accessLevel = 'Admin';
         }
 
         const owner = {

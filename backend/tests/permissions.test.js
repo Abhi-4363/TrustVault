@@ -371,5 +371,221 @@ describe('Stage 4: Per-Document Read and Edit Permissions', () => {
       expect(text).toContain('confidential cross share document');
     });
   });
+
+  describe('Comprehensive End-to-End Shared with Me and Edit Permission Workflow', () => {
+    let docId;
+    let viewRecipientToken;
+    let editRecipientToken;
+    let editRecipientId;
+
+    beforeEach(async () => {
+      // Create View Recipient (Dan)
+      const resDan = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Dan Viewer',
+          email: 'dan.viewer@trustvault.internal',
+          password: 'Password123!',
+        });
+      viewRecipientToken = resDan.body.data.token;
+
+      // Create Edit Recipient (Eva)
+      const resEva = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Eva Editor',
+          email: 'eva.editor@trustvault.internal',
+          password: 'Password123!',
+        });
+      editRecipientToken = resEva.body.data.token;
+      editRecipientId = resEva.body.data.user._id || resEva.body.data.user.id;
+
+      // Alice uploads a new test document
+      const samplePath = path.join(testFilesDir, 'quarterly-budget.pdf');
+      fs.writeFileSync(samplePath, '%PDF-1.4 Q1 Budget Allocations');
+
+      const uploadRes = await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .field('title', 'Q1 Financial Budget')
+        .field('description', 'Initial budget proposal for Q1')
+        .attach('file', samplePath);
+
+      docId = uploadRes.body.document._id;
+    });
+
+    it('1-4: Owner shares with View permission (accepting "view" alias); View recipient sees doc as Reader, can download, but cannot edit', async () => {
+      // 1. Owner shares with permissionLevel: 'view'
+      const shareRes = await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          email: 'dan.viewer@trustvault.internal',
+          permissionLevel: 'view',
+        });
+      expect(shareRes.status).toBe(200);
+
+      // 2. Dan sees document under shared documents list with 'Reader' access level
+      const listRes = await request(app)
+        .get('/api/documents')
+        .set('Authorization', `Bearer ${viewRecipientToken}`);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.documents.length).toBe(1);
+      expect(listRes.body.documents[0].accessLevel).toBe('Reader');
+
+      // 3. Dan can read metadata and download
+      const readRes = await request(app)
+        .get(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${viewRecipientToken}`);
+      expect(readRes.status).toBe(200);
+
+      const downloadRes = await request(app)
+        .get(`/api/documents/${docId}/download`)
+        .set('Authorization', `Bearer ${viewRecipientToken}`);
+      expect(downloadRes.status).toBe(200);
+
+      // 4. Dan CANNOT edit metadata (403 Forbidden)
+      const editRes = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${viewRecipientToken}`)
+        .send({ title: 'Tampered by Viewer' });
+      expect(editRes.status).toBe(403);
+      expect(editRes.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('5-7: Owner shares with Edit permission; recipient sees Editor label, can edit title/description/tags, and changes persist', async () => {
+      // 5. Owner shares with Edit permission
+      const shareRes = await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          email: 'eva.editor@trustvault.internal',
+          permissionLevel: 'edit',
+        });
+      expect(shareRes.status).toBe(200);
+
+      // 6. Eva sees document in Shared with Me with Editor access level
+      const listRes = await request(app)
+        .get('/api/documents')
+        .set('Authorization', `Bearer ${editRecipientToken}`);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.documents.length).toBe(1);
+      expect(listRes.body.documents[0].accessLevel).toBe('Editor');
+
+      // 7. Eva can update supported metadata
+      const patchRes = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${editRecipientToken}`)
+        .send({
+          title: 'Q1 Financial Budget (Approved by Eva)',
+          description: 'Revised executive allocation for Q1 operations',
+          tags: ['budget', 'q1', 'approved'],
+        });
+      expect(patchRes.status).toBe(200);
+      expect(patchRes.body.document.title).toBe('Q1 Financial Budget (Approved by Eva)');
+      expect(patchRes.body.document.description).toBe('Revised executive allocation for Q1 operations');
+      expect(patchRes.body.document.tags).toEqual(['budget', 'q1', 'approved']);
+
+      // Verify retrieval returns persisted changes
+      const getRes = await request(app)
+        .get(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${editRecipientToken}`);
+      expect(getRes.status).toBe(200);
+      expect(getRes.body.document.title).toBe('Q1 Financial Budget (Approved by Eva)');
+    });
+
+    it('8: Unrelated users cannot see or edit the document', async () => {
+      // Share with Eva only
+      await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ email: 'eva.editor@trustvault.internal', permissionLevel: 'edit' });
+
+      // Charlie (outsider) requests document list
+      const listRes = await request(app)
+        .get('/api/documents')
+        .set('Authorization', `Bearer ${outsiderToken}`);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.documents.length).toBe(0);
+
+      // Charlie attempts direct edit
+      const editRes = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .send({ title: 'Hacked by Outsider' });
+      expect(editRes.status).toBe(403);
+    });
+
+    it('9-10: Revoking Edit permission immediately prevents edits; re-granting View removes edit capability', async () => {
+      // Grant edit permission
+      await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ email: 'eva.editor@trustvault.internal', permissionLevel: 'edit' });
+
+      // Eva verifies she can edit
+      const edit1 = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${editRecipientToken}`)
+        .send({ title: 'Edit Pass 1' });
+      expect(edit1.status).toBe(200);
+
+      // 9. Revoke permission
+      const revokeRes = await request(app)
+        .delete(`/api/documents/${docId}/permissions/${editRecipientId}`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(revokeRes.status).toBe(200);
+
+      // Immediately assert subsequent edit fails with 403
+      const editAfterRevoke = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${editRecipientToken}`)
+        .send({ title: 'Edit After Revocation' });
+      expect(editAfterRevoke.status).toBe(403);
+
+      // 10. Re-grant VIEW permission (downgrading from previous Edit)
+      const regrantRes = await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ email: 'eva.editor@trustvault.internal', permissionLevel: 'read' });
+      expect(regrantRes.status).toBe(200);
+
+      // Subsequent edit attempt MUST be blocked with 403
+      const editAsViewer = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${editRecipientToken}`)
+        .send({ title: 'Attempted Edit as Viewer' });
+      expect(editAsViewer.status).toBe(403);
+    });
+
+    it('11-13: Unauthenticated requests are rejected, audit trail records successful/denied attempts, and Owner/Admin retain control', async () => {
+      // 11. Unauthenticated PATCH is rejected with 401
+      const unauthRes = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .send({ title: 'Unauthenticated Title' });
+      expect(unauthRes.status).toBe(401);
+
+      // 12. Denied attempt records ACCESS_DENIED audit log
+      await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .send({ title: 'Forbidden Attempt' });
+
+      const auditRes = await request(app)
+        .get(`/api/documents/${docId}/audit`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(auditRes.status).toBe(200);
+      const deniedEvent = auditRes.body.auditLogs.find((l) => l.action === 'ACCESS_DENIED');
+      expect(deniedEvent).toBeDefined();
+
+      // 13. Owner can edit document metadata directly
+      const ownerEdit = await request(app)
+        .patch(`/api/documents/${docId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ title: 'Owner Updated Title' });
+      expect(ownerEdit.status).toBe(200);
+      expect(ownerEdit.body.document.title).toBe('Owner Updated Title');
+    });
+  });
 });
 

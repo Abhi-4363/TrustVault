@@ -3,7 +3,7 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-105%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-110%20passed-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-12%2F12%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
@@ -22,6 +22,7 @@ TrustVault enforces a strict **Zero-Trust** security architecture:
 5. **Upload & Magic-Number Validation**: Uploads are strictly checked against file signatures (magic numbers) to prevent disguised scripts/executables, with automatic disk purging.
 6. **Administrator Governance Dashboard**: Real-time system analytics, global audit log explorer with un-truncated CSV/JSON export, and user account management.
 7. **Secure Download with Original Filename**: Downloads use the browser's File System Access API (`showSaveFilePicker`) to present the original filename (e.g. `Report.pdf`) in a native Save-As dialog, bypassing Chromium's blob-URL UUID fallback. Bearer-token authentication is preserved; tokens are never placed in URLs.
+8. **End-to-End Sharing & Metadata Editing**: Document owners can grant `read` or `edit` permissions. Recipients with Edit permission can modify document titles, descriptions, and discoverability tags through an integrated Metadata Editor modal, with changes reflected in real-time and audited in the immutable log. View recipients remain strictly restricted to read/download access.
 
 ---
 
@@ -146,7 +147,7 @@ npm test
 ```text
  ✓ tests/auth.test.js                    (11 tests) - Password hashing, JWT issuance, role enforcement
  ✓ tests/document.test.js                (16 tests) - File upload limits, private storage, binary stream, download filename
- ✓ tests/permissions.test.js             (12 tests) - Granular read/edit ACLs, isolation boundaries
+ ✓ tests/permissions.test.js             (17 tests) - Granular read/edit ACLs, Shared with Me workflow, metadata editing
  ✓ tests/revocation.test.js              (2 tests)  - Immediate revocation with zero caching delay
  ✓ tests/audit.test.js                   (6 tests)  - Immutable audit trail & pre-hook tamper prevention
  ✓ tests/search-validation.test.js       (14 tests) - Magic numbers, disguised executables, XSS sanitization
@@ -155,8 +156,8 @@ npm test
  ✓ tests/health.test.js                  (3 tests)  - Public health endpoint without secret leakage
 
 Test Files:  9 passed (9)
-Tests:       105 passed (105)
-Duration:    5.31s
+Tests:       110 passed (110)
+Duration:    5.05s
 Vulnerabilities: 0
 ```
 
@@ -199,6 +200,13 @@ To experience all enterprise security capabilities in the live browser:
    - A native browser **Save As** dialog opens pre-filled with the original filename (e.g. `Report.pdf`).
    - Accept the location — the file is fetched from the backend with Bearer-token authentication and written directly to the chosen path.
    - The Bearer token is never placed in a URL. Chromium's blob-URL UUID fallback is bypassed entirely.
+
+7. **Test End-to-End Shared with Me & Metadata Editing**:
+   - Sign in as Document Owner (e.g., `sarah.lead@trustvault.internal`).
+   - Open the Share dialog on any document, grant **Can Edit** access to another colleague (e.g., `alex.dev@trustvault.internal`), and observe the confirmation.
+   - Sign in as the recipient, navigate to **Shared with Me**, and observe the document listed with the **Can Edit** badge and an active **Edit** action button.
+   - Click the **Edit** button to open the Metadata Editor, modify the document title or description, and save. The changes persist immediately and are audited under `DOCUMENT_UPDATED`.
+   - View recipients (`Can Read`) see no enabled edit actions, and direct API edit attempts by unauthorized users are strictly blocked with HTTP 403 and logged under `ACCESS_DENIED`.
 
 ---
 

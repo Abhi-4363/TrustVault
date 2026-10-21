@@ -249,6 +249,12 @@
   border-color: var(--border-light);
 }
 
+.row-action-edit:hover {
+  color: #2563eb;
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
 .row-action-delete:hover {
   color: var(--color-danger-icon);
   background-color: var(--color-danger-bg);

@@ -119,8 +119,8 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
           throw new Error(data.error?.message || 'Failed to grant permission.');
         }
 
-        setPermissions(data.acl || []);
-        setSuccessMsg(`Granted '${permissionLevel}' access to ${selectedEmail}.`);
+        const label = permissionLevel === 'edit' ? 'Can Edit' : 'Can Read';
+        setSuccessMsg(`Successfully granted '${label}' access to ${selectedEmail}.`);
         setSelectedEmail('');
         if (onPermissionsUpdated) onPermissionsUpdated();
       } else {

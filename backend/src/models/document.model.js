@@ -28,11 +28,12 @@ const aclEntrySchema = new mongoose.Schema(
     permissionLevel: {
       type: String,
       enum: {
-        values: ['read', 'edit'],
-        message: 'Permission level must be read or edit',
+        values: ['read', 'view', 'edit'],
+        message: 'Permission level must be read, view, or edit',
       },
       required: true,
       default: 'read',
+      set: (val) => (String(val).toLowerCase().trim() === 'view' ? 'read' : String(val).toLowerCase().trim()),
     },
     grantedBy: {
       type: mongoose.Schema.Types.Mixed,

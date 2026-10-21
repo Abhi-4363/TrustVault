@@ -25,6 +25,7 @@ import { AuthModals } from './components/auth/AuthModals';
 import { AuthLandingPortal } from './components/auth/AuthLandingPortal';
 import { UploadModal } from './components/dashboard/UploadModal';
 import { ShareModal } from './components/dashboard/ShareModal';
+import { EditModal } from './components/dashboard/EditModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
@@ -44,11 +45,12 @@ export function App() {
   // Authentication Context
   const { user, token, logout } = useAuth();
 
-  // Auth, Upload & Share Modals
+  // Auth, Upload, Share & Edit Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [shareModalConfig, setShareModalConfig] = useState({ isOpen: false, document: null });
+  const [editModalConfig, setEditModalConfig] = useState({ isOpen: false, document: null });
 
   // Private Vault Documents
   const [vaultDocuments, setVaultDocuments] = useState([]);
@@ -367,6 +369,13 @@ export function App() {
         }
         return;
       }
+    } else if (action === 'edit') {
+      if (!user) {
+        setAuthModalMode('login');
+        setAuthModalOpen(true);
+        return;
+      }
+      setEditModalConfig({ isOpen: true, document: doc });
     } else if (action === 'share') {
       if (!user) {
         setAuthModalMode('login');
@@ -868,6 +877,17 @@ export function App() {
         onClose={() => setShareModalConfig({ isOpen: false, document: null })}
         document={shareModalConfig.document}
         onPermissionsUpdated={() => {
+          fetchVaultDocuments();
+          fetchLiveActivities();
+        }}
+      />
+
+      {/* Document Metadata Editor Dialog */}
+      <EditModal
+        isOpen={editModalConfig.isOpen}
+        onClose={() => setEditModalConfig({ isOpen: false, document: null })}
+        document={editModalConfig.document}
+        onUpdateSuccess={() => {
           fetchVaultDocuments();
           fetchLiveActivities();
         }}
