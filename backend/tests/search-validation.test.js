@@ -47,6 +47,7 @@ describe('Stage 7: Search, Metadata Indexing, and Upload Validation', () => {
       });
     userAToken = resA.body.data.token;
     userAId = resA.body.data.user._id || resA.body.data.user.id;
+    await User.findByIdAndUpdate(userAId, { role: 'owner' });
 
     // Register User B (Bob - External Auditor / Peer)
     const resB = await request(app)

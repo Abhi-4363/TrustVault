@@ -3,7 +3,7 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-116%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-130%20passed-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-12%2F12%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
@@ -110,10 +110,11 @@ The seed script (`npm run seed`) automatically creates four corporate personas r
 
 | Persona | Role | Email | Password | Permissions & Purpose |
 | :--- | :---: | :--- | :--- | :--- |
-| **Marcus Vance** | `admin` | `admin@trustvault.internal` | `TrustVault2026!` | Chief Security Officer — Full access to Governance Dashboard, Global Audit Trail, CSV/JSON export, and User Deactivation |
+| **Marcus Vance** | `admin` | `admin@trustvault.internal` | `TrustVault2026!` | Chief Security Officer — Full access to Governance Dashboard, Owner Approval Queue, Global Audit Trail, and User Deactivation |
 | **Sarah Jenkins** | `owner` | `sarah.lead@trustvault.internal` | `TrustVault2026!` | Document Owner (VP Engineering) — Uploads documents, manages ACLs for owned files, and reviews personal audit history |
-| **Alex Mercer** | `viewer` | `alex.dev@trustvault.internal` | `TrustVault2026!` | Viewer (Platform Engineer) — Read-only collaborator; views and downloads explicitly shared files, blocked from uploading |
 | **Elena Rostova** | `owner` | `elena.legal@trustvault.internal` | `TrustVault2026!` | Document Owner (Compliance Counsel) — Uploads compliance documents, collaborates and manages permissions on legal files |
+| **Alex Mercer** | `viewer` | `alex.dev@trustvault.internal` | `TrustVault2026!` | Viewer (Platform Engineer) — Read-only collaborator; views and downloads explicitly shared files, blocked from uploading |
+| **Jordan Lee** | `viewer` (pending) | `jordan.req@trustvault.internal` | `TrustVault2026!` | Pending Document Owner Requester — Demonstrates the pending owner workflow, awaiting Admin governance decision |
 
 ---
 
@@ -128,7 +129,7 @@ All 12 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematicall
 | **THREAT-03** | Permission Revocation Lag | Direct-to-database permission check on every stream with zero cache lag | **VERIFIED (Zero Delay)** |
 | **THREAT-04** | Publicly Accessible File URLs | Storage isolated outside web root; direct static GET probes return 404 | **VERIFIED (404 Not Found)** |
 | **THREAT-05** | Audit Log Tampering | Pre-save schema hooks reject PUT, PATCH, and DELETE operations | **VERIFIED (Append-Only)** |
-| **THREAT-06** | Privilege Escalation | Registration role parameter forced to `'owner'`; admin routes guarded | **VERIFIED (403 Forbidden)** |
+| **THREAT-06** | Privilege Escalation | Registration role parameter forced to `'viewer'`; owner requests queued | **VERIFIED (403 Forbidden)** |
 | **THREAT-07** | Malicious / Disguised Uploads | Magic number signature verification; automatic disk purging of rejects | **VERIFIED (415 Unsupported)** |
 | **THREAT-08** | Cross-Site Scripting (XSS) | Backend HTML and event-handler stripping in document metadata | **VERIFIED (Sanitized)** |
 | **THREAT-09** | CSRF & Missing Bearer Token | Stateless Bearer token verification; requests without headers rejected | **VERIFIED (401 Unauthorized)** |
@@ -140,9 +141,44 @@ All 12 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematicall
 
 ## 7. Automated Test Suite
 
-TrustVault maintains a 100% test pass rate across 9 comprehensive test suites:
+TrustVault maintains a 100% test pass rate across 10 comprehensive test suites with **130 automated integration tests**:
 
 ```bash
+cd backend
+npm test
+```
+
+| Suite | File | Tests | Key Invariants Covered |
+| :--- | :--- | :---: | :--- |
+| **Owner Approval Workflow** | `tests/owner-approval-workflow.test.js` | 13 | Viewer-default registration, pending owner queue, approval/rejection lifecycle, downgrade with zero data loss, self-promotion blocking |
+| **Security Threat Integration**| `tests/security-integration.test.js` | 18 | Automated verification of all 12 entries in `THREATS.md` |
+| **Admin Governance & Audit** | `tests/admin-governance.test.js` | 23 | System analytics, un-truncated CSV/JSON export, user account deactivation |
+| **Upload Signature & Search** | `tests/search-validation.test.js` | 18 | Magic-number binary header inspection, scoped search isolation |
+| **Document Access & Streaming**| `tests/document.test.js` | 16 | Private disk storage, UUID obfuscation, download authorization |
+| **Permissions & Delegation** | `tests/permissions.test.js` | 17 | Per-document ACLs (`read`/`edit`), multi-user collaboration |
+| **Immediate Access Revocation**| `tests/revocation.test.js` | 2 | Zero token caching lag, direct-to-database check |
+| **Tamper-Resistant Audit** | `tests/audit.test.js` | 7 | Append-only ledger, mutation rejection, chronological ordering |
+| **Authentication & RBAC** | `tests/auth.test.js` | 13 | bcrypt (12 rounds), HMAC SHA-256 JWT, deactivated account blocking |
+| **Service Health Check** | `tests/health.test.js` | 3 | Server uptime, environment state, storage accessibility |
+
+---
+
+## 8. Admin User Management, Owner Approval, and Role Revocation Workflow
+
+### Strict Separation of Effective vs Requested Role
+TrustVault distinguishes an account's **effective role** (`role`: `admin`, `owner`, `viewer`) from its **requested role** (`requestedRole`: `owner`, `viewer`, or `null`) and approval lifecycle (`ownerApprovalStatus`: `not_required`, `pending`, `approved`, `rejected`):
+1. **Public Registration Policy**: Public registrations are **always provisioned as effective Viewers (`role: 'viewer'`)**. Users requesting `owner` privileges have their account flagged as `ownerApprovalStatus: 'pending'` and are queued for Administrator review.
+2. **Immediate In-App Notice**: Requester accounts receive an in-app notice with their submission date and can browse files shared with them as Viewers while awaiting Admin action. A live "Check Status" button polls `/api/auth/me` to reflect approval decisions instantly.
+3. **Admin Queue & Notifications**: Administrators see a live badge count in the navigation (`1 PENDING`) and a dedicated **Pending Document Owner Requests** table in the Admin Governance dashboard.
+4. **Approve / Reject Actions**:
+   - `POST /api/admin/owner-requests/:userId/approve`: Promotes effective role to `owner`, sets status to `approved`, and emits an immutable `OWNER_REQUEST_APPROVED` audit event. The user immediately gains upload and ACL delegation privileges.
+   - `POST /api/admin/owner-requests/:userId/reject`: Keeps effective role as `viewer`, sets status to `rejected`, records the reason, and emits an `OWNER_REQUEST_REJECTED` audit event.
+5. **Role Promotion & Downgrade (Zero Data Loss Guarantee)**:
+   - Administrators can promote any Viewer to Owner (`USER_PROMOTED_TO_OWNER`) or downgrade any Owner to Viewer (`USER_DOWNGRADED_TO_VIEWER`) at any time.
+   - When an Owner is downgraded:
+     - Their upload, deletion, and sharing permissions are revoked immediately.
+     - **All existing documents previously uploaded by the downgraded user are strictly preserved** in private storage without file deletion or ownership reassignment.
+     - Pre-action confirmation dialog explicitly details this guarantee before role updates take effect.
 cd backend
 npm test
 ```

@@ -37,12 +37,32 @@ describe('Authentication & Identity Security Suite', () => {
       const user = response.body.data.user;
       expect(user.name).toBe('Alice Developer');
       expect(user.email).toBe('alice@company.com');
-      expect(user.role).toBe('owner');
+      expect(user.role).toBe('viewer');
+      expect(user.requestedRole).toBe('viewer');
+      expect(user.ownerApprovalStatus).toBe('not_required');
 
       // CRITICAL SECURITY ASSERTION: passwordHash must NEVER be returned in response
       expect(user).not.toHaveProperty('passwordHash');
       expect(user).not.toHaveProperty('password');
       expect(JSON.stringify(response.body)).not.toContain('SecurePassword123');
+    });
+
+    it('should register an Owner request with effective role viewer and pending approval status', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Dana Requester',
+          email: 'dana.requester@company.com',
+          password: 'SecurePassword123',
+          requestedRole: 'owner',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toMatch(/pending Admin approval/i);
+      expect(response.body.data.user.role).toBe('viewer'); // Effective role strictly Viewer
+      expect(response.body.data.user.requestedRole).toBe('owner');
+      expect(response.body.data.user.ownerApprovalStatus).toBe('pending');
+      expect(response.body.data.user.ownerApprovalRequestedAt).toBeDefined();
     });
 
     it('should reject registration when email already exists (409 Conflict)', async () => {
@@ -83,8 +103,8 @@ describe('Authentication & Identity Security Suite', () => {
         });
 
       expect(response.status).toBe(201);
-      // Assert that role strictly defaults to 'owner' (Document Owner)
-      expect(response.body.data.user.role).toBe('owner');
+      // Assert that role strictly defaults to 'viewer'
+      expect(response.body.data.user.role).toBe('viewer');
     });
   });
 
@@ -180,7 +200,7 @@ describe('Authentication & Identity Security Suite', () => {
       expect(response.status).toBe(200);
       expect(response.body.data.user).toHaveProperty('email', 'charlie@company.com');
       expect(response.body.data.user).toHaveProperty('name', 'Charlie Owner');
-      expect(response.body.data.user).toHaveProperty('role', 'owner');
+      expect(response.body.data.user).toHaveProperty('role', 'viewer');
     });
 
     it('should return 401 Unauthorized when Authorization header is missing', async () => {

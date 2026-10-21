@@ -114,6 +114,9 @@ export async function getAnalytics(req, res) {
       });
     }
 
+    const pendingOwnerRequests = allUsers.filter((u) => u.ownerApprovalStatus === 'pending');
+    const pendingOwnerRequestsCount = pendingOwnerRequests.length;
+
     return res.status(200).json({
       overview: {
         totalUsers: allUsers.length,
@@ -122,6 +125,16 @@ export async function getAnalytics(req, res) {
         totalDocuments: allDocs.length,
         totalStorageBytes,
         totalAuditEvents: allAuditLogs.length,
+        pendingOwnerRequests: pendingOwnerRequestsCount,
+      },
+      totals: {
+        users: allUsers.length,
+        activeUsers: activeUsers.length,
+        deactivatedUsers: deactivatedUsers.length,
+        documents: allDocs.length,
+        activeShares: totalPermissions,
+        auditLogs: allAuditLogs.length,
+        pendingOwnerRequests: pendingOwnerRequestsCount,
       },
       users: {
         roleDistribution: roleCounts,
@@ -133,6 +146,8 @@ export async function getAnalytics(req, res) {
         totalPermissions,
         readPermissions,
         editPermissions,
+        read: readPermissions,
+        edit: editPermissions,
       },
       topAccessedDocuments,
       actionBreakdown,
@@ -341,6 +356,12 @@ export async function listAllUsers(req, res) {
         name: u.name,
         email: u.email,
         role: u.role,
+        requestedRole: u.requestedRole || null,
+        ownerApprovalStatus: u.ownerApprovalStatus || 'not_required',
+        ownerApprovalRequestedAt: u.ownerApprovalRequestedAt || null,
+        ownerApprovalReviewedAt: u.ownerApprovalReviewedAt || null,
+        ownerApprovalReviewedByName: u.ownerApprovalReviewedByName || null,
+        roleChangeReason: u.roleChangeReason || '',
         isActive: u.isActive !== false, // default true
         documentsOwned: ownershipMap[userId] || 0,
         createdAt: u.createdAt,
@@ -654,16 +675,34 @@ export async function updateUserRole(req, res) {
     }
 
     // 5. Update user role
+    const updates = { role: normalizedRole };
+    let specificAuditAction = 'USER_ROLE_UPDATED';
+
+    if (previousRole === 'viewer' && normalizedRole === 'owner') {
+      specificAuditAction = 'USER_PROMOTED_TO_OWNER';
+      updates.ownerApprovalStatus = 'approved';
+      updates.ownerApprovalReviewedAt = new Date();
+      updates.ownerApprovalReviewedBy = callerId;
+      updates.ownerApprovalReviewedByName = req.user.name || req.user.email;
+      updates.roleChangeReason = req.body.reason ? String(req.body.reason).trim() : 'Promoted to Document Owner by Administrator';
+    } else if (previousRole === 'owner' && normalizedRole === 'viewer') {
+      specificAuditAction = 'USER_DOWNGRADED_TO_VIEWER';
+      updates.roleChangeReason = req.body.reason ? String(req.body.reason).trim() : 'Downgraded to Viewer by Administrator';
+      // Critical Security & Data Guarantee: Documents are strictly preserved without deletion or ownership transfer!
+    } else if (req.body.reason) {
+      updates.roleChangeReason = String(req.body.reason).trim();
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { role: normalizedRole },
+      updates,
       { new: true }
     );
 
     // 6. Record immutable audit log
     await logAuditEvent({
       req,
-      action: 'USER_ROLE_UPDATED',
+      action: specificAuditAction,
       documentId: String(targetUser._id || targetUser.id),
       documentTitle: `Account: ${targetUser.email}`,
       metadata: {
@@ -673,6 +712,8 @@ export async function updateUserRole(req, res) {
         previousRole,
         newRole: normalizedRole,
         changedBy: req.user.email,
+        reason: updates.roleChangeReason || '',
+        documentsPreserved: true,
       },
     });
 
@@ -685,6 +726,12 @@ export async function updateUserRole(req, res) {
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
+        requestedRole: updatedUser.requestedRole || null,
+        ownerApprovalStatus: updatedUser.ownerApprovalStatus || 'not_required',
+        ownerApprovalRequestedAt: updatedUser.ownerApprovalRequestedAt || null,
+        ownerApprovalReviewedAt: updatedUser.ownerApprovalReviewedAt || null,
+        ownerApprovalReviewedByName: updatedUser.ownerApprovalReviewedByName || null,
+        roleChangeReason: updatedUser.roleChangeReason || '',
         isActive: updatedUser.isActive !== false,
         createdAt: updatedUser.createdAt,
       },
@@ -695,6 +742,230 @@ export async function updateUserRole(req, res) {
       error: {
         code: 'ROLE_UPDATE_ERROR',
         message: 'Failed to update user role.',
+      },
+    });
+  }
+}
+
+/**
+ * GET /api/admin/owner-requests
+ * Lists all pending Document Owner access requests.
+ */
+export async function listOwnerRequests(req, res) {
+  try {
+    const allUsers = await User.find();
+    const pendingUsers = allUsers.filter((u) => u.ownerApprovalStatus === 'pending');
+
+    return res.status(200).json({
+      status: 'success',
+      total: pendingUsers.length,
+      requests: pendingUsers.map((u) => {
+        const userId = String(u._id || u.id);
+        return {
+          id: userId,
+          _id: userId,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          requestedRole: u.requestedRole || 'owner',
+          ownerApprovalStatus: u.ownerApprovalStatus,
+          ownerApprovalRequestedAt: u.ownerApprovalRequestedAt || u.createdAt,
+          createdAt: u.createdAt,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('[Admin List Owner Requests Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'OWNER_REQUESTS_FETCH_ERROR',
+        message: 'Failed to retrieve pending owner requests.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/owner-requests/:userId/approve
+ * Approves a user's pending Owner access request.
+ * Transitions role: 'viewer' -> 'owner' and status: 'pending' -> 'approved'.
+ */
+export async function approveOwnerRequest(req, res) {
+  try {
+    const { userId } = req.params;
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    if (targetUser.ownerApprovalStatus !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_STATE',
+          message: `User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`,
+        },
+      });
+    }
+
+    const previousRole = targetUser.role;
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        role: 'owner',
+        ownerApprovalStatus: 'approved',
+        ownerApprovalReviewedAt: new Date(),
+        ownerApprovalReviewedBy: adminId,
+        ownerApprovalReviewedByName: adminName,
+        roleChangeReason: 'Owner privileges approved by Administrator.',
+      },
+      { new: true }
+    );
+
+    // Record immutable audit event
+    await logAuditEvent({
+      req,
+      action: 'OWNER_REQUEST_APPROVED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        affectedUserName: targetUser.name,
+        previousRole,
+        newRole: 'owner',
+        approvedBy: req.user.email,
+        timestamp: new Date().toISOString(),
+        outcome: 'approved',
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Owner access approved for "${targetUser.name}". Account upgraded to Document Owner.`,
+      user: {
+        id: String(updatedUser._id || updatedUser.id),
+        _id: String(updatedUser._id || updatedUser.id),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        requestedRole: updatedUser.requestedRole || null,
+        ownerApprovalStatus: updatedUser.ownerApprovalStatus,
+        ownerApprovalRequestedAt: updatedUser.ownerApprovalRequestedAt,
+        ownerApprovalReviewedAt: updatedUser.ownerApprovalReviewedAt,
+        ownerApprovalReviewedByName: updatedUser.ownerApprovalReviewedByName,
+        roleChangeReason: updatedUser.roleChangeReason,
+        isActive: updatedUser.isActive !== false,
+        createdAt: updatedUser.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Approve Owner Request Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'OWNER_APPROVAL_ERROR',
+        message: 'Failed to approve owner request.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/owner-requests/:userId/reject
+ * Rejects a user's pending Owner access request.
+ * Retains effective role: 'viewer' and updates status: 'pending' -> 'rejected'.
+ */
+export async function rejectOwnerRequest(req, res) {
+  try {
+    const { userId } = req.params;
+    const reason = req.body?.reason ? String(req.body.reason).trim() : 'Owner access request rejected by administrator.';
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    if (targetUser.ownerApprovalStatus !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_STATE',
+          message: `User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`,
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        role: 'viewer',
+        ownerApprovalStatus: 'rejected',
+        ownerApprovalReviewedAt: new Date(),
+        ownerApprovalReviewedBy: adminId,
+        ownerApprovalReviewedByName: adminName,
+        roleChangeReason: reason,
+      },
+      { new: true }
+    );
+
+    // Record immutable audit event
+    await logAuditEvent({
+      req,
+      action: 'OWNER_REQUEST_REJECTED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        affectedUserName: targetUser.name,
+        currentRole: 'viewer',
+        rejectedBy: req.user.email,
+        reason,
+        timestamp: new Date().toISOString(),
+        outcome: 'rejected',
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Owner access request for "${targetUser.name}" has been rejected. Account retains Viewer privileges.`,
+      user: {
+        id: String(updatedUser._id || updatedUser.id),
+        _id: String(updatedUser._id || updatedUser.id),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        requestedRole: updatedUser.requestedRole || null,
+        ownerApprovalStatus: updatedUser.ownerApprovalStatus,
+        ownerApprovalRequestedAt: updatedUser.ownerApprovalRequestedAt,
+        ownerApprovalReviewedAt: updatedUser.ownerApprovalReviewedAt,
+        ownerApprovalReviewedByName: updatedUser.ownerApprovalReviewedByName,
+        roleChangeReason: updatedUser.roleChangeReason,
+        isActive: updatedUser.isActive !== false,
+        createdAt: updatedUser.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Reject Owner Request Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'OWNER_REJECTION_ERROR',
+        message: 'Failed to reject owner request.',
       },
     });
   }

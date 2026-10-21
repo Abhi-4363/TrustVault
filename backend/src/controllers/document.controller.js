@@ -82,7 +82,10 @@ export function canEditDocument(doc, user) {
   const ownerId = String(doc.ownerId);
   const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
 
-  if (userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail)) return true;
+  // Active document owner or administrator
+  if (user.role !== 'viewer' && (userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail))) {
+    return true;
+  }
   if (user.role === 'admin') return true;
 
   if (Array.isArray(doc.acl)) {
@@ -107,6 +110,9 @@ export function canEditDocument(doc, user) {
  */
 export function canManageDocument(doc, user) {
   if (!doc || !user) return false;
+  // Downgraded or standard viewers are strictly forbidden from managing, sharing, or deleting documents
+  if (user.role === 'viewer') return false;
+
   const userId = String(user.id || user._id);
   const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);

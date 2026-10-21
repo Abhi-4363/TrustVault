@@ -12,7 +12,9 @@ import {
   ExternalLink,
   CheckCircle2,
   Settings as SettingsIcon,
-  Search
+  Search,
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 import { AppShell } from './layouts/AppShell';
 import { PageHeader } from './components/dashboard/PageHeader';
@@ -43,7 +45,10 @@ export function App() {
   const [backendConnected, setBackendConnected] = useState(false);
 
   // Authentication Context
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, refreshProfile } = useAuth();
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [refreshingProfile, setRefreshingProfile] = useState(false);
+  const [approvalStatusNotice, setApprovalStatusNotice] = useState('');
 
   // Auth, Upload, Share & Edit Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -239,6 +244,45 @@ export function App() {
       }
     }
   }, [user?.role, user?.id || user?._id]);
+
+  // Fetch pending owner requests count for Admin badge
+  useEffect(() => {
+    if (user?.role === 'admin' && token) {
+      fetch('http://localhost:5000/api/admin/owner-requests', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) setPendingRequestsCount(data.total ?? data.requests?.length ?? 0);
+        })
+        .catch(() => {});
+    }
+  }, [user?.role, token]);
+
+  // Check approval status in real-time for Viewer accounts
+  const handleCheckApprovalStatus = async () => {
+    setRefreshingProfile(true);
+    setApprovalStatusNotice('');
+    try {
+      const updatedUser = await refreshProfile();
+      if (updatedUser) {
+        if (updatedUser.role === 'owner') {
+          setApprovalStatusNotice('Congratulations! Your Document Owner privileges have been approved by an Administrator.');
+        } else if (updatedUser.ownerApprovalStatus === 'rejected') {
+          setApprovalStatusNotice('Your request for Document Owner access was reviewed and declined.');
+        } else if (updatedUser.ownerApprovalStatus === 'pending') {
+          setApprovalStatusNotice('Your request is still awaiting Administrator review.');
+        } else {
+          setApprovalStatusNotice('Profile refreshed.');
+        }
+      }
+    } catch {
+      setApprovalStatusNotice('Failed to refresh status.');
+    } finally {
+      setRefreshingProfile(false);
+      setTimeout(() => setApprovalStatusNotice(''), 6000);
+    }
+  };
 
   const openModal = (config) => {
     setModalConfig({
@@ -617,6 +661,7 @@ export function App() {
       sharedDocsCount={sharedDocsCount}
       userRole={user?.role}
       isAuthenticated={Boolean(user)}
+      pendingRequestsCount={pendingRequestsCount}
     >
       {!user ? (
         <AuthLandingPortal initialMode={authModalMode} />
@@ -693,6 +738,7 @@ export function App() {
             setAuthModalMode('login');
             setAuthModalOpen(true);
           }}
+          onPendingCountChange={(cnt) => setPendingRequestsCount(cnt)}
         />
       ) : activeNav === 'settings' ? (
         <div className="settings-preview-panel" style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
@@ -734,6 +780,76 @@ export function App() {
         </div>
       ) : (
         <>
+          {/* Viewer Account Status Notice Banners (Stage 8) */}
+          {user.role === 'viewer' && user.ownerApprovalStatus === 'pending' && (
+            <div className="viewer-role-banner viewer-banner-pending" role="status">
+              <div className="banner-icon-box">
+                <Clock size={20} className="text-warning" />
+              </div>
+              <div className="banner-content">
+                <div className="banner-title-row">
+                  <strong>Document Owner Access Request Pending Administrator Approval</strong>
+                  <span className="banner-badge badge-pending">Under Review</span>
+                </div>
+                <p className="banner-description">
+                  Your request to ingest corporate documents and manage collaborator ACLs was submitted on{' '}
+                  <strong>{new Date(user.ownerApprovalRequestedAt || user.createdAt).toLocaleDateString()}</strong>.
+                  Your account is fully functional with standard Viewer privileges while awaiting Administrator review.
+                </p>
+                {approvalStatusNotice && (
+                  <div className="banner-live-notice">{approvalStatusNotice}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="banner-refresh-btn"
+                onClick={handleCheckApprovalStatus}
+                disabled={refreshingProfile}
+                title="Check if Administrator has approved your Owner access request"
+              >
+                <RefreshCw size={13} className={refreshingProfile ? 'spinner' : ''} />
+                <span>{refreshingProfile ? 'Checking...' : 'Check Status'}</span>
+              </button>
+            </div>
+          )}
+
+          {user.role === 'viewer' && user.ownerApprovalStatus === 'rejected' && (
+            <div className="viewer-role-banner viewer-banner-rejected" role="status">
+              <div className="banner-icon-box">
+                <AlertTriangle size={20} className="text-danger" />
+              </div>
+              <div className="banner-content">
+                <div className="banner-title-row">
+                  <strong>Document Owner Request Reviewed — Retained as Viewer</strong>
+                  <span className="banner-badge badge-rejected">Request Declined</span>
+                </div>
+                <p className="banner-description">
+                  An Administrator reviewed your request for Owner privileges: &quot;
+                  <em>{user.roleChangeReason || 'Owner access request rejected by administrator.'}</em>
+                  &quot;. Your account retains full Viewer access to review files shared with you.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {user.role === 'viewer' && user.roleChangeReason && user.ownerApprovalStatus !== 'pending' && user.ownerApprovalStatus !== 'rejected' && (
+            <div className="viewer-role-banner viewer-banner-downgraded" role="status">
+              <div className="banner-icon-box">
+                <ShieldCheck size={20} className="text-info" />
+              </div>
+              <div className="banner-content">
+                <div className="banner-title-row">
+                  <strong>Account Role Notice: Effective Role is Viewer</strong>
+                  <span className="banner-badge badge-info">Zero Data Loss Guarantee</span>
+                </div>
+                <p className="banner-description">
+                  Your effective role is Viewer ({user.roleChangeReason}). All documents previously uploaded by you remain{' '}
+                  <strong>strictly preserved in vault storage</strong> with existing collaborator access active. New uploads and sharing administration are restricted.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Main Page Header */}
           <PageHeader
             title={

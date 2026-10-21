@@ -22,6 +22,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [requestedRole, setRequestedRole] = useState('viewer'); // 'viewer' | 'owner'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -52,7 +53,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
     setLoading(true);
     try {
       if (mode === 'register') {
-        await register(name.trim(), email.trim(), password);
+        await register(name.trim(), email.trim(), password, requestedRole);
       } else {
         await login(email.trim(), password);
       }
@@ -219,6 +220,63 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                 </div>
               </div>
 
+              {mode === 'register' && (
+                <div className="form-group role-selector-group">
+                  <label className="form-label">
+                    Requested Account Type <span className="required-star">*</span>
+                  </label>
+                  <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
+                    <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="requestedRole"
+                        value="viewer"
+                        checked={requestedRole === 'viewer'}
+                        onChange={() => setRequestedRole('viewer')}
+                        className="sr-only"
+                      />
+                      <div className="type-card-content">
+                        <div className="type-card-header">
+                          <span className="type-card-title">Viewer</span>
+                          <span className="type-card-badge badge-viewer">Immediate Access</span>
+                        </div>
+                        <p className="type-card-desc">
+                          Standard read-only access to documents shared with you. Ready immediately upon registration.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="requestedRole"
+                        value="owner"
+                        checked={requestedRole === 'owner'}
+                        onChange={() => setRequestedRole('owner')}
+                        className="sr-only"
+                      />
+                      <div className="type-card-content">
+                        <div className="type-card-header">
+                          <span className="type-card-title">Document Owner</span>
+                          <span className="type-card-badge badge-owner">Requires Approval</span>
+                        </div>
+                        <p className="type-card-desc">
+                          Upload confidential documents and manage collaborator ACLs. Requires Administrator approval before upload rights are activated.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                  <p className="account-type-notice">
+                    <Shield size={12} className="notice-icon" aria-hidden="true" />
+                    <span>
+                      {requestedRole === 'owner'
+                        ? 'Your account will be provisioned immediately as a Viewer while your Owner request is queued for Administrator review.'
+                        : 'You can request Owner privileges at any time after registration through an Administrator.'}
+                    </span>
+                  </p>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 variant="primary"
@@ -303,6 +361,26 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                     </div>
                     <div className="demo-card-capabilities">
                       Collaborate and inspect files shared with you. Restricted from uploading or deleting files.
+                    </div>
+                  </button>
+
+                  {/* Pending Owner Request Demo */}
+                  <button
+                    type="button"
+                    className="demo-account-card demo-card-pending"
+                    onClick={() => {
+                      setEmail('jordan.req@trustvault.internal');
+                      setPassword('TrustVault2026!');
+                      setError('');
+                    }}
+                    title="Fill Pending Owner Request demo credentials"
+                  >
+                    <div className="demo-card-header">
+                      <span className="demo-badge demo-badge-pending">Pending Owner Request</span>
+                      <span className="demo-email-text">jordan.req@trustvault.internal</span>
+                    </div>
+                    <div className="demo-card-capabilities">
+                      Viewer account with an active Owner approval request queued for Admin governance.
                     </div>
                   </button>
                 </div>

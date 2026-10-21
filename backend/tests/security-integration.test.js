@@ -65,6 +65,7 @@ describe('Stage 9: Automated Security Threat Model Integration Tests', () => {
       });
     aliceToken = resAlice.body.data.token;
     aliceId = resAlice.body.data.user._id || resAlice.body.data.user.id;
+    await User.findByIdAndUpdate(aliceId, { role: 'owner' });
 
     // 2. Setup Bob (External Colleague / Potential Attacker)
     const resBob = await request(app)
@@ -240,7 +241,7 @@ describe('Stage 9: Automated Security Threat Model Integration Tests', () => {
   // THREAT-06: Privilege Escalation
   // =========================================================================
   describe('THREAT-06: Privilege Escalation', () => {
-    it('CRITICAL: Registration payload attempting role manipulation must be forced to owner', async () => {
+    it('CRITICAL: Registration payload attempting role manipulation must be forced to viewer', async () => {
       const res = await request(app)
         .post('/api/auth/register')
         .send({
@@ -251,7 +252,7 @@ describe('Stage 9: Automated Security Threat Model Integration Tests', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.data.user.role).toBe('owner');
+      expect(res.body.data.user.role).toBe('viewer');
     });
 
     it('CRITICAL: Non-admin calling administrative endpoints must receive 403 Forbidden', async () => {

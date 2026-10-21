@@ -15,12 +15,20 @@ import {
   AlertTriangle,
   Calendar,
   Layers,
-  ArrowUpDown
+  ArrowUpDown,
+  Clock,
+  Check,
+  X,
+  CheckCircle2,
+  XCircle,
+  UserMinus,
+  UserPlus,
+  Info
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import './AdminDashboard.css';
 
-export function AdminDashboard({ user, token, onNavigateToLogin }) {
+export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountChange }) {
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'audit' | 'users'
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -39,11 +47,18 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
     endDate: ''
   });
 
-  // 3. User Governance State
+  // 3. User Governance & Approval State
   const [usersList, setUsersList] = useState([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [deactivatingUserId, setDeactivatingUserId] = useState(null);
   const [updatingRoleId, setUpdatingRoleId] = useState(null);
+
+  // Downgrade and Rejection Modals
+  const [downgradeModalUser, setDowngradeModalUser] = useState(null);
+  const [downgradeReason, setDowngradeReason] = useState('');
+  const [rejectModalUser, setRejectModalUser] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const isAdmin = user && user.role === 'admin';
 
@@ -134,9 +149,30 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
     }
   }, [token, isAdmin]);
 
+  // Fetch Pending Owner Requests (Stage 8)
+  const fetchPendingRequests = useCallback(async () => {
+    if (!token || !isAdmin) return;
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/owner-requests', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const reqs = data.requests || [];
+        setPendingRequests(reqs);
+        if (typeof onPendingCountChange === 'function') {
+          onPendingCountChange(data.total ?? reqs.length);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch pending owner requests:', err);
+    }
+  }, [token, isAdmin, onPendingCountChange]);
+
   // Initial load according to active tab
   useEffect(() => {
     if (!isAdmin) return;
+    fetchPendingRequests();
     if (activeTab === 'analytics') {
       fetchAnalytics();
     } else if (activeTab === 'audit') {
@@ -144,7 +180,82 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
     } else if (activeTab === 'users') {
       fetchUsers();
     }
-  }, [activeTab, isAdmin, fetchAnalytics, fetchAuditLogs, fetchUsers]);
+  }, [activeTab, isAdmin, fetchAnalytics, fetchAuditLogs, fetchUsers, fetchPendingRequests]);
+
+  // Approve Pending Owner Request
+  const handleApproveRequest = async (targetUserId, targetUserName) => {
+    if (!token) return;
+    setUpdatingRoleId(targetUserId);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/owner-requests/${targetUserId}/approve`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Owner access approved for ${targetUserName}.`);
+        fetchPendingRequests();
+        fetchUsers();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to approve owner request.');
+      }
+    } catch {
+      setErrorMsg('Network error approving owner request.');
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  // Reject Pending Owner Request
+  const handleRejectRequest = async (targetUserId, reason = '') => {
+    if (!token) return;
+    setUpdatingRoleId(targetUserId);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/owner-requests/${targetUserId}/reject`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: reason || 'Owner access request rejected by administrator.' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || 'Owner access request rejected.');
+        setRejectModalUser(null);
+        setRejectReason('');
+        fetchPendingRequests();
+        fetchUsers();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reject owner request.');
+      }
+    } catch {
+      setErrorMsg('Network error rejecting owner request.');
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  // Promote Viewer to Document Owner directly
+  const handlePromoteUser = async (targetUser) => {
+    const targetId = targetUser.id || targetUser._id;
+    await handleUpdateUserRole(targetId, 'owner', 'Promoted to Document Owner by administrator.');
+  };
+
+  // Confirm Downgrade of Owner to Viewer
+  const handleConfirmDowngrade = async () => {
+    if (!downgradeModalUser) return;
+    const targetId = downgradeModalUser.id || downgradeModalUser._id;
+    const reason = downgradeReason.trim() || 'Role downgraded to Viewer by administrator.';
+    await handleUpdateUserRole(targetId, 'viewer', reason);
+    setDowngradeModalUser(null);
+    setDowngradeReason('');
+  };
 
   // Export audit logs (CSV / JSON)
   const handleExport = (format) => {
@@ -216,7 +327,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
   };
 
   // Update user role (Viewer, Document Owner, Administrator)
-  const handleUpdateUserRole = async (targetUserId, newRole) => {
+  const handleUpdateUserRole = async (targetUserId, newRole, reason = '') => {
     if (!token) return;
     setUpdatingRoleId(targetUserId);
     try {
@@ -226,12 +337,14 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ role: newRole })
+        body: JSON.stringify({ role: newRole, reason })
       });
       const data = await res.json();
       if (res.ok) {
         setSuccessMsg(data.message || `User role updated to ${newRole}.`);
         fetchUsers();
+        fetchPendingRequests();
+        fetchAnalytics();
       } else {
         setErrorMsg(data.error?.message || 'Failed to update user role.');
       }
@@ -359,11 +472,17 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                     <span className="stat-card-title">Tenant Users</span>
                     <Users size={18} />
                   </div>
-                  <div className="stat-card-value">{analytics.totals.users}</div>
+                  <div className="stat-card-value">
+                    {analytics.overview?.totalUsers ?? analytics.totals?.users ?? 0}
+                  </div>
                   <div className="stat-card-sub">
-                    <span className="badge-active">{analytics.totals.activeUsers} Active</span>
-                    {analytics.totals.deactivatedUsers > 0 && (
-                      <span className="badge-suspended">{analytics.totals.deactivatedUsers} Suspended</span>
+                    <span className="badge-active">
+                      {analytics.overview?.activeUsers ?? analytics.totals?.activeUsers ?? 0} Active
+                    </span>
+                    {(analytics.overview?.deactivatedUsers ?? analytics.totals?.deactivatedUsers ?? 0) > 0 && (
+                      <span className="badge-suspended">
+                        {analytics.overview?.deactivatedUsers ?? analytics.totals?.deactivatedUsers} Suspended
+                      </span>
                     )}
                   </div>
                 </div>
@@ -373,7 +492,9 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                     <span className="stat-card-title">Vault Documents</span>
                     <FileText size={18} />
                   </div>
-                  <div className="stat-card-value">{analytics.totals.documents}</div>
+                  <div className="stat-card-value">
+                    {analytics.overview?.totalDocuments ?? analytics.totals?.documents ?? 0}
+                  </div>
                   <div className="stat-card-sub">Cryptographically Quarantined</div>
                 </div>
 
@@ -382,9 +503,11 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                     <span className="stat-card-title">Active Access Grants</span>
                     <Key size={18} />
                   </div>
-                  <div className="stat-card-value">{analytics.totals.activeShares}</div>
+                  <div className="stat-card-value">
+                    {analytics.permissions?.totalPermissions ?? analytics.totals?.activeShares ?? 0}
+                  </div>
                   <div className="stat-card-sub">
-                    {analytics.permissions.read} Read • {analytics.permissions.edit} Edit
+                    {analytics.permissions?.readPermissions ?? analytics.permissions?.read ?? 0} Read • {analytics.permissions?.editPermissions ?? analytics.permissions?.edit ?? 0} Edit
                   </div>
                 </div>
 
@@ -393,7 +516,9 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                     <span className="stat-card-title">Audit Records</span>
                     <Activity size={18} />
                   </div>
-                  <div className="stat-card-value">{analytics.totals.auditLogs}</div>
+                  <div className="stat-card-value">
+                    {analytics.overview?.totalAuditEvents ?? analytics.totals?.auditLogs ?? 0}
+                  </div>
                   <div className="stat-card-sub">Append-only Tamper-Resistant</div>
                 </div>
               </div>
@@ -511,7 +636,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                       {analytics.topAccessedDocuments.map((doc, idx) => (
                         <li key={idx} className="list-summary-row">
                           <span className="doc-title-cell">{doc.title}</span>
-                          <span className="actor-count">{doc.count} reads/downloads</span>
+                          <span className="actor-count">{doc.accessCount ?? doc.count ?? 0} reads/downloads</span>
                         </li>
                       ))}
                     </ul>
@@ -688,6 +813,92 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
       {/* TAB 3: USER DIRECTORY & GOVERNANCE */}
       {activeTab === 'users' && (
         <div className="admin-tab-content">
+          {/* Dedicated Pending Owner Requests Queue (Stage 8) */}
+          <div className="pending-requests-card" aria-labelledby="pending-requests-title">
+            <div className="pending-requests-header">
+              <div className="pending-header-title">
+                <Clock size={18} className="text-warning" />
+                <h3 id="pending-requests-title">Pending Document Owner Requests</h3>
+                <span className={`pending-counter-badge ${pendingRequests.length > 0 ? 'badge-has-pending' : ''}`}>
+                  {pendingRequests.length} Pending
+                </span>
+              </div>
+              <p className="pending-header-subtitle">
+                Registered users requesting Document Owner privileges to ingest corporate files and manage collaborator ACLs.
+              </p>
+            </div>
+
+            {pendingRequests.length > 0 ? (
+              <div className="pending-requests-table-wrap">
+                <table className="admin-data-table pending-data-table" aria-label="Pending Owner Approval Requests Table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Email</th>
+                      <th>Requested Role</th>
+                      <th>Requested Date</th>
+                      <th>Approval Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingRequests.map((reqUser) => {
+                      const reqId = reqUser.id || reqUser._id;
+                      return (
+                        <tr key={reqId}>
+                          <td>
+                            <strong>{reqUser.name}</strong>
+                          </td>
+                          <td>
+                            <code>{reqUser.email}</code>
+                          </td>
+                          <td>
+                            <span className="user-role-pill role-owner">Document Owner</span>
+                          </td>
+                          <td className="cell-timestamp">
+                            {new Date(reqUser.ownerApprovalRequestedAt || reqUser.createdAt).toLocaleString()}
+                          </td>
+                          <td>
+                            <div className="pending-actions-btn-group">
+                              <button
+                                type="button"
+                                className="action-btn-approve"
+                                onClick={() => handleApproveRequest(reqId, reqUser.name)}
+                                disabled={updatingRoleId === reqId}
+                                title={`Approve Owner privileges for ${reqUser.name}`}
+                              >
+                                <Check size={14} />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn-reject"
+                                onClick={() => {
+                                  setRejectModalUser(reqUser);
+                                  setRejectReason('');
+                                }}
+                                disabled={updatingRoleId === reqId}
+                                title={`Reject Owner privileges for ${reqUser.name}`}
+                              >
+                                <X size={14} />
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="pending-empty-state">
+                <CheckCircle2 size={18} className="text-success" />
+                <span>All owner access requests have been reviewed. No pending requests in queue.</span>
+              </div>
+            )}
+          </div>
+
+          {/* User Directory Filter Bar */}
           <div className="users-filter-bar">
             <div className="filter-input-wrap user-search-input">
               <Search size={14} className="filter-icon" />
@@ -699,20 +910,23 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
               />
             </div>
             <span className="user-count-badge">
-              {filteredUsers.length} Users Listed
+              {filteredUsers.length} Registered Accounts
             </span>
           </div>
 
+          {/* Full User Governance Table */}
           <div className="admin-table-wrapper">
             <table className="admin-data-table" aria-label="User Governance Directory Table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Current Role</th>
+                  <th>User Name</th>
+                  <th>Email Address</th>
+                  <th>Effective Role</th>
+                  <th>Requested Role</th>
+                  <th>Approval Status</th>
                   <th>Account Status</th>
                   <th>Registration Date</th>
-                  <th>Actions</th>
+                  <th>Governance Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -722,9 +936,15 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                     const isSelf = user && (String(targetId) === String(user.id || user._id) || targetUser.email === user.email);
                     const isActive = targetUser.isActive !== false;
 
-                    const r = targetUser.role || 'owner';
-                    const label = r === 'admin' ? 'Admin' : (r === 'viewer' || r === 'member') ? 'Viewer' : 'Document Owner';
-                    const roleClass = r === 'admin' ? 'role-admin' : (r === 'viewer' || r === 'member') ? 'role-viewer' : 'role-owner';
+                    const r = targetUser.role || 'viewer';
+                    const label = r === 'admin' ? 'Administrator' : r === 'owner' ? 'Document Owner' : 'Viewer';
+                    const roleClass = r === 'admin' ? 'role-admin' : r === 'owner' ? 'role-owner' : 'role-viewer';
+
+                    const reqRole = targetUser.requestedRole
+                      ? (targetUser.requestedRole === 'owner' ? 'Document Owner' : 'Viewer')
+                      : '—';
+
+                    const approvalStatus = targetUser.ownerApprovalStatus || 'not_required';
 
                     return (
                       <tr key={targetId}>
@@ -735,27 +955,33 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                           <div className="actor-secondary"><code>{targetUser.email}</code></div>
                         </td>
                         <td>
-                          <div className="user-role-cell">
-                            <span className={`user-role-pill ${roleClass}`}>
-                              {label}
+                          <span className={`user-role-pill ${roleClass}`}>
+                            {label}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="requested-role-text">
+                            {reqRole}
+                          </span>
+                        </td>
+                        <td>
+                          {approvalStatus === 'pending' ? (
+                            <span className="approval-badge badge-pending">
+                              <Clock size={11} /> Pending Review
                             </span>
-                            {!isSelf ? (
-                              <select
-                                className="user-role-select"
-                                value={r}
-                                disabled={updatingRoleId === targetId}
-                                onChange={(e) => handleUpdateUserRole(targetId, e.target.value)}
-                                title={`Update role for ${targetUser.name}`}
-                                aria-label={`Update role for ${targetUser.name}`}
-                              >
-                                <option value="viewer">Viewer</option>
-                                <option value="owner">Document Owner</option>
-                                <option value="admin">Administrator</option>
-                              </select>
-                            ) : (
-                              <span className="self-tag">(Locked)</span>
-                            )}
-                          </div>
+                          ) : approvalStatus === 'approved' ? (
+                            <span className="approval-badge badge-approved">
+                              <Check size={11} /> Approved
+                            </span>
+                          ) : approvalStatus === 'rejected' ? (
+                            <span className="approval-badge badge-rejected">
+                              <X size={11} /> Rejected
+                            </span>
+                          ) : (
+                            <span className="approval-badge badge-neutral">
+                              Not Required
+                            </span>
+                          )}
                         </td>
                         <td>
                           {isActive ? (
@@ -772,25 +998,109 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                             {isSelf ? (
                               <span className="self-tag">(Current Admin)</span>
                             ) : (
-                              <button
-                                type="button"
-                                className={`user-action-btn ${isActive ? 'btn-deactivate' : 'btn-reactivate'}`}
-                                onClick={() => handleToggleUserStatus(targetUser)}
-                                disabled={deactivatingUserId === targetId}
-                                title={isActive ? 'Deactivate this user account' : 'Reactivate this user account'}
-                              >
-                                {isActive ? (
+                              <>
+                                {/* Pending quick actions */}
+                                {approvalStatus === 'pending' && (
                                   <>
-                                    <UserX size={14} />
-                                    <span>Deactivate Account</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserCheck size={14} />
-                                    <span>Reactivate Account</span>
+                                    <button
+                                      type="button"
+                                      className="user-action-btn btn-approve-mini"
+                                      onClick={() => handleApproveRequest(targetId, targetUser.name)}
+                                      disabled={updatingRoleId === targetId}
+                                      title="Approve Owner privileges"
+                                    >
+                                      <Check size={12} />
+                                      <span>Approve</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="user-action-btn btn-reject-mini"
+                                      onClick={() => {
+                                        setRejectModalUser(targetUser);
+                                        setRejectReason('');
+                                      }}
+                                      disabled={updatingRoleId === targetId}
+                                      title="Reject Owner privileges"
+                                    >
+                                      <X size={12} />
+                                      <span>Reject</span>
+                                    </button>
                                   </>
                                 )}
-                              </button>
+
+                                {/* Promote / Downgrade quick buttons */}
+                                {r === 'viewer' && approvalStatus !== 'pending' && (
+                                  <button
+                                    type="button"
+                                    className="user-action-btn btn-promote"
+                                    onClick={() => handlePromoteUser(targetUser)}
+                                    disabled={updatingRoleId === targetId}
+                                    title="Promote Viewer to Document Owner"
+                                  >
+                                    <UserPlus size={12} />
+                                    <span>Promote to Owner</span>
+                                  </button>
+                                )}
+
+                                {r === 'owner' && (
+                                  <button
+                                    type="button"
+                                    className="user-action-btn btn-downgrade"
+                                    onClick={() => {
+                                      setDowngradeModalUser(targetUser);
+                                      setDowngradeReason('');
+                                    }}
+                                    disabled={updatingRoleId === targetId}
+                                    title="Revoke Owner privileges (Strict Document Preservation Guarantee)"
+                                  >
+                                    <UserMinus size={12} />
+                                    <span>Revoke Owner</span>
+                                  </button>
+                                )}
+
+                                {/* Direct role dropdown */}
+                                <select
+                                  className="user-role-select"
+                                  value={r}
+                                  disabled={updatingRoleId === targetId}
+                                  onChange={(e) => {
+                                    const nextRole = e.target.value;
+                                    if (nextRole === 'viewer' && r === 'owner') {
+                                      setDowngradeModalUser(targetUser);
+                                      setDowngradeReason('');
+                                    } else {
+                                      handleUpdateUserRole(targetId, nextRole);
+                                    }
+                                  }}
+                                  title={`Change role for ${targetUser.name}`}
+                                  aria-label={`Change role for ${targetUser.name}`}
+                                >
+                                  <option value="viewer">Viewer</option>
+                                  <option value="owner">Document Owner</option>
+                                  <option value="admin">Administrator</option>
+                                </select>
+
+                                {/* Deactivate / Reactivate button */}
+                                <button
+                                  type="button"
+                                  className={`user-action-btn ${isActive ? 'btn-deactivate' : 'btn-reactivate'}`}
+                                  onClick={() => handleToggleUserStatus(targetUser)}
+                                  disabled={deactivatingUserId === targetId}
+                                  title={isActive ? 'Deactivate this user account' : 'Reactivate this user account'}
+                                >
+                                  {isActive ? (
+                                    <>
+                                      <UserX size={13} />
+                                      <span>Suspend</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck size={13} />
+                                      <span>Restore</span>
+                                    </>
+                                  )}
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -799,13 +1109,145 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="6" className="admin-table-empty">
+                    <td colSpan="8" className="admin-table-empty">
                       No user accounts found matching &quot;{userSearchTerm}&quot;.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Downgrade Owner to Viewer (Strict Document Preservation) */}
+      {downgradeModalUser && (
+        <div className="admin-modal-backdrop" onClick={() => setDowngradeModalUser(null)} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="downgrade-dialog-title"
+          >
+            <div className="admin-modal-header danger-header">
+              <div className="modal-header-icon-box warning-box">
+                <AlertTriangle size={22} className="text-warning" />
+              </div>
+              <div>
+                <h3 id="downgrade-dialog-title" className="admin-modal-title">
+                  Revoke Owner Privileges & Downgrade to Viewer
+                </h3>
+                <p className="admin-modal-subtitle">
+                  Account: <strong>{downgradeModalUser.name}</strong> ({downgradeModalUser.email})
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              <div className="modal-guarantee-box">
+                <div className="guarantee-header">
+                  <ShieldCheck size={16} className="text-success" />
+                  <strong>Zero Data Loss Guarantee</strong>
+                </div>
+                <p>
+                  All existing documents previously uploaded by <strong>{downgradeModalUser.name}</strong> will remain <strong>strictly preserved</strong> in private vault storage. No files will be deleted or reassigned. Existing collaborators will retain active access.
+                </p>
+              </div>
+
+              <p className="modal-consequence-text">
+                <strong>Restrictions upon downgrade:</strong> The user will immediately be blocked from uploading new documents, purging files, or managing sharing ACL permissions.
+              </p>
+
+              <div className="form-group" style={{ marginTop: '14px' }}>
+                <label className="form-label" htmlFor="downgrade-reason-input">
+                  Reason for role downgrade <span className="label-hint">(optional, recorded in immutable audit trail)</span>:
+                </label>
+                <input
+                  id="downgrade-reason-input"
+                  type="text"
+                  placeholder="e.g. Completed contractor tenure / role changed to external advisor"
+                  value={downgradeReason}
+                  onChange={(e) => setDowngradeReason(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button variant="secondary" onClick={() => setDowngradeModalUser(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleConfirmDowngrade}
+                disabled={updatingRoleId === (downgradeModalUser.id || downgradeModalUser._id)}
+              >
+                <UserMinus size={14} />
+                <span>Confirm Revocation & Downgrade to Viewer</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Reject Owner Access Request */}
+      {rejectModalUser && (
+        <div className="admin-modal-backdrop" onClick={() => setRejectModalUser(null)} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-dialog-title"
+          >
+            <div className="admin-modal-header danger-header">
+              <div className="modal-header-icon-box danger-box">
+                <XCircle size={22} className="text-danger" />
+              </div>
+              <div>
+                <h3 id="reject-dialog-title" className="admin-modal-title">
+                  Reject Owner Access Request
+                </h3>
+                <p className="admin-modal-subtitle">
+                  User: <strong>{rejectModalUser.name}</strong> ({rejectModalUser.email})
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              <p className="modal-consequence-text">
+                The user&apos;s request for Document Owner upload privileges will be rejected. Their account will retain active <strong>Viewer</strong> privileges so they can continue reviewing documents shared with them.
+              </p>
+
+              <div className="form-group" style={{ marginTop: '14px' }}>
+                <label className="form-label" htmlFor="reject-reason-input">
+                  Reason for rejection <span className="label-hint">(recorded in audit log and visible to user)</span>:
+                </label>
+                <input
+                  id="reject-reason-input"
+                  type="text"
+                  placeholder="e.g. Department quota reached / owner privileges not required for current project"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button variant="secondary" onClick={() => setRejectModalUser(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleRejectRequest(rejectModalUser.id || rejectModalUser._id, rejectReason)}
+                disabled={updatingRoleId === (rejectModalUser.id || rejectModalUser._id)}
+              >
+                <X size={14} />
+                <span>Confirm Rejection</span>
+              </Button>
+            </div>
           </div>
         </div>
       )}

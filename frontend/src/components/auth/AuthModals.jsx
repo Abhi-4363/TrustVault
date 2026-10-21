@@ -9,6 +9,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [requestedRole, setRequestedRole] = useState('viewer');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,7 +26,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
       if (mode === 'register') {
         if (!name.trim()) throw new Error('Please enter your full name');
         if (password.length < 8) throw new Error('Password must be at least 8 characters long');
-        await register(name, email, password);
+        await register(name, email, password, requestedRole);
       } else {
         await login(email, password);
       }
@@ -142,6 +143,54 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
                 />
               </div>
             </div>
+
+            {mode === 'register' && (
+              <div className="form-group" style={{ marginTop: '8px' }}>
+                <label className="form-label">
+                  Requested Account Role
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRequestedRole('viewer')}
+                    style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: requestedRole === 'viewer' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                      backgroundColor: requestedRole === 'viewer' ? '#eff6ff' : 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '11.5px'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Viewer</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Immediate read access</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRequestedRole('owner')}
+                    style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: requestedRole === 'owner' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                      backgroundColor: requestedRole === 'owner' ? '#eff6ff' : 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '11.5px'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Document Owner</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Requires Admin approval</div>
+                  </button>
+                </div>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                  {requestedRole === 'owner'
+                    ? 'Owner requests are reviewed by an Administrator. You will gain Viewer privileges immediately while waiting.'
+                    : 'Standard read-only account with access to shared files.'}
+                </p>
+              </div>
+            )}
 
             <Button
               type="submit"

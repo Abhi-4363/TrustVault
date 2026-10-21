@@ -16,6 +16,9 @@ import {
   deactivateUser,
   reactivateUser,
   updateUserRole,
+  listOwnerRequests,
+  approveOwnerRequest,
+  rejectOwnerRequest,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -32,6 +35,11 @@ router.get('/audit-logs', getGlobalAuditLogs);
 
 // Audit log export (CSV/JSON, no truncation)
 router.get('/audit-logs/export', exportAuditLogs);
+
+// Owner access requests
+router.get('/owner-requests', listOwnerRequests);
+router.post('/owner-requests/:userId/approve', approveOwnerRequest);
+router.post('/owner-requests/:userId/reject', rejectOwnerRequest);
 
 // User management console
 router.get('/users', listAllUsers);

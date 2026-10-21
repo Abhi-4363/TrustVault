@@ -5,6 +5,7 @@
 
 import { verifyToken } from '../utils/token.js';
 import { User } from '../models/user.model.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 /**
  * Protects endpoints by requiring a valid JWT Bearer token
@@ -66,7 +67,14 @@ export async function requireAuth(req, res, next) {
       email: user.email,
       name: user.name,
       role: user.role,
+      requestedRole: user.requestedRole || null,
+      ownerApprovalStatus: user.ownerApprovalStatus || 'not_required',
+      ownerApprovalRequestedAt: user.ownerApprovalRequestedAt || null,
+      ownerApprovalReviewedAt: user.ownerApprovalReviewedAt || null,
+      ownerApprovalReviewedByName: user.ownerApprovalReviewedByName || null,
+      roleChangeReason: user.roleChangeReason || '',
       isActive: user.isActive !== false,
+      createdAt: user.createdAt,
     };
 
     next();
@@ -85,7 +93,7 @@ export async function requireAuth(req, res, next) {
  * @param  {...string} roles - Permitted roles (e.g. 'admin', 'manager')
  */
 export function requireRole(...roles) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         error: {
@@ -96,6 +104,24 @@ export function requireRole(...roles) {
     }
 
     if (!roles.includes(req.user.role)) {
+      try {
+        await logAuditEvent({
+          req,
+          action: 'ACCESS_DENIED',
+          documentId: 'ADMIN_GOVERNANCE',
+          documentTitle: 'Administrative Operation Refused',
+          metadata: {
+            attemptedEndpoint: req.originalUrl || req.url,
+            attemptedMethod: req.method,
+            callerRole: req.user.role,
+            requiredRoles: roles,
+            reason: 'User lacks required privileges for administrative management.',
+          },
+        });
+      } catch (err) {
+        // Non-blocking fallback
+      }
+
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',

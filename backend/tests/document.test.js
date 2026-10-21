@@ -43,6 +43,7 @@ describe('Stage 3: Document Metadata and Private Storage', () => {
       });
     userAToken = resA.body.data.token;
     userAId = resA.body.data.user._id || resA.body.data.user.id;
+    await User.findByIdAndUpdate(userAId, { role: 'owner' });
 
     // Register User B
     const resB = await request(app)

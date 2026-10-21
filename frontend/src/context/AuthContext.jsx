@@ -42,14 +42,38 @@ export function AuthProvider({ children }) {
     verifySession();
   }, [token]);
 
-  // Register new account
-  const register = async (name, email, password) => {
+  // Refresh current user session profile
+  const refreshProfile = async () => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setUser(result.data.user);
+        return result.data.user;
+      }
+    } catch (err) {
+      console.error('Profile refresh error:', err);
+    }
+    return null;
+  };
+
+  // Register new account (public accounts default to viewer, owner requests are queued)
+  const register = async (name, email, password, requestedRole = 'viewer') => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        requestedRole,
+        accountType: requestedRole,
+      }),
     });
 
     const data = await response.json();
@@ -62,7 +86,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
     setToken(newToken);
     setUser(newUser);
-    return newUser;
+    return { user: newUser, token: newToken, message: data.message };
   };
 
   // Log in with existing credentials
@@ -105,6 +129,7 @@ export function AuthProvider({ children }) {
         register,
         login,
         logout,
+        refreshProfile,
       }}
     >
       {children}

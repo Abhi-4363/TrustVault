@@ -85,6 +85,19 @@ export async function runSeed(isStandalone = false) {
       name: 'Alex Mercer',
       email: 'alex.dev@trustvault.internal',
       role: 'viewer',
+      requestedRole: 'viewer',
+      ownerApprovalStatus: 'not_required',
+      password: 'TrustVault2026!',
+      passwordHash,
+      isActive: true,
+    },
+    {
+      name: 'Jordan Lee',
+      email: 'jordan.req@trustvault.internal',
+      role: 'viewer',
+      requestedRole: 'owner',
+      ownerApprovalStatus: 'pending',
+      ownerApprovalRequestedAt: new Date(Date.now() - 3600000),
       password: 'TrustVault2026!',
       passwordHash,
       isActive: true,
@@ -326,6 +339,7 @@ export async function runSeed(isStandalone = false) {
   console.log(' 📄 Document Owner: sarah.lead@trustvault.internal  / TrustVault2026!');
   console.log(' 📄 Document Owner: elena.legal@trustvault.internal / TrustVault2026!');
   console.log(' 👁 Viewer:         alex.dev@trustvault.internal    / TrustVault2026!');
+  console.log(' ⏳ Pending Owner:  jordan.req@trustvault.internal  / TrustVault2026!');
   console.log('----------------------------------------------------');
   console.log('✔ Seeding complete successfully.\n');
 

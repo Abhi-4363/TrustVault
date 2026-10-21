@@ -426,12 +426,113 @@
   color: var(--text-secondary);
 }
 
-.demo-helper-note {
+.demo-card-pending:hover {
+  border-color: #f59e0b;
+}
+
+.demo-badge-pending {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+/* ── Requested Account Type Selector (Stage 8) ────────────────────────────── */
+
+.role-selector-group {
+  margin-top: var(--space-1);
+}
+
+.account-type-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2-5, 10px);
+  margin-top: 6px;
+}
+
+.account-type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  background-color: var(--bg-app, #f8fafc);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.account-type-card:hover {
+  background-color: #fff;
+  border-color: var(--color-primary-300, #93c5fd);
+  transform: translateY(-1px);
+}
+
+.account-type-card.selected {
+  background-color: #f0f7ff;
+  border-color: var(--color-primary-600, #2563eb);
+  box-shadow: 0 0 0 1px var(--color-primary-600, #2563eb);
+}
+
+.type-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.type-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.type-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.type-card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.type-card-badge.badge-viewer {
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+.type-card-badge.badge-owner {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.type-card-desc {
   font-size: 11px;
-  color: var(--text-muted);
-  text-align: center;
-  margin: var(--space-1) 0 0;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.account-type-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 11.5px;
   line-height: 1.4;
+  color: var(--color-primary-800, #1e40af);
+  background-color: var(--color-primary-50, #eff6ff);
+  border: 1px solid var(--color-primary-200, #bfdbfe);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+
+.account-type-notice .notice-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* ── Responsive Viewport Adjustments ───────────────────────────────────────── */

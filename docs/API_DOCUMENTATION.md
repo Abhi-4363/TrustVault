@@ -79,3 +79,7 @@
 | `GET` | `/api/admin/users/:id` | Detailed user governance profile | Bearer (Admin) |
 | `PATCH` | `/api/admin/users/:id/deactivate` | Deactivate tenant user account | Bearer (Admin) |
 | `PATCH` | `/api/admin/users/:id/reactivate` | Reactivate tenant user account | Bearer (Admin) |
+| `GET` | `/api/admin/owner-requests` | List all pending Document Owner approval requests | Bearer (Admin) |
+| `POST` | `/api/admin/owner-requests/:userId/approve` | Approve owner access; elevates role to `owner`, logs `OWNER_REQUEST_APPROVED` | Bearer (Admin) |
+| `POST` | `/api/admin/owner-requests/:userId/reject` | Reject owner access; retains role `viewer`, logs `OWNER_REQUEST_REJECTED` | Bearer (Admin) |
+| `PATCH` | `/api/admin/users/:userId/role` | Promote to Owner or downgrade to Viewer (preserves existing files with zero data loss) | Bearer (Admin) |

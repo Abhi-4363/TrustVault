@@ -10,6 +10,7 @@
 
 import { User } from '../models/user.model.js';
 import { generateToken } from '../utils/token.js';
+import { logAuditEvent } from '../services/audit.service.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -72,8 +73,18 @@ export async function register(req, res, next) {
       });
     }
 
-    // 3. THREAT-06 Mitigation: Enforce default 'owner' (Document Owner) role regardless of client payload
-    const role = 'owner';
+    // 3. Process requested account type (Viewer vs Owner)
+    // The selection represents the user's requested role, not an automatically granted privilege.
+    // Client can supply requestedRole or accountType ('viewer' | 'owner')
+    // Client-supplied 'role' field (e.g. role: 'admin' or role: 'owner') is strictly rejected/ignored for THREAT-06 mitigation.
+    const rawRequested = String(req.body.requestedRole || req.body.accountType || '').toLowerCase().trim();
+    const isOwnerRequested = rawRequested === 'owner';
+
+    // Effective role is strictly 'viewer' upon public registration!
+    const role = 'viewer';
+    const requestedRole = isOwnerRequested ? 'owner' : 'viewer';
+    const ownerApprovalStatus = isOwnerRequested ? 'pending' : 'not_required';
+    const ownerApprovalRequestedAt = isOwnerRequested ? new Date() : null;
 
     // 4. Create user record with hashed password
     const user = await User.create({
@@ -81,15 +92,61 @@ export async function register(req, res, next) {
       email: normalizedEmail,
       password,
       role,
+      requestedRole,
+      ownerApprovalStatus,
+      ownerApprovalRequestedAt,
+      ownerApprovalReviewedAt: null,
+      ownerApprovalReviewedBy: null,
+      ownerApprovalReviewedByName: null,
+      roleChangeReason: '',
+      isActive: true,
     });
+
+    // Record immutable audit events
+    await logAuditEvent({
+      req,
+      action: 'ACCOUNT_REGISTERED',
+      documentId: String(user._id || user.id),
+      documentTitle: `Account: ${user.email}`,
+      metadata: {
+        userId: String(user._id || user.id),
+        email: user.email,
+        name: user.name,
+        effectiveRole: role,
+        requestedRole,
+        ownerApprovalStatus,
+      },
+    });
+
+    if (isOwnerRequested) {
+      await logAuditEvent({
+        req,
+        action: 'OWNER_ACCESS_REQUESTED',
+        documentId: String(user._id || user.id),
+        documentTitle: `Account: ${user.email}`,
+        metadata: {
+          userId: String(user._id || user.id),
+          email: user.email,
+          name: user.name,
+          currentRole: 'viewer',
+          requestedRole: 'owner',
+          approvalStatus: 'pending',
+          requestedAt: ownerApprovalRequestedAt,
+        },
+      });
+    }
 
     // 5. Generate authentication token
     const token = generateToken(user);
 
+    const message = isOwnerRequested
+      ? 'Account registered successfully. Your Owner access request is pending Admin approval. You can continue using your Viewer account while you wait.'
+      : 'User account created successfully.';
+
     // 6. Respond with created user (toJSON strips passwordHash)
     return res.status(201).json({
       status: 'success',
-      message: 'User account created successfully.',
+      message,
       data: {
         user: user.toJSON ? user.toJSON() : user,
         token,

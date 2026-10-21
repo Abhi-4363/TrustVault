@@ -79,6 +79,134 @@
   color: var(--text-main);
 }
 
+/* ── Stage 8: Viewer Role & Request Status Banners ───────────────────────── */
+
+.viewer-role-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-6);
+  border: 1px solid transparent;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.viewer-banner-pending {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.viewer-banner-rejected {
+  background-color: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+.viewer-banner-downgraded {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.viewer-role-banner .banner-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.viewer-role-banner .banner-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.viewer-role-banner .banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5, 10px);
+  font-size: var(--text-sm);
+  color: var(--text-main);
+}
+
+.viewer-role-banner .banner-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.viewer-role-banner .banner-badge.badge-pending {
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.viewer-role-banner .banner-badge.badge-rejected {
+  background-color: #ffe4e6;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+
+.viewer-role-banner .banner-badge.badge-info {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.viewer-role-banner .banner-description {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.viewer-role-banner .banner-live-notice {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #047857;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  margin-top: 4px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.viewer-role-banner .banner-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #fff;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #b45309;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.viewer-role-banner .banner-refresh-btn:hover:not(:disabled) {
+  background-color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.viewer-role-banner .banner-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 1100px) {
   .dashboard-main-split {
@@ -90,5 +218,14 @@
   .dashboard-metrics-grid {
     grid-template-columns: 1fr;
     gap: var(--space-3);
+  }
+
+  .viewer-role-banner {
+    flex-direction: column;
+  }
+
+  .viewer-role-banner .banner-refresh-btn {
+    align-self: flex-start;
+    margin-top: 4px;
   }
 }

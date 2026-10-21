@@ -43,6 +43,7 @@ describe('Stage 5: Immediate Revocation Engine', () => {
       });
     ownerToken = resA.body.data.token;
     ownerId = resA.body.data.user._id || resA.body.data.user.id;
+    await User.findByIdAndUpdate(ownerId, { role: 'owner' });
 
     // 2. Register Colleague (Bob)
     const resB = await request(app)

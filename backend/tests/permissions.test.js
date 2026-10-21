@@ -43,6 +43,7 @@ describe('Stage 4: Per-Document Read and Edit Permissions', () => {
       });
     ownerToken = resOwner.body.data.token;
     ownerId = resOwner.body.data.user._id || resOwner.body.data.user.id;
+    await User.findByIdAndUpdate(ownerId, { role: 'owner' });
 
     // 2. Create Colleague (Bob)
     const resReader = await request(app)
@@ -307,6 +308,8 @@ describe('Stage 4: Per-Document Read and Edit Permissions', () => {
         });
       expect(resUser1.status).toBe(201);
       const tokenUser1 = resUser1.body.data.token;
+      const user1Id = resUser1.body.data.user._id || resUser1.body.data.user.id;
+      await User.findByIdAndUpdate(user1Id, { role: 'owner' });
 
       const samplePdfPath = path.join(testFilesDir, 'cross-share-doc.pdf');
       fs.writeFileSync(samplePdfPath, '%PDF-1.4 confidential cross share document');

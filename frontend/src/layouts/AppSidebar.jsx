@@ -35,6 +35,7 @@ export function AppSidebar({
   myDocsCount = null,
   sharedDocsCount = null,
   userRole = null,
+  pendingRequestsCount = 0,
 }) {
   const normalizedRole = String(userRole || '').toLowerCase().trim();
   const isAdmin = normalizedRole === 'admin';
@@ -42,8 +43,9 @@ export function AppSidebar({
 
   let navItems = [];
   if (isAdmin) {
+    const adminTag = pendingRequestsCount > 0 ? `${pendingRequestsCount} PENDING` : 'ADMIN';
     navItems = [
-      { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: 'ADMIN' },
+      { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: adminTag, isPendingBadge: pendingRequestsCount > 0 },
       { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
       { id: 'my-documents', label: 'My Documents', icon: Files, tag: myDocsCount !== null ? String(myDocsCount) : null },
       { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: sharedDocsCount !== null ? String(sharedDocsCount) : null },
@@ -125,7 +127,11 @@ export function AppSidebar({
                   >
                     <Icon size={18} className="nav-icon" aria-hidden="true" />
                     <span className="nav-label">{item.label}</span>
-                    {item.tag && <span className="nav-tag">{item.tag}</span>}
+                    {item.tag && (
+                      <span className={`nav-tag ${item.isPendingBadge ? 'nav-tag-pending' : ''}`}>
+                        {item.tag}
+                      </span>
+                    )}
                   </button>
                 </li>
               );

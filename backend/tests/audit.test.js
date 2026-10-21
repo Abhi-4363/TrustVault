@@ -43,6 +43,7 @@ describe('Stage 6: Audit Trail and Integrity Protection', () => {
       });
     ownerToken = resA.body.data.token;
     ownerId = resA.body.data.user._id || resA.body.data.user.id;
+    await User.findByIdAndUpdate(ownerId, { role: 'owner' });
 
     // 2. Create Colleague (Bob)
     const resB = await request(app)

@@ -24,6 +24,7 @@ export function AppShell({
   sharedDocsCount,
   userRole,
   isAuthenticated = false,
+  pendingRequestsCount = 0,
 }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -38,6 +39,7 @@ export function AppShell({
           myDocsCount={myDocsCount}
           sharedDocsCount={sharedDocsCount}
           userRole={userRole}
+          pendingRequestsCount={pendingRequestsCount}
         />
       )}
 

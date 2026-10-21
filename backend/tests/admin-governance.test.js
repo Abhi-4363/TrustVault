@@ -44,6 +44,7 @@ describe('Stage 8: Administrator Governance Dashboard', () => {
       });
     ownerToken = resOwner.body.data.token;
     ownerId = resOwner.body.data.user._id || resOwner.body.data.user.id;
+    await User.findByIdAndUpdate(ownerId, { role: 'owner' });
 
     // Seed Viewer directly with role 'viewer'
     const viewerUser = await User.create({

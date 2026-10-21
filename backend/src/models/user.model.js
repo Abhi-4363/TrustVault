@@ -39,7 +39,37 @@ const userSchema = new mongoose.Schema(
         values: ['admin', 'owner', 'document_owner', 'viewer', 'manager', 'member'],
         message: 'Role must be admin, owner (Document Owner), or viewer',
       },
-      default: 'owner',
+      default: 'viewer',
+    },
+    requestedRole: {
+      type: String,
+      enum: ['owner', 'viewer', null],
+      default: null,
+    },
+    ownerApprovalStatus: {
+      type: String,
+      enum: ['not_required', 'pending', 'approved', 'rejected'],
+      default: 'not_required',
+    },
+    ownerApprovalRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    ownerApprovalReviewedAt: {
+      type: Date,
+      default: null,
+    },
+    ownerApprovalReviewedBy: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    ownerApprovalReviewedByName: {
+      type: String,
+      default: null,
+    },
+    roleChangeReason: {
+      type: String,
+      default: '',
     },
     isActive: {
       type: Boolean,
@@ -58,7 +88,8 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 // Ensure passwordHash is NEVER returned in JSON representations
 userSchema.methods.toJSON = function () {
-  const obj = this.toObject ? this.toObject() : { ...this };
+  const obj = this.toObject ? this.toObject({ virtuals: true }) : { ...this };
+  obj.id = String(this._id);
   delete obj.passwordHash;
   delete obj.__v;
   return obj;
@@ -79,7 +110,21 @@ class InMemoryUserRepository {
     this.users.clear();
   }
 
-  async create({ name, email, password, role = 'owner', passwordHash: suppliedHash, isActive = true }) {
+  async create({
+    name,
+    email,
+    password,
+    role = 'viewer',
+    passwordHash: suppliedHash,
+    isActive = true,
+    requestedRole = null,
+    ownerApprovalStatus = 'not_required',
+    ownerApprovalRequestedAt = null,
+    ownerApprovalReviewedAt = null,
+    ownerApprovalReviewedBy = null,
+    ownerApprovalReviewedByName = null,
+    roleChangeReason = '',
+  }) {
     const normalizedEmail = email.toLowerCase().trim();
     if (this.users.has(normalizedEmail)) {
       const err = new Error('Email address is already registered');
@@ -97,12 +142,21 @@ class InMemoryUserRepository {
       passwordHash = await bcrypt.hash(password, salt);
     }
 
+    const id = `mem_user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const userObj = {
-      _id: `mem_user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      _id: id,
+      id,
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
       role,
+      requestedRole,
+      ownerApprovalStatus,
+      ownerApprovalRequestedAt,
+      ownerApprovalReviewedAt,
+      ownerApprovalReviewedBy,
+      ownerApprovalReviewedByName,
+      roleChangeReason,
       isActive: isActive !== false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -110,7 +164,7 @@ class InMemoryUserRepository {
         return bcrypt.compare(candidatePassword, this.passwordHash);
       },
       toJSON() {
-        const copy = { ...this };
+        const copy = { ...this, id: this._id };
         delete copy.passwordHash;
         delete copy.comparePassword;
         delete copy.toJSON;
@@ -123,11 +177,12 @@ class InMemoryUserRepository {
   }
 
   async findByIdAndUpdate(id, updateData, options = {}) {
+    const idStr = String(id);
     for (const [email, user] of this.users.entries()) {
-      if (user._id === id) {
+      if (String(user._id) === idStr || String(user.id) === idStr) {
         // Apply updates
         Object.keys(updateData).forEach((key) => {
-          if (key !== '_id' && key !== 'email') {
+          if (key !== '_id' && key !== 'id' && key !== 'email') {
             user[key] = updateData[key];
           }
         });
@@ -145,15 +200,20 @@ class InMemoryUserRepository {
       return user || null;
     }
     if (query._id) {
+      const queryIdStr = String(query._id);
       for (const u of this.users.values()) {
-        if (u._id === query._id) return u;
+        if (String(u._id) === queryIdStr || String(u.id) === queryIdStr) return u;
       }
     }
     return null;
   }
 
   async findById(id) {
-    return this.findOne({ _id: id });
+    const idStr = String(id);
+    for (const u of this.users.values()) {
+      if (String(u._id) === idStr || String(u.id) === idStr) return u;
+    }
+    return null;
   }
 
   async find(query = {}) {
@@ -177,13 +237,41 @@ export const User = {
     return mongoose.connection && mongoose.connection.readyState === 1;
   },
 
-  async create({ name, email, password, passwordHash, role = 'owner', isActive = true }) {
+  async create({
+    name,
+    email,
+    password,
+    passwordHash,
+    role = 'viewer',
+    isActive = true,
+    requestedRole = null,
+    ownerApprovalStatus = 'not_required',
+    ownerApprovalRequestedAt = null,
+    ownerApprovalReviewedAt = null,
+    ownerApprovalReviewedBy = null,
+    ownerApprovalReviewedByName = null,
+    roleChangeReason = '',
+  }) {
     // Support seeding a user with a pre‑hashed password (e.g., admin bootstrap).
     // If a passwordHash is provided directly, we skip bcrypt hashing to avoid
     // errors when `password` is undefined (as in the test suite).
     if (!this.isMongooseActive()) {
       // Forward the appropriate fields to the in‑memory repo.
-      return inMemoryUserStore.create({ name, email, password, role, passwordHash, isActive });
+      return inMemoryUserStore.create({
+        name,
+        email,
+        password,
+        role,
+        passwordHash,
+        isActive,
+        requestedRole,
+        ownerApprovalStatus,
+        ownerApprovalRequestedAt,
+        ownerApprovalReviewedAt,
+        ownerApprovalReviewedBy,
+        ownerApprovalReviewedByName,
+        roleChangeReason,
+      });
     }
 
     let finalHash;
@@ -200,6 +288,13 @@ export const User = {
       passwordHash: finalHash,
       role,
       isActive: isActive !== false,
+      requestedRole,
+      ownerApprovalStatus,
+      ownerApprovalRequestedAt,
+      ownerApprovalReviewedAt,
+      ownerApprovalReviewedBy,
+      ownerApprovalReviewedByName,
+      roleChangeReason,
     });
 
     await user.save();

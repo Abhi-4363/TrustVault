@@ -351,3 +351,69 @@ This document records the exact progression of development prompts, implementati
 - **Real Git Commit Reference**:
   - Commit Hash: `ffbbe38`
   - Commit Message: `feat: implement tenant role governance, metadata search filters, and security threat mitigations`
+
+---
+
+## Prompt Entry 9 — Admin User Management, Owner Approval Requests, and Role Revocation Workflow
+
+- **Date / Timestamp**: 2026-10-21T18:24:00+05:30
+- **User Prompt / Instructions**:
+  - Implement the complete account-management workflow in TrustVault for the Snovasys Fresher Hiring Challenge 2026.
+  - Admin User Management: Dedicated section in Admin Dashboard listing all accounts with name, email, effective role, requested role, account status, registration date, owner approval status, and action controls.
+  - Registration Workflow: Public registration must allow users to choose requested account type (`Viewer` vs `Document Owner`) with an explanatory notice that Owner access requires Admin approval. Effective role must **always be `viewer`** upon registration. If `owner` was requested, status is marked `pending` and queued for review. User receives immediate in-app notice with submission details.
+  - Admin Notification & Pending Requests Queue: Visible badge count in Admin navigation showing pending owner requests. Dedicated review table in Admin Dashboard with quick **Approve** and **Reject** actions.
+  - Approve / Reject Owner Requests: Dedicated endpoints (`POST /api/admin/owner-requests/:userId/approve` and `POST /api/admin/owner-requests/:userId/reject`). Approve elevates role to `owner`; Reject retains role as `viewer`. Immutable audit events (`OWNER_REQUEST_APPROVED`, `OWNER_REQUEST_REJECTED`) logged with reasons.
+  - Role Promotion & Downgrade (Owner -> Viewer): Admin can promote Viewers to Owner or downgrade Owners to Viewer. When an Owner is downgraded, their upload/management rights are revoked immediately, but **all existing documents previously uploaded by them are strictly preserved** without deletion or ownership reassignment. Pre-action confirmation modal with Zero Data Loss Guarantee.
+  - Separation of Effective vs Requested Role: Distinct `role` and `requestedRole` schema fields with status lifecycle (`not_required`, `pending`, `approved`, `rejected`).
+  - Automated Tests: Full coverage for all 16 scenarios specified in the challenge requirements.
+  - Documentation: Update `README.md`, `THREATS.md`, `API_DOCUMENTATION.md`, and record in `PROMPTS.md`.
+  - Strict Rule: DO NOT commit, push, or deploy without explicit user approval.
+
+- **What the AI Actually Implemented**:
+  1. **User Schema & In-Memory Model Extensions (`backend/src/models/user.model.js`)**:
+     - Added fields: `role` (strictly defaults to `'viewer'`), `requestedRole` (`'owner'`, `'viewer'`, or `null`), `ownerApprovalStatus` (`'not_required'`, `'pending'`, `'approved'`, `'rejected'`), `ownerApprovalRequestedAt`, `ownerApprovalReviewedAt`, `ownerApprovalReviewedBy`, `ownerApprovalReviewedByName`, and `roleChangeReason`.
+     - Ensured both Mongoose and in-memory repository expose normalized `_id` and `id` properties.
+  2. **Audit Action Types (`backend/src/models/audit.model.js`)**:
+     - Added `ACCOUNT_REGISTERED`, `OWNER_ACCESS_REQUESTED`, `OWNER_REQUEST_APPROVED`, `OWNER_REQUEST_REJECTED`, `USER_PROMOTED_TO_OWNER`, and `USER_DOWNGRADED_TO_VIEWER` to `VALID_ACTIONS`.
+  3. **Auth Controller & Registration Logic (`backend/src/controllers/auth.controller.js`)**:
+     - Evaluates `requestedRole` / `accountType` on registration. Public accounts always receive effective `role: 'viewer'`.
+     - If `requestedRole === 'owner'`, sets `ownerApprovalStatus: 'pending'` and emits `ACCOUNT_REGISTERED` and `OWNER_ACCESS_REQUESTED` audit events.
+     - Auth middleware (`requireRole`) updated to record `ACCESS_DENIED` on unauthorized administrative attempts.
+  4. **Document Access Controller (`backend/src/controllers/document.controller.js`)**:
+     - Enforced `canManageDocument` check: users with effective role `'viewer'` (including downgraded owners) cannot upload, purge, or modify document sharing ACLs.
+     - Preserved `canReadDocument` check: downgraded owners retain read and stream-download access to their historical documents without data loss.
+  5. **Admin Governance Controller & Routes (`backend/src/controllers/admin.controller.js`, `backend/src/routes/admin.routes.js`)**:
+     - Implemented `GET /api/admin/owner-requests`: Lists all accounts with `ownerApprovalStatus === 'pending'`.
+     - Implemented `POST /api/admin/owner-requests/:userId/approve`: State-machine validation (`INVALID_REQUEST_STATE` guard), upgrades role to `owner`, sets status to `approved`, and logs `OWNER_REQUEST_APPROVED`.
+     - Implemented `POST /api/admin/owner-requests/:userId/reject`: Rejection reason recording, sets status to `rejected`, and logs `OWNER_REQUEST_REJECTED`.
+     - Enhanced `PATCH /api/admin/users/:userId/role`: Handles direct promotions (`USER_PROMOTED_TO_OWNER`) and downgrades (`USER_DOWNGRADED_TO_VIEWER`) with document preservation guarantee and reason recording.
+     - Updated `listAllUsers` to return all governance columns and timestamps.
+     - Updated `getAnalytics` to include `pendingOwnerRequestsCount`.
+  6. **Comprehensive Automated Test Suite (`backend/tests/owner-approval-workflow.test.js`)**:
+     - Implemented 13 tests covering all 16 prompt scenarios.
+     - All 130 tests across all 10 test suites in `backend` pass with 100%.
+  7. **Frontend UI Implementation**:
+     - `AuthContext.jsx`: Updated `register` with `requestedRole` parameter and added `refreshProfile`.
+     - `AuthLandingPortal.jsx` & CSS: Added interactive Account Type radio selector ("Viewer - Immediate Access" vs "Document Owner - Requires Approval") with policy notice; added 4th demo card for `Jordan Lee` (`jordan.req@trustvault.internal` / `TrustVault2026!`).
+     - `AuthModals.jsx`: Added requested role selector in the modal auth dialog.
+     - `AppSidebar.jsx` & CSS: Dynamic notification badge (`1 PENDING` with amber pill) next to `Admin Governance` navigation item when pending owner requests exist.
+     - `AdminDashboard.jsx` & CSS:
+       - Tab badge showing pending requests count.
+       - Dedicated **Pending Document Owner Requests** queue card at top of User Governance tab with one-click **Approve** and **Reject** buttons.
+       - Full 8-column User Governance Directory table: *User Name, Email Address, Effective Role, Requested Role, Approval Status, Account Status, Registration Date, Governance Actions*.
+       - Quick action buttons: **Approve**, **Reject**, **Promote to Owner**, **Revoke Owner**, role dropdown, and suspend/restore.
+       - **Downgrade Confirmation Modal**: Explains immediate revocation of upload/sharing rights and displays the **Zero Data Loss Guarantee** stating all existing documents are strictly preserved.
+       - **Reject Confirmation Modal**: Captures optional rejection reason for the audit trail.
+     - `App.jsx` & CSS: Viewer role notice banners for pending approval (with live "Check Status" button), rejected request notice with reason, and downgraded notice with zero data loss guarantee.
+  8. **Documentation**:
+     - `README.md`: Updated badge to 130 tests, added Section 8 documenting the approval workflow, and added Jordan Lee demo credentials.
+     - `THREATS.md`: Added `THREAT-13` (Owner Self-Promotion & Stale Approval Manipulation) and `THREAT-14` (Data Loss & Ownership Orphanage on Role Downgrade).
+     - `docs/API_DOCUMENTATION.md`: Documented owner-request and user-role endpoints.
+
+- **What the User Reviewed**:
+  - Reviewed comprehensive implementation summary and issued explicit instruction to commit.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `648873d`
+  - Commit Message: `feat: implement admin user management, owner approval requests, and role revocation workflow`
+
