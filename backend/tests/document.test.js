@@ -193,8 +193,116 @@ describe('Stage 3: Document Metadata and Private Storage', () => {
       expect(res.status).toBe(200);
       expect(res.header['content-disposition']).toContain('attachment');
       expect(res.header['content-disposition']).toContain('alice-secret.txt');
+      expect(res.header['content-disposition']).toContain("filename*=UTF-8''alice-secret.txt");
       expect(res.header['x-content-type-options']).toBe('nosniff');
       expect(res.text).toBe('Alice confidential personal record');
+    });
+
+    it('should preserve original binary bytes and filename byte-for-byte for PDF documents', async () => {
+      const pdfBytes = Buffer.from('%PDF-1.4\n%âãÏÓ\n1 0 obj\n<< /Title (Confidential Project Report) >>\nendobj\ntrailer\n<< /Size 1 >>\nstartxref\n50\n%%EOF');
+      const pdfPath = path.resolve(testFilesDir, 'ProjectReport.pdf');
+      fs.writeFileSync(pdfPath, pdfBytes);
+
+      const uploadRes = await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${userAToken}`)
+        .field('title', 'Project Report 2026')
+        .attach('file', pdfPath);
+
+      expect(uploadRes.status).toBe(201);
+      const pdfDocId = uploadRes.body.document._id;
+
+      // Download and parse raw binary buffer
+      const downloadRes = await request(app)
+        .get(`/api/documents/${pdfDocId}/download`)
+        .set('Authorization', `Bearer ${userAToken}`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(downloadRes.status).toBe(200);
+      expect(downloadRes.header['content-type']).toBe('application/pdf');
+      expect(downloadRes.header['content-disposition']).toContain('attachment');
+      expect(downloadRes.header['content-disposition']).toContain('ProjectReport.pdf');
+      expect(downloadRes.header['content-disposition']).toContain("filename*=UTF-8''ProjectReport.pdf");
+
+      // Verify exact byte-for-byte integrity
+      expect(Buffer.isBuffer(downloadRes.body)).toBe(true);
+      expect(Buffer.compare(downloadRes.body, pdfBytes)).toBe(0);
+      expect(downloadRes.body.length).toBe(pdfBytes.length);
+    });
+
+    it('should preserve non-PDF file formats and not blindly append .pdf (e.g., spreadsheet .xlsx)', async () => {
+      const xlsxBytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x08, 0x00, 0xaa, 0xbb, 0xcc, 0xdd]);
+      const xlsxPath = path.resolve(testFilesDir, 'Q4_Financial_Model.xlsx');
+      fs.writeFileSync(xlsxPath, xlsxBytes);
+
+      const uploadRes = await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${userAToken}`)
+        .field('title', 'Q4 Financial Model')
+        .attach('file', xlsxPath);
+
+      expect(uploadRes.status).toBe(201);
+      const xlsxDocId = uploadRes.body.document._id;
+
+      const downloadRes = await request(app)
+        .get(`/api/documents/${xlsxDocId}/download`)
+        .set('Authorization', `Bearer ${userAToken}`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(downloadRes.status).toBe(200);
+      expect(downloadRes.header['content-disposition']).toContain('attachment');
+      expect(downloadRes.header['content-disposition']).toContain('Q4_Financial_Model.xlsx');
+      expect(downloadRes.header['content-disposition']).not.toContain('.pdf');
+      expect(Buffer.compare(downloadRes.body, xlsxBytes)).toBe(0);
+    });
+
+    it('should preserve DOCX file formats and byte contents without corruption', async () => {
+      const docxBytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x08, 0x00, 0x11, 0x22, 0x33, 0x44]);
+      const docxPath = path.resolve(testFilesDir, 'Enterprise_Contract.docx');
+      fs.writeFileSync(docxPath, docxBytes);
+
+      const uploadRes = await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${userAToken}`)
+        .field('title', 'Enterprise Contract 2026')
+        .attach('file', docxPath);
+
+      expect(uploadRes.status).toBe(201);
+      const docxDocId = uploadRes.body.document._id;
+
+      const downloadRes = await request(app)
+        .get(`/api/documents/${docxDocId}/download`)
+        .set('Authorization', `Bearer ${userAToken}`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(downloadRes.status).toBe(200);
+      expect(downloadRes.header['content-disposition']).toContain('attachment');
+      expect(downloadRes.header['content-disposition']).toContain('Enterprise_Contract.docx');
+      expect(downloadRes.header['content-type']).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(Buffer.compare(downloadRes.body, docxBytes)).toBe(0);
+    });
+
+    it('should reject unauthenticated download requests with 401 Unauthorized', async () => {
+      const res = await request(app)
+        .get(`/api/documents/${uploadedDocId}/download`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
     });
 
     it('should reject User B attempting to delete User A document with 403 Forbidden', async () => {

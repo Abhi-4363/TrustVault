@@ -15,6 +15,7 @@ import {
   registerImmediateRevocation,
   isAccessImmediatelyRevoked,
 } from '../services/revocation.service.js';
+import { STORAGE_DIR } from '../middleware/upload.middleware.js';
 
 /**
  * Sanitises document object for client responses, stripping internal server storage paths
@@ -31,26 +32,34 @@ function sanitizeDocument(doc) {
 export function canReadDocument(doc, user) {
   if (!doc || !user) return false;
   const userId = String(user.id || user._id);
+  const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);
+  const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
 
   // Document owner has full access
-  if (userId === ownerId) return true;
+  if (userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail)) return true;
 
   // Platform administrator has governance access
   if (user.role === 'admin') return true;
 
-  // Check granular ACL entry
+  // Check granular ACL entry (by userId or userEmail)
   if (Array.isArray(doc.acl)) {
     const hasAclAccess = doc.acl.some(
       (entry) =>
-        String(entry.userId) === userId &&
+        (String(entry.userId) === userId ||
+          (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
         (entry.permissionLevel === 'read' || entry.permissionLevel === 'edit')
     );
     if (hasAclAccess) return true;
   }
 
   // Legacy readers array check
-  if (Array.isArray(doc.readers) && doc.readers.some((r) => String(r) === userId)) {
+  if (
+    Array.isArray(doc.readers) &&
+    doc.readers.some(
+      (r) => String(r) === userId || (userEmail && String(r).toLowerCase().trim() === userEmail)
+    )
+  ) {
     return true;
   }
 
@@ -63,14 +72,19 @@ export function canReadDocument(doc, user) {
 export function canEditDocument(doc, user) {
   if (!doc || !user) return false;
   const userId = String(user.id || user._id);
+  const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);
+  const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
 
-  if (userId === ownerId) return true;
+  if (userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail)) return true;
   if (user.role === 'admin') return true;
 
   if (Array.isArray(doc.acl)) {
     const hasEditAcl = doc.acl.some(
-      (entry) => String(entry.userId) === userId && entry.permissionLevel === 'edit'
+      (entry) =>
+        (String(entry.userId) === userId ||
+          (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
+        entry.permissionLevel === 'edit'
     );
     if (hasEditAcl) return true;
   }
@@ -84,9 +98,15 @@ export function canEditDocument(doc, user) {
 export function canManageDocument(doc, user) {
   if (!doc || !user) return false;
   const userId = String(user.id || user._id);
+  const userEmail = (user.email || '').toLowerCase().trim();
   const ownerId = String(doc.ownerId);
+  const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
 
-  return userId === ownerId || user.role === 'admin';
+  return (
+    userId === ownerId ||
+    (ownerEmail && userEmail && ownerEmail === userEmail) ||
+    user.role === 'admin'
+  );
 }
 
 /**
@@ -143,6 +163,8 @@ export async function uploadDocument(req, res) {
       mimeType: req.file.mimetype || 'application/octet-stream',
       storagePath: req.file.path,
       ownerId: userId,
+      ownerName: req.user.name || '',
+      ownerEmail: req.user.email ? req.user.email.toLowerCase().trim() : '',
       tags,
       acl: [],
       readers: [],
@@ -191,27 +213,61 @@ export async function uploadDocument(req, res) {
  */
 export async function listDocuments(req, res) {
   try {
+    const userId = String(req.user.id || req.user._id);
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+
     let allDocs = await Document.find();
-    const accessibleDocs = allDocs.filter((doc) => canReadDocument(doc, req.user));
+    const accessibleDocs = allDocs.filter(
+      (doc) =>
+        !isAccessImmediatelyRevoked(doc._id, userId) &&
+        (!userEmail || !isAccessImmediatelyRevoked(doc._id, userEmail)) &&
+        canReadDocument(doc, req.user)
+    );
+
+    // Directory lookup to resolve owner details if needed
+    let userMap = new Map();
+    try {
+      const allUsers = await User.find();
+      (allUsers || []).forEach((u) => {
+        const uid = String(u._id || u.id);
+        userMap.set(uid, u);
+        if (u.email) userMap.set(u.email.toLowerCase().trim(), u);
+      });
+    } catch {
+      // Non-blocking in-memory fallback
+    }
 
     return res.status(200).json({
       documents: accessibleDocs.map((doc) => {
         const sanitized = sanitizeDocument(doc);
-        const userId = String(req.user.id || req.user._id);
         const ownerId = String(doc.ownerId);
+        const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
+        const isOwner = userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail);
 
         let accessLevel = 'Reader';
-        if (userId === ownerId) {
+        if (isOwner) {
           accessLevel = 'Owner';
         } else if (req.user.role === 'admin') {
           accessLevel = 'Admin';
         } else if (Array.isArray(doc.acl)) {
-          const entry = doc.acl.find((a) => String(a.userId) === userId);
+          const entry = doc.acl.find(
+            (a) =>
+              String(a.userId) === userId ||
+              (a.email && a.email.toLowerCase().trim() === userEmail)
+          );
           if (entry?.permissionLevel === 'edit') {
             accessLevel = 'Editor';
           }
         }
-        return { ...sanitized, accessLevel };
+
+        const ownerUser = userMap.get(ownerId) || (ownerEmail ? userMap.get(ownerEmail) : null);
+        const owner = {
+          id: ownerId,
+          name: doc.ownerName || ownerUser?.name || 'Document Owner',
+          email: doc.ownerEmail || ownerUser?.email || '',
+        };
+
+        return { ...sanitized, accessLevel, owner };
       }),
     });
   } catch (error) {
@@ -244,6 +300,7 @@ export async function getDocumentById(req, res) {
     }
 
     const userId = String(req.user.id || req.user._id);
+    const userEmail = (req.user.email || '').toLowerCase().trim();
 
     // Stage 5 check: immediate revocation validation
     if (isAccessImmediatelyRevoked(id, userId) || !canReadDocument(doc, req.user)) {
@@ -256,15 +313,35 @@ export async function getDocumentById(req, res) {
     }
 
     const ownerId = String(doc.ownerId);
+    const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
+    const isOwner = userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail);
+
     let accessLevel = 'Reader';
-    if (userId === ownerId) {
+    if (isOwner) {
       accessLevel = 'Owner';
     } else if (req.user.role === 'admin') {
       accessLevel = 'Admin';
     } else if (Array.isArray(doc.acl)) {
-      const entry = doc.acl.find((a) => String(a.userId) === userId);
+      const entry = doc.acl.find(
+        (a) =>
+          String(a.userId) === userId ||
+          (a.email && a.email.toLowerCase().trim() === userEmail)
+      );
       if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
     }
+
+    let ownerUser = null;
+    try {
+      ownerUser = await User.findById(ownerId);
+    } catch {
+      // Non-blocking
+    }
+
+    const owner = {
+      id: ownerId,
+      name: doc.ownerName || ownerUser?.name || 'Document Owner',
+      email: doc.ownerEmail || ownerUser?.email || '',
+    };
 
     // Audit log recording (Stage 6)
     await logAuditEvent({
@@ -376,9 +453,14 @@ export async function downloadDocument(req, res) {
     }
 
     const userId = String(req.user.id || req.user._id);
+    const userEmail = (req.user.email || '').toLowerCase().trim();
 
-    // Stage 5: Immediate revocation engine validation
-    if (isAccessImmediatelyRevoked(id, userId) || !canReadDocument(doc, req.user)) {
+    // Stage 5: Immediate revocation engine validation (by ID and by email)
+    if (
+      isAccessImmediatelyRevoked(id, userId) ||
+      (userEmail && isAccessImmediatelyRevoked(id, userEmail)) ||
+      !canReadDocument(doc, req.user)
+    ) {
       return res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -387,14 +469,23 @@ export async function downloadDocument(req, res) {
       });
     }
 
-    if (!fs.existsSync(doc.storagePath)) {
-      return res.status(404).json({
-        error: {
-          code: 'FILE_NOT_FOUND',
-          message: 'Document binary file is missing from private storage.',
-        },
-      });
+    // Resolve storage file path (handle absolute paths or relative STORAGE_DIR paths)
+    let targetPath = doc.storagePath;
+    if (!targetPath || !fs.existsSync(targetPath)) {
+      const fallbackInStorage = path.resolve(STORAGE_DIR, path.basename(doc.storagePath || ''));
+      if (fs.existsSync(fallbackInStorage)) {
+        targetPath = fallbackInStorage;
+      } else {
+        return res.status(404).json({
+          error: {
+            code: 'FILE_NOT_FOUND',
+            message: 'Document binary file is missing from private storage.',
+          },
+        });
+      }
     }
+
+    const stat = fs.statSync(targetPath);
 
     // Audit log recording (Stage 6)
     await logAuditEvent({
@@ -402,16 +493,42 @@ export async function downloadDocument(req, res) {
       action: 'DOCUMENT_DOWNLOAD',
       documentId: doc._id,
       documentTitle: doc.title,
-      metadata: { fileSize: doc.fileSize },
+      metadata: { fileSize: stat.size },
     });
 
-    const safeFilename = path.basename(doc.originalName).replace(/"/g, '');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    // Compute secure attachment filename ensuring valid file extension
+    const rawName = doc.originalName || doc.title || 'document';
+    let safeFilename = path.basename(rawName).replace(/["\r\n]/g, '').trim();
+
+    if (!path.extname(safeFilename)) {
+      const extOnDisk = path.extname(targetPath);
+      if (extOnDisk) {
+        safeFilename += extOnDisk;
+      } else if (doc.mimeType) {
+        const mimeMap = {
+          'application/pdf': '.pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+          'application/zip': '.zip',
+          'text/plain': '.txt',
+          'text/csv': '.csv',
+          'image/png': '.png',
+          'image/jpeg': '.jpg',
+        };
+        if (mimeMap[doc.mimeType]) safeFilename += mimeMap[doc.mimeType];
+      }
+    }
+
+    const asciiFallback = safeFilename.replace(/[^\x20-\x7E]/g, '_');
+    const encodedFilename = encodeURIComponent(safeFilename);
+
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`);
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
-    res.setHeader('Content-Length', doc.fileSize);
+    res.setHeader('Content-Length', stat.size);
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
-    const stream = fs.createReadStream(doc.storagePath);
+    const stream = fs.createReadStream(targetPath);
     stream.on('error', (streamErr) => {
       console.error('[Download Stream Error]:', streamErr);
       if (!res.headersSent) {
@@ -585,19 +702,27 @@ export async function grantDocumentPermission(req, res) {
       targetUser = await User.findById(userId);
     }
 
-    if (!targetUser) {
-      return res.status(404).json({
+    const callerId = String(req.user.id || req.user._id);
+    const ownerId = String(doc.ownerId);
+    const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
+
+    const targetUserId = targetUser ? String(targetUser._id || targetUser.id) : (email ? email.toLowerCase().trim() : null);
+    const targetEmail = targetUser ? targetUser.email.toLowerCase().trim() : (email ? email.toLowerCase().trim() : '');
+    const targetName = targetUser ? targetUser.name : (targetEmail ? targetEmail.split('@')[0] : 'Collaborator');
+
+    if (!targetUserId && !targetEmail) {
+      return res.status(400).json({
         error: {
-          code: 'USER_NOT_FOUND',
-          message: 'The target user was not found in the organization directory.',
+          code: 'USER_REQUIRED',
+          message: 'Target collaborator email or user ID is required.',
         },
       });
     }
 
-    const targetUserId = String(targetUser._id || targetUser.id);
-    const ownerId = String(doc.ownerId);
-
-    if (targetUserId === ownerId) {
+    if (
+      (targetUserId && targetUserId === ownerId) ||
+      (targetEmail && ownerEmail && targetEmail === ownerEmail)
+    ) {
       return res.status(400).json({
         error: {
           code: 'INVALID_GRANT',
@@ -607,18 +732,24 @@ export async function grantDocumentPermission(req, res) {
     }
 
     let currentAcl = Array.isArray(doc.acl) ? [...doc.acl] : [];
-    const existingIndex = currentAcl.findIndex((entry) => String(entry.userId) === targetUserId);
-    const callerId = String(req.user.id || req.user._id);
+    const existingIndex = currentAcl.findIndex(
+      (entry) =>
+        (targetUserId && String(entry.userId) === targetUserId) ||
+        (targetEmail && entry.email && entry.email.toLowerCase().trim() === targetEmail)
+    );
 
     if (existingIndex >= 0) {
       currentAcl[existingIndex].permissionLevel = permissionLevel;
       currentAcl[existingIndex].grantedBy = callerId;
       currentAcl[existingIndex].grantedAt = new Date();
+      if (targetUserId) currentAcl[existingIndex].userId = targetUserId;
+      if (targetName) currentAcl[existingIndex].name = targetName;
+      if (targetEmail) currentAcl[existingIndex].email = targetEmail;
     } else {
       currentAcl.push({
         userId: targetUserId,
-        email: targetUser.email,
-        name: targetUser.name,
+        email: targetEmail,
+        name: targetName,
         permissionLevel,
         grantedBy: callerId,
         grantedAt: new Date(),
@@ -626,8 +757,11 @@ export async function grantDocumentPermission(req, res) {
     }
 
     let currentReaders = Array.isArray(doc.readers) ? [...doc.readers] : [];
-    if (!currentReaders.some((r) => String(r) === targetUserId)) {
+    if (targetUserId && !currentReaders.some((r) => String(r) === targetUserId)) {
       currentReaders.push(targetUserId);
+    }
+    if (targetEmail && !currentReaders.some((r) => String(r).toLowerCase().trim() === targetEmail)) {
+      currentReaders.push(targetEmail);
     }
 
     const updatedDoc = await Document.findByIdAndUpdate(
@@ -644,13 +778,13 @@ export async function grantDocumentPermission(req, res) {
       documentTitle: doc.title,
       metadata: {
         targetUserId,
-        targetEmail: targetUser.email,
+        targetEmail,
         permissionLevel,
       },
     });
 
     return res.status(200).json({
-      message: `Successfully granted '${permissionLevel}' access to ${targetUser.email}.`,
+      message: `Successfully granted '${permissionLevel}' access to ${targetEmail}.`,
       acl: updatedDoc.acl,
     });
   } catch (error) {
@@ -691,11 +825,41 @@ export async function revokeDocumentPermission(req, res) {
       });
     }
 
-    // Stage 5: Register immediate revocation marker
-    registerImmediateRevocation(id, targetUserId);
+    // Look up target user to resolve both ID and email
+    let targetUser = null;
+    try {
+      targetUser = await User.findById(targetUserId);
+      if (!targetUser && String(targetUserId).includes('@')) {
+        targetUser = await User.findOne({ email: String(targetUserId).toLowerCase().trim() });
+      }
+    } catch {
+      // Non-blocking
+    }
 
-    const updatedAcl = (doc.acl || []).filter((entry) => String(entry.userId) !== String(targetUserId));
-    const updatedReaders = (doc.readers || []).filter((r) => String(r) !== String(targetUserId));
+    const targetUserStr = String(targetUserId).toLowerCase().trim();
+    const targetEmail = targetUser ? targetUser.email.toLowerCase().trim() : (targetUserStr.includes('@') ? targetUserStr : '');
+    const targetId = targetUser ? String(targetUser._id || targetUser.id) : targetUserStr;
+
+    // Stage 5: Register immediate revocation markers
+    registerImmediateRevocation(id, targetId);
+    if (targetEmail) {
+      registerImmediateRevocation(id, targetEmail);
+    }
+
+    const updatedAcl = (doc.acl || []).filter((entry) => {
+      const entryUid = String(entry.userId || '').toLowerCase().trim();
+      const entryEmail = String(entry.email || '').toLowerCase().trim();
+      if (entryUid === targetUserStr || entryUid === targetId.toLowerCase()) return false;
+      if (targetEmail && (entryUid === targetEmail || entryEmail === targetEmail)) return false;
+      return true;
+    });
+
+    const updatedReaders = (doc.readers || []).filter((r) => {
+      const rStr = String(r).toLowerCase().trim();
+      if (rStr === targetUserStr || rStr === targetId.toLowerCase()) return false;
+      if (targetEmail && rStr === targetEmail) return false;
+      return true;
+    });
 
     const updatedDoc = await Document.findByIdAndUpdate(
       id,
@@ -895,6 +1059,7 @@ export async function searchDocuments(req, res) {
     });
 
     const userId = String(req.user.id || req.user._id);
+    const userEmail = (req.user.email || '').toLowerCase().trim();
 
     return res.status(200).json({
       query: req.query.q || '',
@@ -902,17 +1067,30 @@ export async function searchDocuments(req, res) {
       documents: matchedDocs.map((doc) => {
         const sanitized = sanitizeDocument(doc);
         const ownerId = String(doc.ownerId);
+        const ownerEmail = (doc.ownerEmail || '').toLowerCase().trim();
+        const isOwner = userId === ownerId || (ownerEmail && userEmail && ownerEmail === userEmail);
 
         let accessLevel = 'Reader';
-        if (userId === ownerId) {
+        if (isOwner) {
           accessLevel = 'Owner';
         } else if (req.user.role === 'admin') {
           accessLevel = 'Admin';
         } else if (Array.isArray(doc.acl)) {
-          const entry = doc.acl.find((a) => String(a.userId) === userId);
+          const entry = doc.acl.find(
+            (a) =>
+              String(a.userId) === userId ||
+              (a.email && a.email.toLowerCase().trim() === userEmail)
+          );
           if (entry?.permissionLevel === 'edit') accessLevel = 'Editor';
         }
-        return { ...sanitized, accessLevel };
+
+        const owner = {
+          id: ownerId,
+          name: doc.ownerName || 'Document Owner',
+          email: doc.ownerEmail || '',
+        };
+
+        return { ...sanitized, accessLevel, owner };
       }),
     });
   } catch (error) {

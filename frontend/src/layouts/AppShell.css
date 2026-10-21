@@ -14,6 +14,10 @@
   transition: margin-left var(--transition-normal);
 }
 
+.app-main-layout.no-sidebar {
+  margin-left: 0;
+}
+
 .app-content-container {
   flex: 1;
   padding: var(--space-8);

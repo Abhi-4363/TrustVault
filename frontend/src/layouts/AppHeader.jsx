@@ -26,6 +26,7 @@ export function AppHeader({
   backendConnected = false,
   onOpenLogin,
   onOpenRegister,
+  showMenuToggle = true,
 }) {
   const { user, isAuthenticated, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -40,14 +41,25 @@ export function AppHeader({
   return (
     <header className="app-header" aria-label="Application Header">
       <div className="header-left">
-        <button
-          type="button"
-          className="mobile-menu-trigger"
-          onClick={onMenuToggle}
-          aria-label="Open mobile navigation menu"
-        >
-          <Menu size={20} />
-        </button>
+        {!showMenuToggle ? (
+          <div className="header-unauth-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
+            <div style={{ backgroundColor: 'var(--color-primary-600)', color: '#ffffff', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={16} />
+            </div>
+            <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+              TrustVault
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="mobile-menu-trigger"
+            onClick={onMenuToggle}
+            aria-label="Open mobile navigation menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
 
         <nav className="header-breadcrumb" aria-label="Breadcrumb">
           <ol className="breadcrumb-list">

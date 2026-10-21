@@ -38,7 +38,7 @@ function getFileIcon(type) {
  * DocumentTable Component
  * Accessible enterprise table with real-time local search and explicit action modal triggers.
  */
-export function DocumentTable({ documents = [], onActionSelect }) {
+export function DocumentTable({ documents = [], onActionSelect, userRole }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL');
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -178,15 +178,17 @@ export function DocumentTable({ documents = [], onActionSelect }) {
 
                   <td className="td-actions text-right">
                     <div className="action-buttons-group">
-                      <button
-                        type="button"
-                        className="row-action-btn"
-                        onClick={() => onActionSelect('share', doc)}
-                        title={`Manage sharing for ${doc.name}`}
-                        aria-label={`Share ${doc.name}`}
-                      >
-                        <Share2 size={15} />
-                      </button>
+                      {(!doc.isReal || doc.accessLevel === 'Owner' || userRole === 'admin') && (
+                        <button
+                          type="button"
+                          className="row-action-btn"
+                          onClick={() => onActionSelect('share', doc)}
+                          title={`Manage sharing for ${doc.name}`}
+                          aria-label={`Share ${doc.name}`}
+                        >
+                          <Share2 size={15} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="row-action-btn"
@@ -205,7 +207,7 @@ export function DocumentTable({ documents = [], onActionSelect }) {
                       >
                         <Info size={15} />
                       </button>
-                      {doc.isReal && (
+                      {doc.isReal && (doc.accessLevel === 'Owner' || userRole === 'admin') && (
                         <button
                           type="button"
                           className="row-action-btn row-action-delete"

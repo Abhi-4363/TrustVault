@@ -12,6 +12,7 @@ export function PageHeader({
   description = 'Manage, share, and track confidential enterprise documents with fine-grained access policies.',
   onUploadClick,
   onViewSharedClick,
+  isViewer = false,
 }) {
   return (
     <section className="page-header" aria-labelledby="page-title">
@@ -33,14 +34,16 @@ export function PageHeader({
         >
           View shared documents
         </Button>
-        <Button
-          variant="primary"
-          icon={Upload}
-          onClick={onUploadClick}
-          title="Upload a new confidential file to TrustVault"
-        >
-          Upload document
-        </Button>
+        {!isViewer && (
+          <Button
+            variant="primary"
+            icon={Upload}
+            onClick={onUploadClick}
+            title="Upload a new confidential file to TrustVault"
+          >
+            Upload document
+          </Button>
+        )}
       </div>
     </section>
   );

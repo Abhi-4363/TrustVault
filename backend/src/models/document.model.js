@@ -83,6 +83,17 @@ const documentSchema = new mongoose.Schema(
       ref: 'User',
       index: true,
     },
+    ownerName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    ownerEmail: {
+      type: String,
+      default: '',
+      trim: true,
+      lowercase: true,
+    },
     tags: {
       type: [String],
       default: [],
@@ -132,6 +143,8 @@ class InMemoryDocumentRepository {
       mimeType: data.mimeType,
       storagePath: data.storagePath,
       ownerId: data.ownerId,
+      ownerName: data.ownerName || '',
+      ownerEmail: data.ownerEmail || '',
       tags: Array.isArray(data.tags) ? data.tags : [],
       acl: Array.isArray(data.acl) ? data.acl : [],
       readers: Array.isArray(data.readers) ? data.readers : [],

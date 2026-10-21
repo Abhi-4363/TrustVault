@@ -294,4 +294,82 @@ describe('Stage 4: Per-Document Read and Edit Permissions', () => {
       expect(emails).not.toContain('alice@trustvault.internal');
     });
   });
+
+  describe('Cross-Account Sharing and Owner Attribution', () => {
+    it('should correctly attribute document owner and Reader access level when shared with a second account', async () => {
+      // 1. User 1 registers and uploads document
+      const resUser1 = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Abhiram Kondagalla',
+          email: 'abhiram.kondagalla604@gmail.com',
+          password: 'Password123!',
+        });
+      expect(resUser1.status).toBe(201);
+      const tokenUser1 = resUser1.body.data.token;
+
+      const samplePdfPath = path.join(testFilesDir, 'cross-share-doc.pdf');
+      fs.writeFileSync(samplePdfPath, '%PDF-1.4 confidential cross share document');
+
+      const uploadRes = await request(app)
+        .post('/api/documents')
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .field('title', 'Confidential Project Brief')
+        .field('description', 'Owned by abhiram.kondagalla604')
+        .attach('file', samplePdfPath);
+      expect(uploadRes.status).toBe(201);
+      const docId = uploadRes.body.document._id;
+
+      // 2. User 2 registers
+      const resUser2 = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Kondagalla Abhiram',
+          email: 'kondagalla.abhiram@gmail.com',
+          password: 'Password123!',
+        });
+      expect(resUser2.status).toBe(201);
+      const tokenUser2 = resUser2.body.data.token;
+
+      // 3. User 1 shares document with User 2
+      const shareRes = await request(app)
+        .post(`/api/documents/${docId}/permissions`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({
+          email: 'kondagalla.abhiram@gmail.com',
+          permissionLevel: 'read',
+        });
+      expect(shareRes.status).toBe(200);
+
+      // 4. User 2 requests document collection
+      const listResUser2 = await request(app)
+        .get('/api/documents')
+        .set('Authorization', `Bearer ${tokenUser2}`);
+
+      expect(listResUser2.status).toBe(200);
+      expect(listResUser2.body.documents.length).toBe(1);
+
+      const sharedDoc = listResUser2.body.documents[0];
+      expect(sharedDoc._id).toBe(docId);
+      // Access level MUST be Reader (Viewer), NOT Owner!
+      expect(sharedDoc.accessLevel).toBe('Reader');
+      // Owner MUST be User 1 (abhiram.kondagalla604@gmail.com), NOT User 2!
+      expect(sharedDoc.owner).toBeDefined();
+      expect(sharedDoc.owner.email).toBe('abhiram.kondagalla604@gmail.com');
+      expect(sharedDoc.owner.name).toBe('Abhiram Kondagalla');
+
+      // 5. User 2 downloads the shared document
+      const downloadRes = await request(app)
+        .get(`/api/documents/${docId}/download`)
+        .set('Authorization', `Bearer ${tokenUser2}`);
+
+      expect(downloadRes.status).toBe(200);
+      expect(downloadRes.header['content-disposition']).toContain('attachment');
+      expect(downloadRes.header['content-disposition']).toContain('cross-share-doc.pdf');
+      expect(downloadRes.header['x-content-type-options']).toBe('nosniff');
+      const text = downloadRes.text || (downloadRes.body ? downloadRes.body.toString() : '');
+      expect(text).toContain('confidential cross share document');
+    });
+  });
 });
+

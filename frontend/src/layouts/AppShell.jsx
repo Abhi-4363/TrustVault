@@ -20,19 +20,28 @@ export function AppShell({
   onHelpClick,
   onOpenLogin,
   onOpenRegister,
+  myDocsCount,
+  sharedDocsCount,
+  userRole,
+  isAuthenticated = false,
 }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   return (
-    <div className="app-shell">
-      <AppSidebar
-        activeNav={activeNav}
-        onNavSelect={onNavSelect}
-        isMobileOpen={isMobileNavOpen}
-        onCloseMobile={() => setIsMobileNavOpen(false)}
-      />
+    <div className={`app-shell ${!isAuthenticated ? 'unauthenticated' : ''}`}>
+      {isAuthenticated && (
+        <AppSidebar
+          activeNav={activeNav}
+          onNavSelect={onNavSelect}
+          isMobileOpen={isMobileNavOpen}
+          onCloseMobile={() => setIsMobileNavOpen(false)}
+          myDocsCount={myDocsCount}
+          sharedDocsCount={sharedDocsCount}
+          userRole={userRole}
+        />
+      )}
 
-      <div className="app-main-layout">
+      <div className={`app-main-layout ${!isAuthenticated ? 'no-sidebar' : ''}`}>
         <AppHeader
           pageTitle={pageTitle}
           onMenuToggle={() => setIsMobileNavOpen(!isMobileNavOpen)}
@@ -42,6 +51,7 @@ export function AppShell({
           onHelpClick={onHelpClick}
           onOpenLogin={onOpenLogin}
           onOpenRegister={onOpenRegister}
+          showMenuToggle={isAuthenticated}
         />
 
         <main className="app-content-container" id="main-content" tabIndex="-1">
@@ -53,7 +63,7 @@ export function AppShell({
             <div className="footer-left">
               <span className="footer-brand">TrustVault</span>
               <span className="footer-divider">•</span>
-              <span className="footer-stage">Stage 1 Foundation & UI</span>
+              <span className="footer-stage">Zero-Trust Protected</span>
               <span className="footer-divider">•</span>
               <span className="footer-copyright">Snovasys Fresher Challenge 2026</span>
             </div>

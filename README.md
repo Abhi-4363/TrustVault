@@ -3,7 +3,7 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-100%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-105%20passed-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-12%2F12%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
@@ -21,6 +21,7 @@ TrustVault enforces a strict **Zero-Trust** security architecture:
 4. **Append-Only Immutable Audit Trail**: Every file upload, download, metadata read, permission grant, and revocation is permanently recorded in a tamper-resistant ledger.
 5. **Upload & Magic-Number Validation**: Uploads are strictly checked against file signatures (magic numbers) to prevent disguised scripts/executables, with automatic disk purging.
 6. **Administrator Governance Dashboard**: Real-time system analytics, global audit log explorer with un-truncated CSV/JSON export, and user account management.
+7. **Secure Download with Original Filename**: Downloads use the browser's File System Access API (`showSaveFilePicker`) to present the original filename (e.g. `Report.pdf`) in a native Save-As dialog, bypassing Chromium's blob-URL UUID fallback. Bearer-token authentication is preserved; tokens are never placed in URLs.
 
 ---
 
@@ -59,8 +60,9 @@ graph TD
 - **Backend API**: Node.js, Express 4, Mongoose (with dual-engine architecture: persistent MongoDB Atlas + resilient zero-configuration in-memory adapter)
 - **Security & Crypto**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), defensive HTTP headers, sliding-window rate limiter
 - **File Ingestion**: Multer, private encrypted disk quarantine, magic-number binary signature inspection
+- **File Download**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; blob-URL fallback for Firefox/Safari
 - **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic)
-- **Testing**: Vitest 5, Supertest (9 test suites, 100 automated integration tests)
+- **Testing**: Vitest 5, Supertest (9 test suites, 105 automated integration tests)
 
 ---
 
@@ -143,8 +145,8 @@ npm test
 ### Test Suite Summary:
 ```text
  ✓ tests/auth.test.js                    (11 tests) - Password hashing, JWT issuance, role enforcement
- ✓ tests/document.test.js                (12 tests) - File upload limits, private storage, binary stream
- ✓ tests/permissions.test.js             (11 tests) - Granular read/edit ACLs, isolation boundaries
+ ✓ tests/document.test.js                (16 tests) - File upload limits, private storage, binary stream, download filename
+ ✓ tests/permissions.test.js             (12 tests) - Granular read/edit ACLs, isolation boundaries
  ✓ tests/revocation.test.js              (2 tests)  - Immediate revocation with zero caching delay
  ✓ tests/audit.test.js                   (6 tests)  - Immutable audit trail & pre-hook tamper prevention
  ✓ tests/search-validation.test.js       (14 tests) - Magic numbers, disguised executables, XSS sanitization
@@ -153,8 +155,8 @@ npm test
  ✓ tests/health.test.js                  (3 tests)  - Public health endpoint without secret leakage
 
 Test Files:  9 passed (9)
-Tests:       100 passed (100)
-Duration:    3.93s
+Tests:       105 passed (105)
+Duration:    5.31s
 Vulnerabilities: 0
 ```
 
@@ -191,6 +193,12 @@ To experience all enterprise security capabilities in the live browser:
    - Sign in as a Viewer (`alex.dev@trustvault.internal`).
    - Use the search bar to search for terms in private documents owned by other users.
    - Zero matching documents or confidential metadata are leaked. Notice that Viewer cannot upload documents or alter document permissions.
+
+6. **Test Secure Download with Original Filename**:
+   - Click the **Download** button on any document (PDF, DOCX, or XLSX).
+   - A native browser **Save As** dialog opens pre-filled with the original filename (e.g. `Report.pdf`).
+   - Accept the location — the file is fetched from the backend with Bearer-token authentication and written directly to the chosen path.
+   - The Bearer token is never placed in a URL. Chromium's blob-URL UUID fallback is bypassed entirely.
 
 ---
 

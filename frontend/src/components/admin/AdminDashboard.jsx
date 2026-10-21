@@ -172,7 +172,9 @@ export function AdminDashboard({ user, token, onNavigateToLogin }) {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        window.URL.revokeObjectURL(url);
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 10000);
         setSuccessMsg(`Successfully generated and downloaded ${format.toUpperCase()} compliance export.`);
       })
       .catch((err) => {

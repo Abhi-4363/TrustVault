@@ -86,7 +86,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
   if (!isOpen || !document) return null;
 
   const isOwner = document.isReal
-    ? document.accessLevel === 'Owner'
+    ? document.accessLevel === 'Owner' || user?.role === 'admin'
     : true; // In demo preview allow trying
 
   const handleGrant = async (e) => {

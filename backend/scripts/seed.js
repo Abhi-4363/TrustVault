@@ -123,12 +123,16 @@ export async function runSeed(isStandalone = false) {
       description: 'Comprehensive compliance and penetration testing audit results.',
       originalName: 'Q4-2026-Enterprise-Audit.pdf',
       ownerId: marcus._id || marcus.id,
+      ownerName: marcus.name,
+      ownerEmail: marcus.email,
       fileSize: 412850,
       mimeType: 'application/pdf',
       tags: ['compliance', 'audit', 'iso27001', 'confidential'],
       acl: [
         {
           userId: elena._id || elena.id,
+          email: elena.email,
+          name: elena.name,
           userEmail: elena.email,
           userName: elena.name,
           permissionLevel: 'edit',
@@ -137,6 +141,8 @@ export async function runSeed(isStandalone = false) {
         },
         {
           userId: sarah._id || sarah.id,
+          email: sarah.email,
+          name: sarah.name,
           userEmail: sarah.email,
           userName: sarah.name,
           permissionLevel: 'read',
@@ -150,12 +156,16 @@ export async function runSeed(isStandalone = false) {
       description: 'System specifications for hardware security modules and per-file keys.',
       originalName: 'Project-Apex-Architecture-Spec.pdf',
       ownerId: sarah._id || sarah.id,
+      ownerName: sarah.name,
+      ownerEmail: sarah.email,
       fileSize: 284190,
       mimeType: 'application/pdf',
       tags: ['architecture', 'apex', 'zero-trust'],
       acl: [
         {
           userId: alex._id || alex.id,
+          email: alex.email,
+          name: alex.name,
           userEmail: alex.email,
           userName: alex.name,
           permissionLevel: 'edit',
@@ -169,6 +179,8 @@ export async function runSeed(isStandalone = false) {
       description: 'Strictly restricted executive allocations and merger contingencies.',
       originalName: 'FY2027-Budget-Allocations-Confidential.pdf',
       ownerId: marcus._id || marcus.id,
+      ownerName: marcus.name,
+      ownerEmail: marcus.email,
       fileSize: 521400,
       mimeType: 'application/pdf',
       tags: ['financials', 'executive', 'restricted'],
@@ -179,12 +191,16 @@ export async function runSeed(isStandalone = false) {
       description: 'Cross-border data transfer impact assessment and DPIA guidelines.',
       originalName: 'Global-Privacy-GDPR-Framework.pdf',
       ownerId: elena._id || elena.id,
+      ownerName: elena.name,
+      ownerEmail: elena.email,
       fileSize: 310500,
       mimeType: 'application/pdf',
       tags: ['legal', 'privacy', 'gdpr'],
       acl: [
         {
           userId: marcus._id || marcus.id,
+          email: marcus.email,
+          name: marcus.name,
           userEmail: marcus.email,
           userName: marcus.name,
           permissionLevel: 'read',
@@ -199,10 +215,10 @@ export async function runSeed(isStandalone = false) {
   for (const docData of seedDocsData) {
     let existing = await Document.findOne({ title: docData.title });
     if (!existing) {
-      const { diskFilename } = createDiskFile(docData.originalName);
+      const { diskFilename, fullPath } = createDiskFile(docData.originalName);
       existing = await Document.create({
         ...docData,
-        storagePath: diskFilename,
+        storagePath: fullPath,
       });
       console.log(`   ✔ "${existing.title}" (ACL: ${existing.acl?.length || 0} delegates)`);
     } else {

@@ -22,6 +22,7 @@ import { ActivityList } from './components/dashboard/ActivityList';
 import { DemoDataBanner } from './components/demo/DemoDataBanner';
 import { Modal } from './components/common/Modal';
 import { AuthModals } from './components/auth/AuthModals';
+import { AuthLandingPortal } from './components/auth/AuthLandingPortal';
 import { UploadModal } from './components/dashboard/UploadModal';
 import { ShareModal } from './components/dashboard/ShareModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -91,37 +92,53 @@ export function App() {
 
       if (response.ok) {
         const data = await response.json();
-        const formatted = (data.documents || []).map((doc) => ({
-          id: doc._id,
-          name: doc.title,
-          originalName: doc.originalName,
-          description: doc.description || '',
-          fileType: (doc.originalName.split('.').pop() || 'FILE').toUpperCase(),
-          fileSize:
-            doc.fileSize > 1048576
-              ? `${(doc.fileSize / 1048576).toFixed(1)} MB`
-              : `${(doc.fileSize / 1024).toFixed(1)} KB`,
-          rawSize: doc.fileSize,
-          owner: {
-            name: user?.name || 'You',
-            email: user?.email || '',
-            initials: (user?.name || 'Y')
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-              .substring(0, 2)
-              .toUpperCase(),
-          },
-          accessLevel: 'Owner',
-          lastUpdated: doc.updatedAt || doc.createdAt,
-          formattedDate: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          }),
-          tags: doc.tags || [],
-          isReal: true,
-        }));
+        const formatted = (data.documents || []).map((doc) => {
+          const isUserOwner = doc.accessLevel === 'Owner';
+          const ownerName = doc.owner?.name || (isUserOwner ? (user?.name || 'You') : 'Colleague');
+          const ownerEmail = doc.owner?.email || (isUserOwner ? (user?.email || '') : '');
+          const initials = (ownerName || 'D')
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .substring(0, 2)
+            .toUpperCase();
+
+          const mappedAccess = doc.accessLevel === 'Owner'
+            ? 'Owner'
+            : doc.accessLevel === 'Editor'
+              ? 'Can Edit'
+              : doc.accessLevel === 'Admin'
+                ? 'Admin'
+                : 'Can Read';
+
+          return {
+            id: doc._id,
+            name: doc.title,
+            originalName: doc.originalName,
+            description: doc.description || '',
+            fileType: (doc.originalName ? doc.originalName.split('.').pop() : 'FILE').toUpperCase(),
+            fileSize:
+              doc.fileSize > 1048576
+                ? `${(doc.fileSize / 1048576).toFixed(1)} MB`
+                : `${(doc.fileSize / 1024).toFixed(1)} KB`,
+            rawSize: doc.fileSize,
+            owner: {
+              name: ownerName,
+              email: ownerEmail,
+              initials: initials || 'TV',
+            },
+            accessLevel: mappedAccess,
+            acl: doc.acl || [],
+            lastUpdated: doc.updatedAt || doc.createdAt,
+            formattedDate: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            tags: doc.tags || [],
+            isReal: true,
+          };
+        });
         setVaultDocuments(formatted);
       }
     } catch (err) {
@@ -229,26 +246,66 @@ export function App() {
     if (action === 'download') {
       if (doc.isReal) {
         try {
+          // Build save filename from stored metadata (available before fetch)
+          let downloadFilename = doc.originalName || doc.name || 'document';
+          if (!downloadFilename.includes('.') && doc.fileType && doc.fileType !== 'FILE') {
+            downloadFilename += `.${doc.fileType.toLowerCase()}`;
+          }
+
+          // ── Chrome / Edge 86+ ──────────────────────────────────────────
+          // showSaveFilePicker must be called BEFORE any async fetch, while
+          // the click user-gesture is still active. The native Save-As dialog
+          // presents the correct filename. This is the only reliable way to
+          // preserve original filenames in Chromium — Chrome ignores the
+          // <a download> attribute on blob: URLs clicked outside a live gesture.
+          let fileHandle = null;
+          if (typeof window.showSaveFilePicker === 'function') {
+            try {
+              fileHandle = await window.showSaveFilePicker({ suggestedName: downloadFilename });
+            } catch (pickerErr) {
+              if (pickerErr.name === 'AbortError') return; // user cancelled
+              fileHandle = null; // other error — fall through to blob path
+            }
+          }
+
+          // Fetch document bytes with Bearer auth (token never in URL)
           const response = await fetch(`http://localhost:5000/api/documents/${doc.id}/download`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           });
 
           if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.error?.message || 'Download failed.');
           }
+          const ct = response.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || 'Received unexpected response format.');
+          }
 
-          const blob = await response.blob();
-          const downloadUrl = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = doc.originalName || doc.name;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          window.URL.revokeObjectURL(downloadUrl);
+          const blobType = ct || 'application/octet-stream';
+          const rawBlob = await response.blob();
+          const blob = rawBlob.type ? rawBlob : new Blob([rawBlob], { type: blobType });
+
+          if (fileHandle) {
+            // File System Access API path (Chrome / Edge)
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+          } else {
+            // Fallback: blob URL (Firefox / Safari where link.download is honoured)
+            const downloadUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = downloadUrl;
+            link.download = downloadFilename;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+              if (link.parentNode) link.parentNode.removeChild(link);
+              URL.revokeObjectURL(downloadUrl);
+            }, 100);
+          }
         } catch (err) {
           openModal({
             title: 'Download Streaming Error',
@@ -259,6 +316,7 @@ export function App() {
         }
         return;
       }
+
 
       openModal({
         title: `Secure Stream: ${doc.name}`,
@@ -477,18 +535,24 @@ export function App() {
 
   // Filter documents based on active navigation item
   const getNavFilteredDocuments = () => {
-    const combinedDocs = [...vaultDocuments, ...DEMO_DOCUMENTS];
     if (activeNav === 'my-documents') {
-      return combinedDocs.filter((d) => d.accessLevel === 'Owner');
+      return vaultDocuments.filter((d) => d.accessLevel === 'Owner');
     }
     if (activeNav === 'shared-with-me') {
-      return combinedDocs.filter((d) => d.accessLevel !== 'Owner');
+      return vaultDocuments.filter((d) => d.accessLevel !== 'Owner');
     }
-    return combinedDocs;
+    return vaultDocuments;
   };
+
+  const myDocsCount = user ? vaultDocuments.filter((d) => d.accessLevel === 'Owner').length : null;
+  const sharedDocsCount = user ? vaultDocuments.filter((d) => d.accessLevel !== 'Owner').length : null;
+  const sharedWithOthersCount = user
+    ? vaultDocuments.filter((d) => d.accessLevel === 'Owner' && Array.isArray(d.acl) && d.acl.length > 0).length
+    : null;
 
   // Determine current page title
   const getPageTitle = () => {
+    if (!user) return 'Welcome to TrustVault';
     switch (activeNav) {
       case 'my-documents':
         return 'My Documents';
@@ -524,87 +588,23 @@ export function App() {
         setAuthModalMode('register');
         setAuthModalOpen(true);
       }}
+      myDocsCount={myDocsCount}
+      sharedDocsCount={sharedDocsCount}
+      userRole={user?.role}
+      isAuthenticated={Boolean(user)}
     >
-      {/* Explicit Demonstration Banner */}
-      <DemoDataBanner
-        onCheckHealth={checkBackendHealth}
-        healthStatus={backendHealth}
-      />
-
-      {/* Main Page Header */}
-      <PageHeader
-        title={
-          activeNav === 'my-documents'
-            ? 'My confidential documents'
-            : activeNav === 'shared-with-me'
-            ? 'Documents shared with me'
-            : activeNav === 'activity'
-            ? 'Audit trail & event log'
-            : activeNav === 'admin'
-            ? 'Enterprise governance & compliance console'
-            : activeNav === 'settings'
-            ? 'Vault security settings'
-            : 'Document overview'
-        }
-        description={
-          activeNav === 'my-documents'
-            ? 'View and manage confidential corporate files where you are designated as the owner.'
-            : activeNav === 'shared-with-me'
-            ? 'Review files where another team member has granted you read or edit privileges.'
-            : activeNav === 'activity'
-            ? 'Chronological record of document access, permissions changes, and administrative events.'
-            : activeNav === 'admin'
-            ? 'Real-time organizational analytics, tamper-resistant global audit trail with export, and identity governance.'
-            : activeNav === 'settings'
-            ? 'Manage encryption policies, access revocation parameters, and compliance standards.'
-            : 'Manage, share, and track confidential enterprise documents with fine-grained access policies.'
-        }
-        onUploadClick={handleUploadClick}
-        onViewSharedClick={() => setActiveNav('shared-with-me')}
-      />
-
-      {/* Summary Cards Row */}
-      <section className="dashboard-metrics-grid" aria-label="Key Performance Metrics">
-        <SummaryCard
-          title={DEMO_METRICS.totalDocuments.label}
-          value={DEMO_METRICS.totalDocuments.value}
-          description={DEMO_METRICS.totalDocuments.description}
-          trend={DEMO_METRICS.totalDocuments.trend}
-          icon={Files}
-          variant="primary"
-          isDemo={true}
+      {!user ? (
+        <AuthLandingPortal
+          onOpenLogin={() => {
+            setAuthModalMode('login');
+            setAuthModalOpen(true);
+          }}
+          onOpenRegister={() => {
+            setAuthModalMode('register');
+            setAuthModalOpen(true);
+          }}
         />
-        <SummaryCard
-          title={DEMO_METRICS.sharedWithOthers.label}
-          value={DEMO_METRICS.sharedWithOthers.value}
-          description={DEMO_METRICS.sharedWithOthers.description}
-          trend={DEMO_METRICS.sharedWithOthers.trend}
-          icon={Share2}
-          variant="purple"
-          isDemo={true}
-        />
-        <SummaryCard
-          title={DEMO_METRICS.sharedWithMe.label}
-          value={DEMO_METRICS.sharedWithMe.value}
-          description={DEMO_METRICS.sharedWithMe.description}
-          trend={DEMO_METRICS.sharedWithMe.trend}
-          icon={UserCheck}
-          variant="success"
-          isDemo={true}
-        />
-        <SummaryCard
-          title={DEMO_METRICS.recentActivities.label}
-          value={DEMO_METRICS.recentActivities.value}
-          description={DEMO_METRICS.recentActivities.description}
-          trend={DEMO_METRICS.recentActivities.trend}
-          icon={Activity}
-          variant="warning"
-          isDemo={true}
-        />
-      </section>
-
-      {/* Main Content Split: Documents Table + Recent Activity */}
-      {activeNav === 'profile' ? (
+      ) : activeNav === 'profile' ? (
         <div 
           className="profile-preview-panel" 
           style={{ 
@@ -629,64 +629,45 @@ export function App() {
             </div>
           </div>
 
-          {user ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <ul className="modal-meta-list">
-                <li className="modal-meta-item">
-                  <span className="modal-meta-label">Full Name:</span>
-                  <span className="modal-meta-val"><strong>{user.name}</strong></span>
-                </li>
-                <li className="modal-meta-item">
-                  <span className="modal-meta-label">Email Address:</span>
-                  <span className="modal-meta-val"><code>{user.email}</code></span>
-                </li>
-                <li className="modal-meta-item">
-                  <span className="modal-meta-label">Assigned Role:</span>
-                  <span className="modal-meta-val" style={{ textTransform: 'capitalize' }}>
-                    <span className="doc-vault-pill" style={{ fontSize: '11px' }}>
-                      {user.role === 'admin' ? 'Administrator' : (user.role === 'viewer' || user.role === 'member') ? 'Viewer' : 'Document Owner'}
-                    </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <ul className="modal-meta-list">
+              <li className="modal-meta-item">
+                <span className="modal-meta-label">Full Name:</span>
+                <span className="modal-meta-val"><strong>{user.name}</strong></span>
+              </li>
+              <li className="modal-meta-item">
+                <span className="modal-meta-label">Email Address:</span>
+                <span className="modal-meta-val"><code>{user.email}</code></span>
+              </li>
+              <li className="modal-meta-item">
+                <span className="modal-meta-label">Assigned Role:</span>
+                <span className="modal-meta-val" style={{ textTransform: 'capitalize' }}>
+                  <span className="doc-vault-pill" style={{ fontSize: '11px' }}>
+                    {user.role === 'admin' ? 'Administrator' : (user.role === 'viewer' || user.role === 'member') ? 'Viewer' : 'Document Owner'}
                   </span>
-                </li>
-                <li className="modal-meta-item">
-                  <span className="modal-meta-label">Private Documents:</span>
-                  <span className="modal-meta-val">{vaultDocuments.length} files quarantined in vault storage</span>
-                </li>
-                <li className="modal-meta-item">
-                  <span className="modal-meta-label">Session Security:</span>
-                  <span className="modal-meta-val">HMAC SHA-256 JWT (Active)</span>
-                </li>
-              </ul>
+                </span>
+              </li>
+              <li className="modal-meta-item">
+                <span className="modal-meta-label">Private Documents:</span>
+                <span className="modal-meta-val">{vaultDocuments.length} files accessible in vault storage</span>
+              </li>
+              <li className="modal-meta-item">
+                <span className="modal-meta-label">Session Security:</span>
+                <span className="modal-meta-val">HMAC SHA-256 JWT (Active)</span>
+              </li>
+            </ul>
 
-              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                <Button variant="secondary" onClick={logout}>
-                  Sign Out of Session
-                </Button>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              <Button variant="secondary" onClick={logout}>
+                Sign Out of Session
+              </Button>
+              {user.role !== 'viewer' && (
                 <Button variant="primary" onClick={() => setUploadModalOpen(true)}>
                   Upload Document
                 </Button>
-              </div>
+              )}
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-              <Lock size={36} style={{ color: 'var(--color-warning-icon)', margin: '0 auto var(--space-3)' }} />
-              <h3 style={{ fontSize: 'var(--text-base)', margin: '0 0 var(--space-2)' }}>
-                Anonymous Vault Session
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', maxWidth: '420px', margin: '0 auto var(--space-4)' }}>
-                You are currently exploring TrustVault in public preview mode. Sign in to your corporate identity to manage your private vault documents.
-              </p>
-              <Button 
-                variant="primary" 
-                onClick={() => {
-                  setAuthModalMode('login');
-                  setAuthModalOpen(true);
-                }}
-              >
-                Sign In to Vault
-              </Button>
-            </div>
-          )}
+          </div>
         </div>
       ) : activeNav === 'admin' ? (
         <AdminDashboard
@@ -699,18 +680,18 @@ export function App() {
         />
       ) : activeNav === 'settings' ? (
         <div className="settings-preview-panel" style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Stage 3 Baseline)</h2>
+          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Production Hardened)</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
-            These parameters represent the active security baseline. Active configuration mutation will be enabled in Stage 8.
+            These parameters represent the active security baseline enforced across all API endpoints and streams.
           </p>
           <ul className="modal-meta-list">
             <li className="modal-meta-item">
               <span className="modal-meta-label">Storage Isolation:</span>
-              <span className="modal-meta-val">Private disk storage (Non-web-accessible)</span>
+              <span className="modal-meta-val">Private disk storage (Non-web-accessible UUID filenames)</span>
             </li>
             <li className="modal-meta-item">
               <span className="modal-meta-label">Maximum Upload Size:</span>
-              <span className="modal-meta-val">25 MB per document</span>
+              <span className="modal-meta-val">25 MB per document (Magic-number inspection enforced)</span>
             </li>
             <li className="modal-meta-item">
               <span className="modal-meta-label">Authorization Protocol:</span>
@@ -718,45 +699,132 @@ export function App() {
             </li>
             <li className="modal-meta-item">
               <span className="modal-meta-label">Audit Log Policy:</span>
-              <span className="modal-meta-val">Append-only (Modifications and deletions prohibited)</span>
+              <span className="modal-meta-val">Append-only immutable ledger (Modifications and deletions prohibited)</span>
             </li>
           </ul>
         </div>
       ) : activeNav === 'activity' ? (
         <div style={{ maxWidth: '800px' }}>
           <ActivityList
-            activities={liveActivities.length > 0 ? liveActivities : DEMO_ACTIVITIES}
-            isLive={liveActivities.length > 0}
+            activities={liveActivities}
+            isLive={true}
             onViewAllClick={() => openModal({
               title: 'Complete Audit Log Stream',
               subtitle: 'System-wide compliance audit records',
-              badge: 'Stage 6 Immutable Ledger',
+              badge: 'Immutable Ledger',
               content: <p>All document uploads, reads, downloads, permission grants, and revocations are permanently logged with actor ID and IP.</p>
             })}
           />
         </div>
       ) : (
-        <div className="dashboard-main-split">
-          <div className="table-column">
-            <DocumentTable
-              documents={getNavFilteredDocuments()}
-              onActionSelect={handleDocumentAction}
-            />
-          </div>
+        <>
+          {/* Main Page Header */}
+          <PageHeader
+            title={
+              activeNav === 'my-documents'
+                ? 'My confidential documents'
+                : activeNav === 'shared-with-me'
+                ? 'Documents shared with me'
+                : 'Document overview'
+            }
+            description={
+              activeNav === 'my-documents'
+                ? 'View and manage confidential corporate files where you are designated as the owner.'
+                : activeNav === 'shared-with-me'
+                ? 'Review files where another team member has granted you read or edit privileges.'
+                : 'Manage, share, and track confidential enterprise documents with fine-grained access policies.'
+            }
+            onUploadClick={handleUploadClick}
+            onViewSharedClick={() => setActiveNav('shared-with-me')}
+            isViewer={user.role === 'viewer'}
+          />
 
-          <aside className="activity-column" aria-label="Security Audit Trail">
-            <ActivityList
-              activities={liveActivities.length > 0 ? liveActivities : DEMO_ACTIVITIES}
-              isLive={liveActivities.length > 0}
-              onViewAllClick={() => openModal({
-                title: 'Audit Trail Explorer',
-                subtitle: 'Full activity and compliance ledger',
-                badge: 'Stage 6 Immutable Ledger',
-                content: <p>All document lifecycle events are cryptographically captured in the append-only ledger.</p>
-              })}
+          {/* Summary Cards Row */}
+          <section className="dashboard-metrics-grid" aria-label="Key Performance Metrics">
+            <SummaryCard
+              title="TOTAL ACCESSIBLE"
+              value={vaultDocuments.length}
+              description={user.role === 'viewer' ? 'Files shared with you' : 'Files in your private vault'}
+              trend={`${myDocsCount || 0} owned by you`}
+              icon={Files}
+              variant="primary"
+              isDemo={false}
             />
-          </aside>
-        </div>
+            <SummaryCard
+              title="SHARED WITH OTHERS"
+              value={sharedWithOthersCount || 0}
+              description="Files with active outbound ACLs"
+              trend="Real-time access control"
+              icon={Share2}
+              variant="purple"
+              isDemo={false}
+            />
+            <SummaryCard
+              title="SHARED WITH ME"
+              value={sharedDocsCount || 0}
+              description="Files granted by team members"
+              trend="Read or Edit privileges"
+              icon={UserCheck}
+              variant="success"
+              isDemo={false}
+            />
+            <SummaryCard
+              title="AUDIT TRAIL EVENTS"
+              value={liveActivities.length}
+              description="Logged lifecycle & access events"
+              trend="Append-only immutable"
+              icon={Activity}
+              variant="warning"
+              isDemo={false}
+            />
+          </section>
+
+          {/* Main Content Split: Documents Table + Recent Activity */}
+          <div className="dashboard-main-split">
+            <div className="table-column">
+              {getNavFilteredDocuments().length === 0 ? (
+                <div style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-8)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+                  <EmptyState
+                    icon={Files}
+                    title={
+                      activeNav === 'my-documents'
+                        ? 'No owned documents found'
+                        : activeNav === 'shared-with-me'
+                        ? 'No shared documents found'
+                        : 'Your document vault is empty'
+                    }
+                    description={
+                      user.role === 'viewer'
+                        ? 'No documents have been shared with your account yet. When a Document Owner grants you access, documents will appear here.'
+                        : 'You have not uploaded any documents yet. Upload a confidential PDF, DOCX, or spreadsheet to begin.'
+                    }
+                    actionLabel={user.role !== 'viewer' ? 'Upload Document' : undefined}
+                    onAction={user.role !== 'viewer' ? handleUploadClick : undefined}
+                  />
+                </div>
+              ) : (
+                <DocumentTable
+                  documents={getNavFilteredDocuments()}
+                  onActionSelect={handleDocumentAction}
+                  userRole={user?.role}
+                />
+              )}
+            </div>
+
+            <aside className="activity-column" aria-label="Security Audit Trail">
+              <ActivityList
+                activities={liveActivities}
+                isLive={true}
+                onViewAllClick={() => openModal({
+                  title: 'Audit Trail Explorer',
+                  subtitle: 'Full activity and compliance ledger',
+                  badge: 'Stage 6 Immutable Ledger',
+                  content: <p>All document lifecycle events are cryptographically captured in the append-only ledger.</p>
+                })}
+              />
+            </aside>
+          </div>
+        </>
       )}
 
       {/* Accessible Informational Modal */}

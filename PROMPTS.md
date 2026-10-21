@@ -220,6 +220,41 @@ This document records the exact progression of development prompts, implementati
   - Commit Hash: `4017daa`
   - Commit Message: `feat: complete stages 7-10 and align role taxonomy to Admin, Document Owner, and Viewer`
 
+---
+
+## Prompt Entry 6 — Document Download Filename Preservation & Browser File System API Fix
+
+- **Date / Timestamp**: 2026-10-21T14:30:00+05:30
+- **User Prompt / Instructions**:
+  - Fix the TrustVault document download issue where downloaded files were saved with random internal UUIDs (e.g., `06605f24-8569-4ec0-a3de-49705d52e893`) instead of their original names and extensions (e.g., `Abhi.docx`, `Report.pdf`).
+  - Trace the complete download flow across "My Documents" and "Shared with Me".
+  - Preserve Bearer-token authentication headers; do not expose authorization tokens in URLs or query strings.
+  - Preserve document permissions, immediate revocation, and audit logging.
+  - Add regression tests covering download headers, file extensions, and unauthorized access.
+  - Update project markdown documentation and commit all changes.
+
+- **What the AI Actually Implemented**:
+  1. **Root-Cause Diagnosis**: Traced complete download execution path. Backend properly emitted `Content-Disposition: attachment; filename="Abhi.docx"; filename*=UTF-8''Abhi.docx`. However, modern Chromium-based browsers discard the `<a download="filename">` attribute on dynamically generated `blob:` URLs when triggered after an asynchronous `fetch()` because the user gesture activation has expired by the time the stream resolves, causing Chromium to name the file after the blob UUID.
+  2. **File System Access API Implementation**: Updated `handleDocumentAction` in `frontend/src/App.jsx` to leverage the modern Web File System Access API (`window.showSaveFilePicker`). The picker opens during the user's active gesture pre-populated with the exact original filename and correct file type filters (PDF, DOCX, XLSX, TXT, images). Once confirmed by the user, the authenticated binary stream is fetched with the Bearer token in the `Authorization` header and written directly to the file stream.
+  3. **Universal Fallback**: Retained a robust fallback for legacy or non-supporting browsers using temporary `<a>` elements with proper MIME types and explicit download attributes.
+  4. **Regression Tests**: Added 5 new automated tests across `backend/tests/document.test.js` and `backend/tests/permissions.test.js` verifying RFC 5987 `Content-Disposition` header compliance, multi-format extension preservation, and unauthorized download rejection (`403 Forbidden`).
+  5. **Verification**: Verified all 105 automated tests pass (100% pass rate) across 9 test suites; verified production frontend bundle builds cleanly.
+
+- **What the User Reviewed**:
+  - Tested download functionality with original file `Abhi.docx` in the live browser application and confirmed correct filename and extension retention.
+  - Requested documentation update across markdown files and git commit.
+
+- **Problems Actually Discovered**:
+  - Direct `blob:` URL downloads after async fetch lose user activation context in Chromium, resulting in random UUID filenames despite valid `Content-Disposition` and `download` HTML attributes.
+
+- **Corrections Actually Made**:
+  - Utilized `showSaveFilePicker()` for modern browsers so the user activation is captured immediately with the original filename pre-filled, bypassing Chromium's blob UUID naming quirk.
+  - Retained strict Bearer-token authentication without placing secrets in URLs.
+- **Real Git Commit Reference**:
+  - Commit Hash: `da1d98e`
+  - Commit Message: `fix(download): preserve original filename and extension using File System Access API`
+
+
 
 
 

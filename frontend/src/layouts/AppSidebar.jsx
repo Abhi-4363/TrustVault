@@ -23,13 +23,31 @@ export function AppSidebar({
   onNavSelect,
   isMobileOpen = false,
   onCloseMobile,
+  myDocsCount = null,
+  sharedDocsCount = null,
+  userRole = null,
 }) {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
-    { id: 'my-documents', label: 'My Documents', icon: Files, tag: '24' },
-    { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: '6' },
+    { 
+      id: 'my-documents', 
+      label: 'My Documents', 
+      icon: Files, 
+      tag: myDocsCount !== null ? String(myDocsCount) : null 
+    },
+    { 
+      id: 'shared-with-me', 
+      label: 'Shared with Me', 
+      icon: Share2, 
+      tag: sharedDocsCount !== null ? String(sharedDocsCount) : null 
+    },
     { id: 'activity', label: 'Activity & Audit', icon: Activity, tag: null },
-    { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: 'ADMIN' },
+    { 
+      id: 'admin', 
+      label: 'Admin Governance', 
+      icon: ShieldAlert, 
+      tag: userRole === 'admin' ? 'ADMIN' : null 
+    },
     { id: 'settings', label: 'Settings', icon: Settings, tag: null },
     { id: 'profile', label: 'Profile', icon: User, tag: null },
   ];
@@ -107,7 +125,7 @@ export function AppSidebar({
             </p>
             <div className="security-status-meta">
               <span className="status-dot" aria-hidden="true" />
-              <span>Stage 1 Foundation Ready</span>
+              <span>Zero-Trust Active</span>
             </div>
           </div>
         </div>
