@@ -29,6 +29,8 @@ import { UploadModal } from './components/dashboard/UploadModal';
 import { ShareModal } from './components/dashboard/ShareModal';
 import { EditModal } from './components/dashboard/EditModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AccountSettings } from './components/dashboard/AccountSettings';
+import { ForcedPasswordChangeModal } from './components/auth/ForcedPasswordChangeModal';
 import { Button } from './components/common/Button';
 import { EmptyState } from './components/common/EmptyState';
 import { 
@@ -665,71 +667,22 @@ export function App() {
     >
       {!user ? (
         <AuthLandingPortal initialMode={authModalMode} />
-      ) : activeNav === 'profile' ? (
-        <div 
-          className="profile-preview-panel" 
-          style={{ 
-            backgroundColor: 'var(--bg-card)', 
-            padding: 'var(--space-6)', 
-            borderRadius: 'var(--radius-lg)', 
-            border: '1px solid var(--border-light)',
-            maxWidth: '680px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-            <div style={{ backgroundColor: 'var(--color-primary-100)', color: 'var(--color-primary-700)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }}>
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--text-main)' }}>
-                Identity & Access Governance
-              </h2>
-              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                Cryptographic session verification and tenant role assignment
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <ul className="modal-meta-list">
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Full Name:</span>
-                <span className="modal-meta-val"><strong>{user.name}</strong></span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Email Address:</span>
-                <span className="modal-meta-val"><code>{user.email}</code></span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Assigned Role:</span>
-                <span className="modal-meta-val" style={{ textTransform: 'capitalize' }}>
-                  <span className="doc-vault-pill" style={{ fontSize: '11px' }}>
-                    {user.role === 'admin' ? 'Administrator' : (user.role === 'viewer' || user.role === 'member') ? 'Viewer' : 'Document Owner'}
-                  </span>
-                </span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Private Documents:</span>
-                <span className="modal-meta-val">{vaultDocuments.length} files accessible in vault storage</span>
-              </li>
-              <li className="modal-meta-item">
-                <span className="modal-meta-label">Session Security:</span>
-                <span className="modal-meta-val">HMAC SHA-256 JWT (Active)</span>
-              </li>
-            </ul>
-
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-              <Button variant="secondary" onClick={logout}>
-                Sign Out of Session
-              </Button>
-              {user.role !== 'viewer' && (
-                <Button variant="primary" onClick={() => setUploadModalOpen(true)}>
-                  Upload Document
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+      ) : user.mustChangePassword ? (
+        <ForcedPasswordChangeModal
+          user={user}
+          token={token}
+          onPasswordChanged={refreshProfile}
+          onLogout={logout}
+        />
+      ) : activeNav === 'profile' || activeNav === 'settings' ? (
+        <AccountSettings
+          user={user}
+          token={token}
+          onLogout={logout}
+          onCheckApprovalStatus={handleCheckApprovalStatus}
+          refreshingStatus={refreshingProfile}
+          approvalNotice={approvalStatusNotice}
+        />
       ) : activeNav === 'admin' ? (
         <AdminDashboard
           user={user}
@@ -740,31 +693,6 @@ export function App() {
           }}
           onPendingCountChange={(cnt) => setPendingRequestsCount(cnt)}
         />
-      ) : activeNav === 'settings' ? (
-        <div className="settings-preview-panel" style={{ backgroundColor: 'var(--bg-card)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-2)' }}>Vault Security Standards (Production Hardened)</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
-            These parameters represent the active security baseline enforced across all API endpoints and streams.
-          </p>
-          <ul className="modal-meta-list">
-            <li className="modal-meta-item">
-              <span className="modal-meta-label">Storage Isolation:</span>
-              <span className="modal-meta-val">Private disk storage (Non-web-accessible UUID filenames)</span>
-            </li>
-            <li className="modal-meta-item">
-              <span className="modal-meta-label">Maximum Upload Size:</span>
-              <span className="modal-meta-val">25 MB per document (Magic-number inspection enforced)</span>
-            </li>
-            <li className="modal-meta-item">
-              <span className="modal-meta-label">Authorization Protocol:</span>
-              <span className="modal-meta-val">Per-request database validation (Zero token caching lag)</span>
-            </li>
-            <li className="modal-meta-item">
-              <span className="modal-meta-label">Audit Log Policy:</span>
-              <span className="modal-meta-val">Append-only immutable ledger (Modifications and deletions prohibited)</span>
-            </li>
-          </ul>
-        </div>
       ) : activeNav === 'activity' ? (
         <div style={{ maxWidth: '800px' }}>
           <ActivityList

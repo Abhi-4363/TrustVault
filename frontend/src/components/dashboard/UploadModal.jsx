@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, 
   File, 
@@ -7,7 +7,10 @@ import {
   AlertCircle, 
   Lock, 
   ShieldCheck,
-  Tag
+  Tag,
+  Users,
+  Globe,
+  Plus
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -24,10 +27,34 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
+  const [visibility, setVisibility] = useState('private'); // 'private' | 'selected_users' | 'all_authenticated_users'
+  const [recipients, setRecipients] = useState([]);
+  const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [selectedUserEmail, setSelectedUserEmail] = useState('');
+  const [permissionLevel, setPermissionLevel] = useState('read');
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+
+  // Fetch directory users for recipient selection
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    const fetchDirectory = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/documents/users/directory', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDirectoryUsers(data.users || []);
+        }
+      } catch (err) {
+        console.error('[UploadModal] Failed to fetch users directory:', err);
+      }
+    };
+    fetchDirectory();
+  }, [isOpen, token]);
 
   if (!isOpen) return null;
 
@@ -73,11 +100,42 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     }
   };
 
+  const handleAddRecipient = () => {
+    if (!selectedUserEmail) return;
+    const existing = recipients.find(
+      (r) => r.email.toLowerCase() === selectedUserEmail.toLowerCase()
+    );
+    if (existing) {
+      setError('This user is already added to the recipient list.');
+      return;
+    }
+    const dirUser = directoryUsers.find(
+      (u) => u.email.toLowerCase() === selectedUserEmail.toLowerCase()
+    );
+    const newRecipient = {
+      email: selectedUserEmail,
+      name: dirUser ? dirUser.name : selectedUserEmail.split('@')[0],
+      permissionLevel: permissionLevel,
+    };
+    setRecipients([...recipients, newRecipient]);
+    setSelectedUserEmail('');
+    setPermissionLevel('read');
+    setError(null);
+  };
+
+  const handleRemoveRecipient = (emailToRemove) => {
+    setRecipients(recipients.filter((r) => r.email.toLowerCase() !== emailToRemove.toLowerCase()));
+  };
+
   const handleReset = () => {
     setSelectedFile(null);
     setTitle('');
     setDescription('');
     setTags('');
+    setVisibility('private');
+    setRecipients([]);
+    setSelectedUserEmail('');
+    setPermissionLevel('read');
     setError(null);
     setSuccess(false);
   };
@@ -99,6 +157,11 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
       return;
     }
 
+    if (visibility === 'selected_users' && recipients.length === 0) {
+      setError('Please select and add at least one recipient collaborator, or change visibility to Private.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -109,6 +172,10 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
       formData.append('description', description.trim());
       if (tags.trim()) {
         formData.append('tags', tags.trim());
+      }
+      formData.append('visibility', visibility);
+      if (visibility === 'selected_users' && recipients.length > 0) {
+        formData.append('recipients', JSON.stringify(recipients));
       }
 
       const response = await fetch('http://localhost:5000/api/documents', {
@@ -306,6 +373,169 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
                   className="form-textarea"
                   disabled={loading}
                 />
+              </div>
+
+              {/* Phase 5: Who can access this document? */}
+              <div className="form-group full-width visibility-section">
+                <label className="form-label">
+                  Who can access this document? <span className="required">*</span>
+                </label>
+                <div className="visibility-options-grid">
+                  {/* Option 1: Private — Only Me */}
+                  <div 
+                    className={`visibility-card ${visibility === 'private' ? 'active' : ''}`}
+                    onClick={() => setVisibility('private')}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setVisibility('private'); }}
+                  >
+                    <div className="visibility-card-header">
+                      <div className="visibility-card-radio">
+                        <input 
+                          type="radio" 
+                          id="vis-private" 
+                          name="document-visibility" 
+                          value="private" 
+                          checked={visibility === 'private'} 
+                          onChange={() => setVisibility('private')} 
+                        />
+                      </div>
+                      <div className="visibility-card-icon">
+                        <Lock size={16} />
+                      </div>
+                      <span className="visibility-card-title">Private — Only Me</span>
+                    </div>
+                    <p className="visibility-card-desc">
+                      Default option. Strictly restricted to you as the document owner. Inaccessible to all other users.
+                    </p>
+                  </div>
+
+                  {/* Option 2: Share with Specific Users */}
+                  <div 
+                    className={`visibility-card ${visibility === 'selected_users' ? 'active' : ''}`}
+                    onClick={() => setVisibility('selected_users')}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setVisibility('selected_users'); }}
+                  >
+                    <div className="visibility-card-header">
+                      <div className="visibility-card-radio">
+                        <input 
+                          type="radio" 
+                          id="vis-selected" 
+                          name="document-visibility" 
+                          value="selected_users" 
+                          checked={visibility === 'selected_users'} 
+                          onChange={() => setVisibility('selected_users')} 
+                        />
+                      </div>
+                      <div className="visibility-card-icon">
+                        <Users size={16} />
+                      </div>
+                      <span className="visibility-card-title">Share with Specific Users</span>
+                    </div>
+                    <p className="visibility-card-desc">
+                      Select registered team members and assign explicit Read or Edit permissions on this document.
+                    </p>
+                  </div>
+
+                  {/* Option 3: Share with All Registered Users */}
+                  <div 
+                    className={`visibility-card ${visibility === 'all_authenticated_users' ? 'active' : ''}`}
+                    onClick={() => setVisibility('all_authenticated_users')}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setVisibility('all_authenticated_users'); }}
+                  >
+                    <div className="visibility-card-header">
+                      <div className="visibility-card-radio">
+                        <input 
+                          type="radio" 
+                          id="vis-all" 
+                          name="document-visibility" 
+                          value="all_authenticated_users" 
+                          checked={visibility === 'all_authenticated_users'} 
+                          onChange={() => setVisibility('all_authenticated_users')} 
+                        />
+                      </div>
+                      <div className="visibility-card-icon">
+                        <Globe size={16} />
+                      </div>
+                      <span className="visibility-card-title">Share with All Registered Users</span>
+                    </div>
+                    <p className="visibility-card-desc">
+                      Available to all authenticated TrustVault accounts (Read-Only). Protected from unauthenticated public access.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recipient Picker if Share with Specific Users is selected */}
+                {visibility === 'selected_users' && (
+                  <div className="recipient-selector-area">
+                    <div className="recipient-picker-header">
+                      <span>Add Collaborators</span>
+                      <span className="recipient-count-badge">{recipients.length} added</span>
+                    </div>
+                    <div className="recipient-selector-row">
+                      <select 
+                        id="recipient-user-select"
+                        className="form-select recipient-user-dropdown"
+                        value={selectedUserEmail}
+                        onChange={(e) => setSelectedUserEmail(e.target.value)}
+                        disabled={loading}
+                      >
+                        <option value="">Select registered user...</option>
+                        {directoryUsers
+                          .filter((u) => !recipients.some((r) => r.email.toLowerCase() === u.email.toLowerCase()))
+                          .map((u) => (
+                            <option key={u.id || u.email} value={u.email}>
+                              {u.name} ({u.email}) — {u.role}
+                            </option>
+                          ))}
+                      </select>
+
+                      <select 
+                        className="form-select recipient-perm-dropdown"
+                        value={permissionLevel}
+                        onChange={(e) => setPermissionLevel(e.target.value)}
+                        disabled={loading}
+                      >
+                        <option value="read">Read Only</option>
+                        <option value="edit">Can Edit</option>
+                      </select>
+
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        onClick={handleAddRecipient}
+                        disabled={!selectedUserEmail || loading}
+                      >
+                        <Plus size={14} /> Add
+                      </Button>
+                    </div>
+
+                    {recipients.length > 0 && (
+                      <div className="recipients-list-chips">
+                        {recipients.map((rec) => (
+                          <div key={rec.email} className="recipient-chip">
+                            <span className="recipient-chip-name">{rec.name || rec.email}</span>
+                            <span className={`recipient-chip-badge badge-${rec.permissionLevel}`}>
+                              {rec.permissionLevel === 'edit' ? 'Can Edit' : 'Read'}
+                            </span>
+                            <button 
+                              type="button" 
+                              className="recipient-chip-remove"
+                              onClick={() => handleRemoveRecipient(rec.email)}
+                              title={`Remove ${rec.email}`}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

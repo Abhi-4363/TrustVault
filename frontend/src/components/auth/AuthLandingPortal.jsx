@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -10,7 +10,8 @@ import {
   ArrowRight, 
   AlertCircle,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Key
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
@@ -18,17 +19,113 @@ import './AuthLandingPortal.css';
 
 export function AuthLandingPortal({ initialMode = 'login' }) {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState(initialMode); // 'login' | 'register'
+  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'reset'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [requestedRole, setRequestedRole] = useState('viewer'); // 'viewer' | 'owner'
   const [error, setError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [forgotSubmitted, setForgotSubmitted] = useState(false);
+  const [forgotNotice, setForgotNotice] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Check URL parameters for single-use reset token (?token=...)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('token');
+      if (tokenParam) {
+        setResetToken(tokenParam);
+        setMode('reset');
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setResetSuccess('');
+
+    // Handle Forgot Password mode (Requirement 2: Send Request to Admin)
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setError('Please provide your registered work email address.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim() }),
+        });
+        const data = await response.json();
+        setForgotSubmitted(true);
+        setForgotNotice(
+          data.message ||
+            'If this email address is registered, your password reset request has been submitted to an Administrator for review.'
+        );
+      } catch {
+        setError('Network error submitting password reset request to administrator.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Handle Reset Password mode
+    if (mode === 'reset') {
+      if (!resetToken.trim()) {
+        setError('Please provide your single-use recovery token.');
+        return;
+      }
+      if (!password || password.length < 8) {
+        setError('New password must be at least 8 characters long.');
+        return;
+      }
+      if (!/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password)) {
+        setError('New password must contain at least one letter and one number.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('New password and confirmation password do not match.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: resetToken.trim(),
+            newPassword: password,
+            confirmPassword: confirmPassword,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error?.message || 'Failed to reset password.');
+        }
+
+        setResetSuccess('Password successfully updated. You may now sign in with your new credentials.');
+        setPassword('');
+        setConfirmPassword('');
+        setResetToken('');
+        setMode('login');
+      } catch (err) {
+        setError(err.message || 'Failed to reset password. Token may be invalid or expired.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (!email.trim() || !password) {
       setError('Please provide both your work email and password.');
@@ -67,6 +164,9 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
+    setResetSuccess('');
+    setForgotSubmitted(false);
+    setForgotNotice('');
   };
 
   return (
@@ -135,12 +235,22 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                 <span className="auth-card-brand-name">TrustVault</span>
               </div>
               <h2 className="auth-card-title">
-                {mode === 'login' ? 'Sign in to your vault' : 'Create corporate account'}
+                {mode === 'login'
+                  ? 'Sign in to your vault'
+                  : mode === 'register'
+                    ? 'Create corporate account'
+                    : mode === 'forgot'
+                      ? 'Forgot Password?'
+                      : 'Reset Account Password'}
               </h2>
               <p className="auth-card-subtitle">
                 {mode === 'login'
                   ? 'Enter your corporate credentials to access confidential documents.'
-                  : 'New accounts are provisioned with Viewer privileges under organizational security policy.'}
+                  : mode === 'register'
+                    ? 'New accounts are provisioned with Viewer privileges under organizational security policy.'
+                    : mode === 'forgot'
+                      ? 'Enter your registered work email to request a password reset from an Administrator.'
+                      : 'Enter your single-use recovery token and set a new password.'}
               </p>
             </div>
 
@@ -151,130 +261,292 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="auth-form" noValidate>
-              {mode === 'register' && (
-                <div className="form-group">
-                  <label htmlFor="portal-name" className="form-label">
-                    Full Name <span className="required-star">*</span>
-                  </label>
-                  <div className="input-with-icon">
-                    <User size={16} className="field-icon" aria-hidden="true" />
-                    <input
-                      id="portal-name"
-                      type="text"
-                      required
-                      placeholder="e.g. Alex Mercer"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="form-input"
-                      disabled={loading}
-                      autoComplete="name"
-                    />
-                  </div>
-                </div>
-              )}
+            {resetSuccess && (
+              <div 
+                className="auth-success-banner" 
+                role="status" 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '10px 14px', 
+                  backgroundColor: '#f0fdf4', 
+                  border: '1px solid #bbf7d0', 
+                  color: '#166534', 
+                  borderRadius: '6px', 
+                  fontSize: '13px', 
+                  marginBottom: '14px' 
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <span>{resetSuccess}</span>
+              </div>
+            )}
 
-              <div className="form-group">
-                <label htmlFor="portal-email" className="form-label">
-                  Work Email Address <span className="required-star">*</span>
-                </label>
-                <div className="input-with-icon">
-                  <Mail size={16} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="portal-email"
-                    type="email"
-                    required
-                    placeholder="name@trustvault.internal"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="form-input"
-                    disabled={loading}
-                    autoComplete="email"
-                    autoFocus={mode === 'login'}
-                  />
+            {mode === 'forgot' && forgotSubmitted ? (
+              <div 
+                className="auth-success-box"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '10px',
+                  padding: '18px',
+                  marginBottom: '16px',
+                  color: '#166534',
+                }}
+                role="status"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '14px' }}>
+                  <CheckCircle2 size={18} className="text-success" />
+                  <span>Request Submitted to Administrator</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: '#14532d' }}>
+                  {forgotNotice}
+                </p>
+                <div style={{ marginTop: '6px' }}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => switchMode('login')}
+                    style={{ width: '100%' }}
+                  >
+                    Back to Sign In
+                  </Button>
                 </div>
               </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="auth-form" noValidate>
+              {mode === 'reset' ? (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="portal-reset-token" className="form-label">
+                      Single-Use Recovery Token <span className="required-star">*</span>
+                    </label>
+                    <div className="input-with-icon">
+                      <Key size={16} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="portal-reset-token"
+                        type="text"
+                        required
+                        placeholder="Paste single-use recovery token..."
+                        value={resetToken}
+                        onChange={(e) => setResetToken(e.target.value)}
+                        className="form-input"
+                        disabled={loading}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
 
-              <div className="form-group">
-                <div className="label-row">
-                  <label htmlFor="portal-password" className="form-label">
-                    Password <span className="required-star">*</span>
-                  </label>
+                  <div className="form-group">
+                    <div className="label-row">
+                      <label htmlFor="portal-new-password" className="form-label">
+                        New Password <span className="required-star">*</span>
+                      </label>
+                      <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                    </div>
+                    <div className="input-with-icon">
+                      <Lock size={16} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="portal-new-password"
+                        type="password"
+                        required
+                        placeholder="Enter new password..."
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="form-input"
+                        disabled={loading}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="portal-confirm-password" className="form-label">
+                      Confirm New Password <span className="required-star">*</span>
+                    </label>
+                    <div className="input-with-icon">
+                      <Lock size={16} className="field-icon" aria-hidden="true" />
+                      <input
+                        id="portal-confirm-password"
+                        type="password"
+                        required
+                        placeholder="Re-enter new password..."
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="form-input"
+                        disabled={loading}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
                   {mode === 'register' && (
-                    <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                    <div className="form-group">
+                      <label htmlFor="portal-name" className="form-label">
+                        Full Name <span className="required-star">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <User size={16} className="field-icon" aria-hidden="true" />
+                        <input
+                          id="portal-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Alex Mercer"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="form-input"
+                          disabled={loading}
+                          autoComplete="name"
+                        />
+                      </div>
+                    </div>
                   )}
-                </div>
-                <div className="input-with-icon">
-                  <Lock size={16} className="field-icon" aria-hidden="true" />
-                  <input
-                    id="portal-password"
-                    type="password"
-                    required
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="form-input"
-                    disabled={loading}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  />
-                </div>
-              </div>
 
-              {mode === 'register' && (
-                <div className="form-group role-selector-group">
-                  <label className="form-label">
-                    Requested Account Type <span className="required-star">*</span>
-                  </label>
-                  <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
-                    <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="requestedRole"
-                        value="viewer"
-                        checked={requestedRole === 'viewer'}
-                        onChange={() => setRequestedRole('viewer')}
-                        className="sr-only"
-                      />
-                      <div className="type-card-content">
-                        <div className="type-card-header">
-                          <span className="type-card-title">Viewer</span>
-                          <span className="type-card-badge badge-viewer">Immediate Access</span>
-                        </div>
-                        <p className="type-card-desc">
-                          Standard read-only access to documents shared with you. Ready immediately upon registration.
-                        </p>
-                      </div>
+                  <div className="form-group">
+                    <label htmlFor="portal-email" className="form-label">
+                      Work Email Address <span className="required-star">*</span>
                     </label>
-
-                    <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
+                    <div className="input-with-icon">
+                      <Mail size={16} className="field-icon" aria-hidden="true" />
                       <input
-                        type="radio"
-                        name="requestedRole"
-                        value="owner"
-                        checked={requestedRole === 'owner'}
-                        onChange={() => setRequestedRole('owner')}
-                        className="sr-only"
+                        id="portal-email"
+                        type="email"
+                        required
+                        placeholder="name@trustvault.internal"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="form-input"
+                        disabled={loading}
+                        autoComplete="email"
+                        autoFocus={mode === 'login' || mode === 'forgot'}
                       />
-                      <div className="type-card-content">
-                        <div className="type-card-header">
-                          <span className="type-card-title">Document Owner</span>
-                          <span className="type-card-badge badge-owner">Requires Approval</span>
-                        </div>
-                        <p className="type-card-desc">
-                          Upload confidential documents and manage collaborator ACLs. Requires Administrator approval before upload rights are activated.
-                        </p>
-                      </div>
-                    </label>
+                    </div>
                   </div>
-                  <p className="account-type-notice">
-                    <Shield size={12} className="notice-icon" aria-hidden="true" />
-                    <span>
-                      {requestedRole === 'owner'
-                        ? 'Your account will be provisioned immediately as a Viewer while your Owner request is queued for Administrator review.'
-                        : 'You can request Owner privileges at any time after registration through an Administrator.'}
-                    </span>
-                  </p>
-                </div>
+
+                  {mode !== 'forgot' && (
+                    <div className="form-group">
+                      <div className="label-row">
+                        <label htmlFor="portal-password" className="form-label">
+                          Password <span className="required-star">*</span>
+                        </label>
+                        {mode === 'register' && (
+                          <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                        )}
+                      </div>
+                      <div className="input-with-icon">
+                        <Lock size={16} className="field-icon" aria-hidden="true" />
+                        <input
+                          id="portal-password"
+                          type="password"
+                          required
+                          placeholder="••••••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="form-input"
+                          disabled={loading}
+                          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        />
+                      </div>
+                      {mode === 'login' && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => switchMode('forgot')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--color-primary-600)',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                          >
+                            Forgot Password?
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => switchMode('reset')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted, #94a3b8)',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                          >
+                            Have recovery token?
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {mode === 'register' && (
+                    <div className="form-group role-selector-group">
+                      <label className="form-label">
+                        Requested Account Type <span className="required-star">*</span>
+                      </label>
+                      <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
+                        <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
+                          <input
+                            type="radio"
+                            name="requestedRole"
+                            value="viewer"
+                            checked={requestedRole === 'viewer'}
+                            onChange={() => setRequestedRole('viewer')}
+                            className="sr-only"
+                          />
+                          <div className="type-card-content">
+                            <div className="type-card-header">
+                              <span className="type-card-title">Viewer</span>
+                              <span className="type-card-badge badge-viewer">Immediate Access</span>
+                            </div>
+                            <p className="type-card-desc">
+                              Standard read-only access to documents shared with you. Ready immediately upon registration.
+                            </p>
+                          </div>
+                        </label>
+
+                        <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
+                          <input
+                            type="radio"
+                            name="requestedRole"
+                            value="owner"
+                            checked={requestedRole === 'owner'}
+                            onChange={() => setRequestedRole('owner')}
+                            className="sr-only"
+                          />
+                          <div className="type-card-content">
+                            <div className="type-card-header">
+                              <span className="type-card-title">Document Owner</span>
+                              <span className="type-card-badge badge-owner">Requires Approval</span>
+                            </div>
+                            <p className="type-card-desc">
+                              Upload confidential documents and manage collaborator ACLs. Requires Administrator approval before upload rights are activated.
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+                      <p className="account-type-notice">
+                        <Shield size={12} className="notice-icon" aria-hidden="true" />
+                        <span>
+                          {requestedRole === 'owner'
+                            ? 'Your account will be provisioned immediately as a Viewer while your Owner request is queued for Administrator review.'
+                            : 'You can request Owner privileges at any time after registration through an Administrator.'}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               <Button
@@ -287,21 +559,86 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                 {loading ? (
                   <>
                     <Loader2 size={16} className="spinner" aria-hidden="true" />
-                    <span>{mode === 'login' ? 'Authenticating...' : 'Provisioning account...'}</span>
+                    <span>
+                      {mode === 'reset'
+                        ? 'Updating password...'
+                        : mode === 'forgot'
+                          ? 'Submitting request...'
+                          : mode === 'login'
+                            ? 'Authenticating...'
+                            : 'Provisioning account...'}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <span>{mode === 'login' ? 'Sign In to Vault' : 'Create Account'}</span>
+                    <span>
+                      {mode === 'reset'
+                        ? 'Set New Password'
+                        : mode === 'forgot'
+                          ? 'Send Request to Admin'
+                          : mode === 'login'
+                            ? 'Sign In to Vault'
+                            : 'Create Account'}
+                    </span>
                     <ArrowRight size={16} aria-hidden="true" />
                   </>
                 )}
               </Button>
             </form>
+            )}
+
+            <div className="auth-switch-container">
+              {mode === 'forgot' ? (
+                <p className="auth-switch-text">
+                  Remember your password?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => switchMode('login')}
+                  >
+                    Back to Sign in
+                  </button>
+                </p>
+              ) : mode === 'reset' ? (
+                <p className="auth-switch-text">
+                  Remember your credentials?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => switchMode('login')}
+                  >
+                    Back to Sign in
+                  </button>
+                </p>
+              ) : mode === 'login' ? (
+                <p className="auth-switch-text">
+                  Don&apos;t have an account?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => switchMode('register')}
+                  >
+                    Create account
+                  </button>
+                </p>
+              ) : (
+                <p className="auth-switch-text">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => switchMode('login')}
+                  >
+                    Sign in
+                  </button>
+                </p>
+              )}
+            </div>
 
             {mode === 'login' && (
-              <div className="demo-accounts-container" aria-label="Quick Demo Accounts Selection">
+              <div className="demo-accounts-container" aria-label="Quick Demo Accounts Selection for Evaluators">
                 <div className="demo-divider-row">
-                  <span className="demo-divider-text">Or evaluate with verified demo roles</span>
+                  <span className="demo-divider-text">OR EVALUATE WITH VERIFIED DEMO ROLES</span>
                 </div>
                 <div className="demo-cards-stack">
                   {/* Administrator Demo */}
@@ -389,32 +726,6 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                 </p>
               </div>
             )}
-
-            <div className="auth-card-footer">
-              {mode === 'login' ? (
-                <p className="auth-switch-text">
-                  Don't have an account?{' '}
-                  <button
-                    type="button"
-                    className="auth-switch-link"
-                    onClick={() => switchMode('register')}
-                  >
-                    Create account
-                  </button>
-                </p>
-              ) : (
-                <p className="auth-switch-text">
-                  Already have an account?{' '}
-                  <button
-                    type="button"
-                    className="auth-switch-link"
-                    onClick={() => switchMode('login')}
-                  >
-                    Sign in
-                  </button>
-                </p>
-              )}
-            </div>
           </div>
         </div>
 

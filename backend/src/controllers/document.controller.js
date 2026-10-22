@@ -43,6 +43,9 @@ export function canReadDocument(doc, user) {
   // Platform administrator has governance access
   if (user.role === 'admin') return true;
 
+  // Platform-wide visibility: All authenticated, active users have Read access
+  if (doc.visibility === 'all_authenticated_users') return true;
+
   // Check granular ACL entry (by userId or userEmail)
   if (Array.isArray(doc.acl)) {
     const hasAclAccess = doc.acl.some(
@@ -172,6 +175,41 @@ export async function uploadDocument(req, res) {
 
     const userId = req.user.id || req.user._id;
 
+    let visibility = 'private';
+    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users'];
+    if (req.body.visibility && VALID_VISIBILITY.includes(String(req.body.visibility).toLowerCase().trim())) {
+      visibility = String(req.body.visibility).toLowerCase().trim();
+    }
+
+    const acl = [];
+    if (visibility === 'selected_users' && req.body.recipients) {
+      let rawRecipients = req.body.recipients;
+      if (typeof rawRecipients === 'string') {
+        try { rawRecipients = JSON.parse(rawRecipients); } catch {}
+      }
+      if (Array.isArray(rawRecipients)) {
+        for (const r of rawRecipients) {
+          const recEmail = String(r.email || '').toLowerCase().trim();
+          if (!recEmail) continue;
+          let level = String(r.permissionLevel || 'read').toLowerCase().trim();
+          if (level === 'view') level = 'read';
+          if (!['read', 'edit'].includes(level)) level = 'read';
+
+          const targetU = await User.findOne({ email: recEmail });
+          if (targetU) {
+            acl.push({
+              userId: String(targetU._id || targetU.id),
+              email: targetU.email.toLowerCase().trim(),
+              name: targetU.name || '',
+              permissionLevel: level,
+              grantedBy: userId,
+              grantedAt: new Date(),
+            });
+          }
+        }
+      }
+    }
+
     const documentData = {
       title,
       description,
@@ -184,8 +222,9 @@ export async function uploadDocument(req, res) {
       ownerName: req.user.name || '',
       ownerEmail: req.user.email ? req.user.email.toLowerCase().trim() : '',
       tags,
-      acl: [],
-      readers: [],
+      visibility,
+      acl,
+      readers: acl.map((e) => e.userId),
     };
 
     const createdDoc = await Document.create(documentData);
@@ -200,6 +239,8 @@ export async function uploadDocument(req, res) {
         fileSize: createdDoc.fileSize,
         mimeType: createdDoc.mimeType,
         category: createdDoc.category,
+        visibility: createdDoc.visibility,
+        recipientsCount: acl.length,
       },
     });
 
@@ -993,6 +1034,130 @@ export async function revokeDocumentPermission(req, res) {
       error: {
         code: 'REVOKE_PERMISSION_ERROR',
         message: 'Failed to revoke document access permission.',
+      },
+    });
+  }
+}
+
+/**
+ * PATCH /api/documents/:id/visibility
+ * Updates document visibility ('private' | 'selected_users' | 'all_authenticated_users')
+ * Requires Owner or Admin authorization.
+ */
+export async function updateDocumentVisibility(req, res) {
+  try {
+    const { id } = req.params;
+    const { visibility, recipients } = req.body;
+
+    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users'];
+    const normVisibility = String(visibility || '').toLowerCase().trim();
+
+    if (!VALID_VISIBILITY.includes(normVisibility)) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_VISIBILITY',
+          message: 'Visibility must be one of: private, selected_users, all_authenticated_users.',
+        },
+      });
+    }
+
+    const doc = await Document.findById(id);
+    if (!doc) {
+      return res.status(404).json({
+        error: {
+          code: 'DOCUMENT_NOT_FOUND',
+          message: 'Requested document does not exist.',
+        },
+      });
+    }
+
+    if (!canManageDocument(doc, req.user)) {
+      await logAuditEvent({
+        req,
+        action: 'ACCESS_DENIED',
+        documentId: id,
+        documentTitle: doc.title,
+        metadata: {
+          attemptedAction: 'UPDATE_VISIBILITY',
+          reason: 'Only the document owner or an administrator can change visibility.',
+        },
+      });
+
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Only the document owner or an administrator can change document visibility.',
+        },
+      });
+    }
+
+    const previousVisibility = doc.visibility || 'private';
+    const updates = { visibility: normVisibility };
+
+    // When visibility changes:
+    // All Users -> Private: block all other users immediately, clear ACL
+    // Specific Users -> Private: remove prior recipient grants
+    if (normVisibility === 'private') {
+      updates.acl = [];
+      updates.readers = [];
+    } else if (normVisibility === 'selected_users' && recipients) {
+      let rawRecipients = recipients;
+      if (typeof rawRecipients === 'string') {
+        try { rawRecipients = JSON.parse(rawRecipients); } catch {}
+      }
+      if (Array.isArray(rawRecipients)) {
+        const newAcl = [];
+        for (const r of rawRecipients) {
+          const recEmail = String(r.email || '').toLowerCase().trim();
+          if (!recEmail) continue;
+          let level = String(r.permissionLevel || 'read').toLowerCase().trim();
+          if (level === 'view') level = 'read';
+          if (!['read', 'edit'].includes(level)) level = 'read';
+
+          const targetU = await User.findOne({ email: recEmail });
+          if (targetU) {
+            newAcl.push({
+              userId: String(targetU._id || targetU.id),
+              email: targetU.email.toLowerCase().trim(),
+              name: targetU.name || '',
+              permissionLevel: level,
+              grantedBy: req.user.id || req.user._id,
+              grantedAt: new Date(),
+            });
+          }
+        }
+        updates.acl = newAcl;
+        updates.readers = newAcl.map((e) => e.userId);
+      }
+    }
+
+    const updatedDoc = await Document.findByIdAndUpdate(id, updates, { new: true });
+
+    // Record immutable audit event
+    await logAuditEvent({
+      req,
+      action: 'DOCUMENT_VISIBILITY_UPDATED',
+      documentId: String(doc._id),
+      documentTitle: doc.title,
+      metadata: {
+        previousVisibility,
+        newVisibility: normVisibility,
+        changedBy: req.user.email,
+        recipientsCount: updatedDoc.acl ? updatedDoc.acl.length : 0,
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Document visibility updated to ${normVisibility}.`,
+      document: sanitizeDocument(updatedDoc),
+    });
+  } catch (error) {
+    console.error('[Update Visibility Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'VISIBILITY_UPDATE_ERROR',
+        message: 'Failed to update document visibility.',
       },
     });
   }

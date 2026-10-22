@@ -73,9 +73,26 @@ export async function requireAuth(req, res, next) {
       ownerApprovalReviewedAt: user.ownerApprovalReviewedAt || null,
       ownerApprovalReviewedByName: user.ownerApprovalReviewedByName || null,
       roleChangeReason: user.roleChangeReason || '',
+      mustChangePassword: Boolean(user.mustChangePassword),
       isActive: user.isActive !== false,
       createdAt: user.createdAt,
     };
+
+    // Mandatory temporary password policy:
+    // When mustChangePassword is true, user can ONLY call /api/auth/change-password and /api/auth/me
+    if (user.mustChangePassword === true) {
+      const allowedPaths = ['/api/auth/change-password', '/api/auth/me'];
+      const currentUrl = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
+      const isAllowed = allowedPaths.some((p) => currentUrl.endsWith(p) || currentUrl === p);
+      if (!isAllowed) {
+        return res.status(403).json({
+          error: {
+            code: 'PASSWORD_CHANGE_REQUIRED',
+            message: 'Temporary password detected. You must choose a new password before accessing any other protected TrustVault functionality.',
+          },
+        });
+      }
+    }
 
     next();
   } catch (error) {

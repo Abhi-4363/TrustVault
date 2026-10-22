@@ -288,10 +288,8 @@
   to { transform: rotate(360deg); }
 }
 
-.auth-card-footer {
-  margin-top: var(--space-6);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-light);
+.auth-switch-container {
+  margin-top: var(--space-4);
   text-align: center;
 }
 
@@ -321,8 +319,8 @@
 /* ── Evaluation Demo Accounts Section ─────────────────────────────────────── */
 
 .demo-accounts-container {
-  margin-top: var(--space-6);
-  padding-top: var(--space-5);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
   border-top: 1px dashed var(--border-light);
   display: flex;
   flex-direction: column;

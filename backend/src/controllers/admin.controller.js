@@ -6,9 +6,13 @@
  *   3. User management console (list, view, deactivate accounts)
  */
 
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { User } from '../models/user.model.js';
 import { Document } from '../models/document.model.js';
 import { AuditLog } from '../models/audit.model.js';
+import { AdminNotification } from '../models/notification.model.js';
+import { PasswordResetRequest } from '../models/passwordResetRequest.model.js';
 import { logAuditEvent } from '../services/audit.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -340,6 +344,7 @@ export async function listAllUsers(req, res) {
   try {
     const allUsers = await User.find();
     const allDocs = await Document.find();
+    const allResetRequests = await PasswordResetRequest.find();
 
     // Build ownership count map
     const ownershipMap = {};
@@ -350,6 +355,12 @@ export async function listAllUsers(req, res) {
 
     const users = allUsers.map((u) => {
       const userId = String(u._id || u.id);
+      const userResets = allResetRequests.filter(
+        (r) => String(r.userId) === userId || r.userEmail === u.email.toLowerCase().trim()
+      );
+      // latest reset request is first
+      const latestReset = userResets.length > 0 ? userResets[0] : null;
+
       return {
         id: userId,
         _id: userId,
@@ -362,6 +373,11 @@ export async function listAllUsers(req, res) {
         ownerApprovalReviewedAt: u.ownerApprovalReviewedAt || null,
         ownerApprovalReviewedByName: u.ownerApprovalReviewedByName || null,
         roleChangeReason: u.roleChangeReason || '',
+        passwordResetStatus: latestReset ? latestReset.status : 'not_requested',
+        passwordResetRequestId: latestReset ? String(latestReset._id || latestReset.id) : null,
+        passwordResetRequestedAt: latestReset ? latestReset.requestedAt : null,
+        passwordResetResolvedAt: latestReset ? latestReset.resolvedAt : null,
+        passwordResetResolvedByName: latestReset ? latestReset.resolvedByName : null,
         isActive: u.isActive !== false, // default true
         documentsOwned: ownershipMap[userId] || 0,
         createdAt: u.createdAt,
@@ -702,7 +718,7 @@ export async function updateUserRole(req, res) {
     // 6. Record immutable audit log
     await logAuditEvent({
       req,
-      action: specificAuditAction,
+      action: 'USER_ROLE_UPDATED',
       documentId: String(targetUser._id || targetUser.id),
       documentTitle: `Account: ${targetUser.email}`,
       metadata: {
@@ -711,11 +727,31 @@ export async function updateUserRole(req, res) {
         affectedUserName: targetUser.name,
         previousRole,
         newRole: normalizedRole,
+        specificAction: specificAuditAction,
         changedBy: req.user.email,
         reason: updates.roleChangeReason || '',
         documentsPreserved: true,
       },
     });
+
+    if (specificAuditAction !== 'USER_ROLE_UPDATED') {
+      await logAuditEvent({
+        req,
+        action: specificAuditAction,
+        documentId: String(targetUser._id || targetUser.id),
+        documentTitle: `Account: ${targetUser.email}`,
+        metadata: {
+          affectedUserId: String(targetUser._id || targetUser.id),
+          affectedUserEmail: targetUser.email,
+          affectedUserName: targetUser.name,
+          previousRole,
+          newRole: normalizedRole,
+          changedBy: req.user.email,
+          reason: updates.roleChangeReason || '',
+          documentsPreserved: true,
+        },
+      });
+    }
 
     return res.status(200).json({
       status: 'success',
@@ -786,9 +822,298 @@ export async function listOwnerRequests(req, res) {
 }
 
 /**
+ * Shared Core Service: Approve Owner Access Request
+ */
+async function processOwnerApprovalCore({ targetUser, adminId, adminName, req }) {
+  if (targetUser.ownerApprovalStatus !== 'pending') {
+    const err = new Error(`User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`);
+    err.code = 'INVALID_REQUEST_STATE';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const previousRole = targetUser.role;
+  const updatedUser = await User.findByIdAndUpdate(
+    targetUser._id || targetUser.id,
+    {
+      role: 'owner',
+      ownerApprovalStatus: 'approved',
+      ownerApprovalReviewedAt: new Date(),
+      ownerApprovalReviewedBy: adminId,
+      ownerApprovalReviewedByName: adminName,
+      roleChangeReason: 'Owner privileges approved by Administrator.',
+    },
+    { new: true }
+  );
+
+  // Sync all matching AdminNotification records
+  await AdminNotification.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      type: { $in: ['owner_access_request', 'owner_request'] },
+      status: 'pending',
+    },
+    {
+      status: 'approved',
+      isRead: true,
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+    }
+  );
+
+  // Record immutable audit event
+  await logAuditEvent({
+    req,
+    action: 'OWNER_REQUEST_APPROVED',
+    documentId: String(targetUser._id || targetUser.id),
+    documentTitle: `Account: ${targetUser.email}`,
+    metadata: {
+      affectedUserId: String(targetUser._id || targetUser.id),
+      affectedUserEmail: targetUser.email,
+      affectedUserName: targetUser.name,
+      previousRole,
+      newRole: 'owner',
+      approvedBy: req.user.email,
+      timestamp: new Date().toISOString(),
+      outcome: 'approved',
+    },
+  });
+
+  return updatedUser;
+}
+
+/**
+ * Shared Core Service: Reject Owner Access Request
+ */
+async function processOwnerRejectionCore({ targetUser, adminId, adminName, reason, req }) {
+  if (targetUser.ownerApprovalStatus !== 'pending') {
+    const err = new Error(`User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`);
+    err.code = 'INVALID_REQUEST_STATE';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    targetUser._id || targetUser.id,
+    {
+      role: 'viewer',
+      ownerApprovalStatus: 'rejected',
+      ownerApprovalReviewedAt: new Date(),
+      ownerApprovalReviewedBy: adminId,
+      ownerApprovalReviewedByName: adminName,
+      roleChangeReason: reason || 'Owner access request rejected by administrator.',
+    },
+    { new: true }
+  );
+
+  // Sync all matching AdminNotification records
+  await AdminNotification.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      type: { $in: ['owner_access_request', 'owner_request'] },
+      status: 'pending',
+    },
+    {
+      status: 'rejected',
+      isRead: true,
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+    }
+  );
+
+  // Record immutable audit event
+  await logAuditEvent({
+    req,
+    action: 'OWNER_REQUEST_REJECTED',
+    documentId: String(targetUser._id || targetUser.id),
+    documentTitle: `Account: ${targetUser.email}`,
+    metadata: {
+      affectedUserId: String(targetUser._id || targetUser.id),
+      affectedUserEmail: targetUser.email,
+      affectedUserName: targetUser.name,
+      currentRole: 'viewer',
+      rejectedBy: req.user.email,
+      reason: reason || 'Owner access request rejected by administrator.',
+      timestamp: new Date().toISOString(),
+      outcome: 'rejected',
+    },
+  });
+
+  return updatedUser;
+}
+
+/**
+ * Shared Core Service: Approve & Execute Password Reset (Password@123)
+ */
+async function processPasswordResetCore({ targetUser, adminId, adminName, req }) {
+  const pendingReset =
+    (await PasswordResetRequest.findOne({
+      userId: String(targetUser._id || targetUser.id),
+      status: 'pending',
+    })) ||
+    (await PasswordResetRequest.findOne({
+      userEmail: targetUser.email.toLowerCase().trim(),
+      status: 'pending',
+    }));
+
+  if (!pendingReset) {
+    const err = new Error('No pending password reset request found for this user account.');
+    err.code = 'REQUEST_ALREADY_PROCESSED';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const BCRYPT_SALT_ROUNDS = process.env.NODE_ENV === 'test' ? 4 : 12;
+  const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
+  const passwordHash = await bcrypt.hash('Password@123', salt);
+
+  await User.findByIdAndUpdate(targetUser._id || targetUser.id, {
+    passwordHash,
+    mustChangePassword: true,
+    passwordResetTokenHash: null,
+    passwordResetExpiresAt: null,
+  });
+
+  await PasswordResetRequest.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      status: 'pending',
+    },
+    {
+      status: 'completed',
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+      resolutionNote: 'Password reset to temporary password Password@123 by administrator.',
+    }
+  );
+
+  await AdminNotification.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      type: { $in: ['password_reset_request', 'password_reset'] },
+      status: 'pending',
+    },
+    {
+      status: 'completed',
+      isRead: true,
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+    }
+  );
+
+  await logAuditEvent({
+    req,
+    action: 'PASSWORD_RESET_APPROVED',
+    documentId: String(targetUser._id || targetUser.id),
+    documentTitle: `Account: ${targetUser.email}`,
+    metadata: {
+      affectedUserId: String(targetUser._id || targetUser.id),
+      affectedUserEmail: targetUser.email,
+      affectedUserName: targetUser.name,
+      resetBy: req.user.email,
+      temporaryPasswordIssued: true,
+      mustChangePassword: true,
+      outcome: 'completed',
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  await logAuditEvent({
+    req,
+    action: 'PASSWORD_RESET_COMPLETED',
+    documentId: String(targetUser._id || targetUser.id),
+    documentTitle: `Account: ${targetUser.email}`,
+    metadata: {
+      affectedUserId: String(targetUser._id || targetUser.id),
+      affectedUserEmail: targetUser.email,
+      affectedUserName: targetUser.name,
+      resetBy: req.user.email,
+      outcome: 'temporary_password_set',
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Shared Core Service: Reject Password Reset Request
+ */
+async function processPasswordResetRejectionCore({ targetUser, adminId, adminName, reason, req }) {
+  const pendingReset =
+    (await PasswordResetRequest.findOne({
+      userId: String(targetUser._id || targetUser.id),
+      status: 'pending',
+    })) ||
+    (await PasswordResetRequest.findOne({
+      userEmail: targetUser.email.toLowerCase().trim(),
+      status: 'pending',
+    }));
+
+  if (!pendingReset) {
+    const err = new Error('No pending password reset request found for this user account.');
+    err.code = 'REQUEST_ALREADY_PROCESSED';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Password remains strictly untouched on rejection
+
+  await PasswordResetRequest.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      status: 'pending',
+    },
+    {
+      status: 'rejected',
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+      resolutionNote: reason || 'Password reset request rejected by administrator.',
+    }
+  );
+
+  await AdminNotification.updateMany(
+    {
+      userId: String(targetUser._id || targetUser.id),
+      type: { $in: ['password_reset_request', 'password_reset'] },
+      status: 'pending',
+    },
+    {
+      status: 'rejected',
+      isRead: true,
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+      resolvedByName: adminName,
+    }
+  );
+
+  await logAuditEvent({
+    req,
+    action: 'PASSWORD_RESET_REJECTED',
+    documentId: String(targetUser._id || targetUser.id),
+    documentTitle: `Account: ${targetUser.email}`,
+    metadata: {
+      affectedUserId: String(targetUser._id || targetUser.id),
+      affectedUserEmail: targetUser.email,
+      affectedUserName: targetUser.name,
+      rejectedBy: req.user.email,
+      reason: reason || 'Password reset request rejected by administrator.',
+      outcome: 'rejected',
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  return { success: true };
+}
+
+/**
  * POST /api/admin/owner-requests/:userId/approve
- * Approves a user's pending Owner access request.
- * Transitions role: 'viewer' -> 'owner' and status: 'pending' -> 'approved'.
+ * Approves a user's pending Owner access request from User Directory.
  */
 export async function approveOwnerRequest(req, res) {
   try {
@@ -804,49 +1129,10 @@ export async function approveOwnerRequest(req, res) {
       });
     }
 
-    if (targetUser.ownerApprovalStatus !== 'pending') {
-      return res.status(400).json({
-        error: {
-          code: 'INVALID_REQUEST_STATE',
-          message: `User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`,
-        },
-      });
-    }
-
-    const previousRole = targetUser.role;
     const adminId = String(req.user.id || req.user._id);
     const adminName = req.user.name || req.user.email;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        role: 'owner',
-        ownerApprovalStatus: 'approved',
-        ownerApprovalReviewedAt: new Date(),
-        ownerApprovalReviewedBy: adminId,
-        ownerApprovalReviewedByName: adminName,
-        roleChangeReason: 'Owner privileges approved by Administrator.',
-      },
-      { new: true }
-    );
-
-    // Record immutable audit event
-    await logAuditEvent({
-      req,
-      action: 'OWNER_REQUEST_APPROVED',
-      documentId: String(targetUser._id || targetUser.id),
-      documentTitle: `Account: ${targetUser.email}`,
-      metadata: {
-        affectedUserId: String(targetUser._id || targetUser.id),
-        affectedUserEmail: targetUser.email,
-        affectedUserName: targetUser.name,
-        previousRole,
-        newRole: 'owner',
-        approvedBy: req.user.email,
-        timestamp: new Date().toISOString(),
-        outcome: 'approved',
-      },
-    });
+    const updatedUser = await processOwnerApprovalCore({ targetUser, adminId, adminName, req });
 
     return res.status(200).json({
       status: 'success',
@@ -869,10 +1155,10 @@ export async function approveOwnerRequest(req, res) {
     });
   } catch (error) {
     console.error('[Admin Approve Owner Request Error]:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       error: {
-        code: 'OWNER_APPROVAL_ERROR',
-        message: 'Failed to approve owner request.',
+        code: error.code || 'OWNER_APPROVAL_ERROR',
+        message: error.message || 'Failed to approve owner request.',
       },
     });
   }
@@ -880,8 +1166,7 @@ export async function approveOwnerRequest(req, res) {
 
 /**
  * POST /api/admin/owner-requests/:userId/reject
- * Rejects a user's pending Owner access request.
- * Retains effective role: 'viewer' and updates status: 'pending' -> 'rejected'.
+ * Rejects a user's pending Owner access request from User Directory.
  */
 export async function rejectOwnerRequest(req, res) {
   try {
@@ -898,48 +1183,10 @@ export async function rejectOwnerRequest(req, res) {
       });
     }
 
-    if (targetUser.ownerApprovalStatus !== 'pending') {
-      return res.status(400).json({
-        error: {
-          code: 'INVALID_REQUEST_STATE',
-          message: `User does not have a pending Owner approval request. Current status: ${targetUser.ownerApprovalStatus || 'not_required'}.`,
-        },
-      });
-    }
-
     const adminId = String(req.user.id || req.user._id);
     const adminName = req.user.name || req.user.email;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        role: 'viewer',
-        ownerApprovalStatus: 'rejected',
-        ownerApprovalReviewedAt: new Date(),
-        ownerApprovalReviewedBy: adminId,
-        ownerApprovalReviewedByName: adminName,
-        roleChangeReason: reason,
-      },
-      { new: true }
-    );
-
-    // Record immutable audit event
-    await logAuditEvent({
-      req,
-      action: 'OWNER_REQUEST_REJECTED',
-      documentId: String(targetUser._id || targetUser.id),
-      documentTitle: `Account: ${targetUser.email}`,
-      metadata: {
-        affectedUserId: String(targetUser._id || targetUser.id),
-        affectedUserEmail: targetUser.email,
-        affectedUserName: targetUser.name,
-        currentRole: 'viewer',
-        rejectedBy: req.user.email,
-        reason,
-        timestamp: new Date().toISOString(),
-        outcome: 'rejected',
-      },
-    });
+    const updatedUser = await processOwnerRejectionCore({ targetUser, adminId, adminName, reason, req });
 
     return res.status(200).json({
       status: 'success',
@@ -962,11 +1209,659 @@ export async function rejectOwnerRequest(req, res) {
     });
   } catch (error) {
     console.error('[Admin Reject Owner Request Error]:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       error: {
-        code: 'OWNER_REJECTION_ERROR',
-        message: 'Failed to reject owner request.',
+        code: error.code || 'OWNER_REJECTION_ERROR',
+        message: error.message || 'Failed to reject owner request.',
       },
     });
   }
 }
+
+/**
+ * POST /api/admin/users/:userId/password-reset/approve
+ * Approves a user's pending Password Reset request from User Directory / Governance.
+ */
+export async function approveUserPasswordReset(req, res) {
+  try {
+    const { userId } = req.params;
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    await processPasswordResetCore({ targetUser, adminId, adminName, req });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Password for "${targetUser.name}" has been reset to temporary password Password@123. The user will be required to change it upon next login.`,
+      user: {
+        id: String(targetUser._id || targetUser.id),
+        email: targetUser.email,
+        name: targetUser.name,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Approve User Password Reset Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'PASSWORD_RESET_APPROVAL_ERROR',
+        message: error.message || 'Failed to process password reset.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/:userId/password-reset/reject
+ * Rejects a user's pending Password Reset request from User Directory / Governance.
+ */
+export async function rejectUserPasswordReset(req, res) {
+  try {
+    const { userId } = req.params;
+    const reason = req.body?.reason ? String(req.body.reason).trim() : 'Password reset request rejected by administrator.';
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    await processPasswordResetRejectionCore({ targetUser, adminId, adminName, reason, req });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Password reset request for "${targetUser.name}" has been rejected. Account password remains unchanged.`,
+    });
+  } catch (error) {
+    console.error('[Admin Reject User Password Reset Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'PASSWORD_RESET_REJECTION_ERROR',
+        message: error.message || 'Failed to reject password reset.',
+      },
+    });
+  }
+}
+
+/**
+ * PATCH /api/admin/users/:userId/password
+ * Administrator resets or updates password for any user account.
+ */
+export async function updateUserPassword(req, res) {
+  try {
+    const { userId } = req.params;
+    const { password, newPassword } = req.body;
+    const targetPassword = password || newPassword;
+
+    if (!targetPassword || typeof targetPassword !== 'string' || targetPassword.length < 8) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must be at least 8 characters long.',
+        },
+      });
+    }
+
+    if (!/(?=.*[a-zA-Z])(?=.*[0-9])/.test(targetPassword)) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must contain at least one letter and one number.',
+        },
+      });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The requested user does not exist.',
+        },
+      });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(targetPassword, salt);
+
+    await User.findByIdAndUpdate(userId, { passwordHash });
+
+    await logAuditEvent({
+      req,
+      action: 'ADMIN_PASSWORD_RESET',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        affectedUserName: targetUser.name,
+        resetBy: req.user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Password successfully updated for ${targetUser.email}.`,
+    });
+  } catch (error) {
+    console.error('[Admin Password Reset Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'PASSWORD_RESET_ERROR',
+        message: 'Failed to update user password.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/:userId/reset-password
+ * Initiates single-use password recovery token for an account without exposing or knowing passwords.
+ */
+export async function initiatePasswordReset(req, res) {
+  try {
+    const { userId } = req.params;
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The requested user does not exist.',
+        },
+      });
+    }
+
+    // Generate secure 32-byte hex token
+    const rawResetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawResetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour expiration
+
+    await User.findByIdAndUpdate(userId, {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: expiresAt,
+    });
+
+    // Record audit event WITHOUT logging the token
+    await logAuditEvent({
+      req,
+      action: 'PASSWORD_RESET_INITIATED',
+      documentId: String(targetUser._id || targetUser.id),
+      documentTitle: `Account: ${targetUser.email}`,
+      metadata: {
+        affectedUserId: String(targetUser._id || targetUser.id),
+        affectedUserEmail: targetUser.email,
+        initiatedBy: req.user.email,
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Password recovery initiated for ${targetUser.email}.`,
+      data: {
+        userId: String(targetUser._id || targetUser.id),
+        email: targetUser.email,
+        resetToken: rawResetToken,
+        resetLink: `/reset-password?token=${rawResetToken}`,
+        expiresAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Initiate Password Reset Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'RESET_INITIATE_ERROR',
+        message: 'Failed to initiate password recovery.',
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Admin Notification Center Endpoints
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/notifications
+ * List administrator notifications with filters ('all', 'unread', 'owner_access_request', 'password_reset_request')
+ */
+export async function listNotifications(req, res) {
+  try {
+    const { filter = 'all' } = req.query;
+    const query = {};
+
+    if (filter === 'unread') {
+      query.isRead = false;
+    } else if (filter === 'owner_access_request' || filter === 'owner' || filter === 'owner_requests') {
+      query.type = { $in: ['owner_access_request', 'owner_request'] };
+    } else if (filter === 'password_reset_request' || filter === 'reset' || filter === 'password_resets') {
+      query.type = { $in: ['password_reset_request', 'password_reset'] };
+    }
+
+    const notifications = await AdminNotification.find(query);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    return res.status(200).json({
+      status: 'success',
+      notifications,
+      unreadCount,
+      totalCount: notifications.length,
+    });
+  } catch (error) {
+    console.error('[List Notifications Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'NOTIFICATIONS_FETCH_ERROR',
+        message: 'Failed to retrieve administrator notifications.',
+      },
+    });
+  }
+}
+
+/**
+ * PATCH /api/admin/notifications/:id/read
+ * Mark a single notification as read
+ */
+export async function markNotificationRead(req, res) {
+  try {
+    const { id } = req.params;
+    const notification = await AdminNotification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found.',
+        },
+      });
+    }
+
+    const updated = await AdminNotification.findByIdAndUpdate(
+      id,
+      { isRead: true, readAt: new Date() },
+      { new: true }
+    );
+
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    await logAuditEvent({
+      req,
+      action: 'ADMIN_NOTIFICATION_MARKED_READ',
+      documentId: String(id),
+      documentTitle: notification.title,
+      metadata: {
+        notificationId: String(id),
+        readBy: req.user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      notification: updated,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('[Mark Notification Read Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'NOTIFICATION_UPDATE_ERROR',
+        message: 'Failed to update notification state.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/notifications/mark-all-read
+ * Mark all notifications as read
+ */
+export async function markAllNotificationsRead(req, res) {
+  try {
+    await AdminNotification.updateMany(
+      { isRead: false },
+      { isRead: true, readAt: new Date() }
+    );
+
+    await logAuditEvent({
+      req,
+      action: 'ADMIN_NOTIFICATIONS_CLEARED',
+      documentId: 'SYSTEM',
+      documentTitle: 'All Administrator Notifications',
+      metadata: {
+        clearedBy: req.user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'All notifications have been marked as read.',
+      unreadCount: 0,
+    });
+  } catch (error) {
+    console.error('[Mark All Read Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'NOTIFICATIONS_UPDATE_ERROR',
+        message: 'Failed to mark all notifications as read.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/notifications/:id/reset-password
+ * Admin resets target user's password to exact temporary password 'Password@123' via notification.
+ */
+export async function approvePasswordResetNotification(req, res) {
+  try {
+    const { id } = req.params;
+    const notification = await AdminNotification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found.',
+        },
+      });
+    }
+
+    if (notification.type !== 'password_reset_request' && notification.type !== 'password_reset') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_NOTIFICATION_TYPE',
+          message: 'This notification is not a password reset request.',
+        },
+      });
+    }
+
+    if (notification.status !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'REQUEST_ALREADY_PROCESSED',
+          message: `This password reset request has already been ${notification.status}.`,
+        },
+      });
+    }
+
+    const targetUser = (await User.findById(notification.userId)) || (await User.findOne({ email: notification.userEmail }));
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The requested user account does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    await processPasswordResetCore({ targetUser, adminId, adminName, req });
+
+    const updatedNotification = await AdminNotification.findById(id);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Password for "${targetUser.name}" has been reset to temporary password Password@123. The user will be required to change it upon next login.`,
+      notification: updatedNotification,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('[Approve Password Reset Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'PASSWORD_RESET_APPROVAL_ERROR',
+        message: error.message || 'Failed to process password reset.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/notifications/:id/reject-password-reset
+ * Admin rejects a user's password reset request via notification.
+ */
+export async function rejectPasswordResetNotification(req, res) {
+  try {
+    const { id } = req.params;
+    const notification = await AdminNotification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found.',
+        },
+      });
+    }
+
+    if (notification.type !== 'password_reset_request' && notification.type !== 'password_reset') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_NOTIFICATION_TYPE',
+          message: 'This notification is not a password reset request.',
+        },
+      });
+    }
+
+    if (notification.status !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'REQUEST_ALREADY_PROCESSED',
+          message: `This password reset request has already been ${notification.status}.`,
+        },
+      });
+    }
+
+    const targetUser = (await User.findById(notification.userId)) || (await User.findOne({ email: notification.userEmail }));
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'The target user does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+    const reason = req.body?.reason ? String(req.body.reason).trim() : 'Password reset request rejected by administrator.';
+
+    await processPasswordResetRejectionCore({ targetUser, adminId, adminName, reason, req });
+
+    const updatedNotification = await AdminNotification.findById(id);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Password reset request has been rejected.',
+      notification: updatedNotification,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('[Reject Password Reset Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'PASSWORD_RESET_REJECTION_ERROR',
+        message: error.message || 'Failed to reject password reset request.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/notifications/:id/approve-owner
+ * Approve owner access request directly from notification center
+ */
+export async function approveOwnerRequestNotification(req, res) {
+  try {
+    const { id } = req.params;
+    const notification = await AdminNotification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found.',
+        },
+      });
+    }
+
+    if (notification.type !== 'owner_access_request' && notification.type !== 'owner_request') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_NOTIFICATION_TYPE',
+          message: 'This notification is not an owner access request.',
+        },
+      });
+    }
+
+    if (notification.status !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'REQUEST_ALREADY_PROCESSED',
+          message: `This owner request has already been ${notification.status}.`,
+        },
+      });
+    }
+
+    const targetUser = (await User.findById(notification.userId)) || (await User.findOne({ email: notification.userEmail }));
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Target user does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+
+    const updatedUser = await processOwnerApprovalCore({ targetUser, adminId, adminName, req });
+
+    const updatedNotification = await AdminNotification.findById(id);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `User "${targetUser.name}" promoted to Document Owner.`,
+      notification: updatedNotification,
+      user: {
+        id: String(updatedUser._id || updatedUser.id),
+        role: updatedUser.role,
+        ownerApprovalStatus: updatedUser.ownerApprovalStatus,
+      },
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('[Approve Owner Notification Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'OWNER_APPROVAL_ERROR',
+        message: error.message || 'Failed to approve Owner request.',
+      },
+    });
+  }
+}
+
+/**
+ * POST /api/admin/notifications/:id/reject-owner
+ * Reject owner access request directly from notification center
+ */
+export async function rejectOwnerRequestNotification(req, res) {
+  try {
+    const { id } = req.params;
+    const notification = await AdminNotification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found.',
+        },
+      });
+    }
+
+    if (notification.type !== 'owner_access_request' && notification.type !== 'owner_request') {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_NOTIFICATION_TYPE',
+          message: 'This notification is not an owner access request.',
+        },
+      });
+    }
+
+    if (notification.status !== 'pending') {
+      return res.status(400).json({
+        error: {
+          code: 'REQUEST_ALREADY_PROCESSED',
+          message: `This owner request has already been ${notification.status}.`,
+        },
+      });
+    }
+
+    const targetUser = (await User.findById(notification.userId)) || (await User.findOne({ email: notification.userEmail }));
+    if (!targetUser) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Target user does not exist.',
+        },
+      });
+    }
+
+    const adminId = String(req.user.id || req.user._id);
+    const adminName = req.user.name || req.user.email;
+    const reason = req.body?.reason ? String(req.body.reason).trim() : 'Owner access request rejected by administrator.';
+
+    const updatedUser = await processOwnerRejectionCore({ targetUser, adminId, adminName, reason, req });
+
+    const updatedNotification = await AdminNotification.findById(id);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Owner access request for "${targetUser.name}" rejected. Account retains Viewer privileges.`,
+      notification: updatedNotification,
+      user: {
+        id: String(updatedUser._id || updatedUser.id),
+        role: updatedUser.role,
+        ownerApprovalStatus: updatedUser.ownerApprovalStatus,
+      },
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('[Reject Owner Notification Error]:', error);
+    return res.status(error.statusCode || 500).json({
+      error: {
+        code: error.code || 'OWNER_REJECTION_ERROR',
+        message: error.message || 'Failed to reject Owner request.',
+      },
+    });
+  }
+}
+

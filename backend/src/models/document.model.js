@@ -104,6 +104,14 @@ const documentSchema = new mongoose.Schema(
       trim: true,
       default: 'General',
     },
+    visibility: {
+      type: String,
+      enum: {
+        values: ['private', 'selected_users', 'all_authenticated_users'],
+        message: 'Visibility must be private, selected_users, or all_authenticated_users',
+      },
+      default: 'private',
+    },
     acl: {
       type: [aclEntrySchema],
       default: [],
@@ -153,6 +161,7 @@ class InMemoryDocumentRepository {
       ownerEmail: data.ownerEmail || '',
       tags: Array.isArray(data.tags) ? data.tags : [],
       category: data.category ? String(data.category).trim() : (Array.isArray(data.tags) && data.tags[0] ? String(data.tags[0]).trim() : 'General'),
+      visibility: data.visibility || 'private',
       acl: Array.isArray(data.acl) ? data.acl : [],
       readers: Array.isArray(data.readers) ? data.readers : [],
       createdAt: new Date(),

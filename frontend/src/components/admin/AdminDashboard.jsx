@@ -23,13 +23,18 @@ import {
   XCircle,
   UserMinus,
   UserPlus,
-  Info
+  Info,
+  Copy,
+  Bell,
+  BellRing,
+  CheckCheck,
+  KeyRound
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import './AdminDashboard.css';
 
 export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountChange }) {
-  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'audit' | 'users'
+  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'audit' | 'users' | 'notifications'
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -59,6 +64,21 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
   const [downgradeReason, setDowngradeReason] = useState('');
   const [rejectModalUser, setRejectModalUser] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Reset Password Modal State (Phase 8)
+  const [resetPasswordModalUser, setResetPasswordModalUser] = useState(null);
+  const [resetResultData, setResetResultData] = useState(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // 4. Administrator Notification Center State (Stage 9)
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsFilter, setNotificationsFilter] = useState('all');
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [confirmResetModal, setConfirmResetModal] = useState({ isOpen: false, notification: null });
+  const [confirmRejectModal, setConfirmRejectModal] = useState({ isOpen: false, notification: null, type: '' });
+  const [reviewModalNotification, setReviewModalNotification] = useState(null);
 
   const isAdmin = user && user.role === 'admin';
 
@@ -160,18 +180,43 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
         const data = await res.json();
         const reqs = data.requests || [];
         setPendingRequests(reqs);
-        if (typeof onPendingCountChange === 'function') {
-          onPendingCountChange(data.total ?? reqs.length);
-        }
       }
     } catch (err) {
       console.error('Failed to fetch pending owner requests:', err);
     }
-  }, [token, isAdmin, onPendingCountChange]);
+  }, [token, isAdmin]);
+
+  // Fetch Administrator Notifications (Stage 9)
+  const fetchNotifications = useCallback(async (filterParam) => {
+    if (!token || !isAdmin) return;
+    const targetFilter = filterParam !== undefined ? filterParam : notificationsFilter;
+    setNotificationsLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/notifications?filter=${targetFilter}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadNotificationsCount(data.unreadCount || 0);
+        if (typeof onPendingCountChange === 'function') {
+          onPendingCountChange(data.unreadCount || 0);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error?.message || 'Failed to fetch administrator notifications.');
+      }
+    } catch {
+      setErrorMsg('Network error connecting to administrator notification service.');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [token, isAdmin, notificationsFilter, onPendingCountChange]);
 
   // Initial load according to active tab
   useEffect(() => {
     if (!isAdmin) return;
+    fetchNotifications();
     fetchPendingRequests();
     if (activeTab === 'analytics') {
       fetchAnalytics();
@@ -179,10 +224,171 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       fetchAuditLogs(1);
     } else if (activeTab === 'users') {
       fetchUsers();
+    } else if (activeTab === 'notifications') {
+      fetchNotifications();
     }
-  }, [activeTab, isAdmin, fetchAnalytics, fetchAuditLogs, fetchUsers, fetchPendingRequests]);
+  }, [activeTab, isAdmin, fetchAnalytics, fetchAuditLogs, fetchUsers, fetchPendingRequests, fetchNotifications]);
 
-  // Approve Pending Owner Request
+  // Mark single notification read
+  const handleMarkNotificationRead = async (id) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id || n.id === id ? data.notification : n))
+        );
+        setUnreadNotificationsCount(data.unreadCount ?? 0);
+        if (typeof onPendingCountChange === 'function') {
+          onPendingCountChange(data.unreadCount ?? 0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+    }
+  };
+
+  // Mark all notifications read
+  const handleMarkAllNotificationsRead = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/mark-all-read`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        setUnreadNotificationsCount(0);
+        if (typeof onPendingCountChange === 'function') {
+          onPendingCountChange(0);
+        }
+        setSuccessMsg('All administrator notifications marked as read.');
+      }
+    } catch (err) {
+      console.error('Failed to mark all read:', err);
+    }
+  };
+
+  // Confirm and execute password reset to Password@123 from Notification Center
+  const handleConfirmResetPassword = async () => {
+    if (!token || !confirmResetModal.notification) return;
+    const notif = confirmResetModal.notification;
+    setResetLoading(true);
+    try {
+      const notifId = notif._id || notif.id;
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Password for ${notif.userName} reset to temporary password Password@123.`);
+        setConfirmResetModal({ isOpen: false, notification: null });
+        fetchNotifications();
+        fetchUsers();
+        fetchPendingRequests();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reset password.');
+      }
+    } catch {
+      setErrorMsg('Network error executing password reset.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Confirm and execute password reset rejection from Notification Center
+  const handleConfirmRejectReset = async () => {
+    if (!token || !confirmRejectModal.notification) return;
+    const notif = confirmRejectModal.notification;
+    try {
+      const notifId = notif._id || notif.id;
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reject-password-reset`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg('Password reset request has been rejected.');
+        setConfirmRejectModal({ isOpen: false, notification: null, type: '' });
+        fetchNotifications();
+        fetchUsers();
+        fetchPendingRequests();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reject reset request.');
+      }
+    } catch {
+      setErrorMsg('Network error rejecting password reset request.');
+    }
+  };
+
+  // Approve Owner request from notification
+  const handleApproveOwnerNotification = async (notif) => {
+    if (!token) return;
+    try {
+      const notifId = notif._id || notif.id;
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/approve-owner`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Owner access approved for ${notif.userName}.`);
+        fetchNotifications();
+        fetchPendingRequests();
+        fetchUsers();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to approve owner request.');
+      }
+    } catch {
+      setErrorMsg('Network error approving owner request.');
+    }
+  };
+
+  // Reject Owner request from notification
+  const handleRejectOwnerNotification = async (notif) => {
+    if (!token) return;
+    try {
+      const notifId = notif._id || notif.id;
+      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reject-owner`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Owner access request rejected for ${notif.userName}.`);
+        fetchNotifications();
+        fetchPendingRequests();
+        fetchUsers();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reject owner request.');
+      }
+    } catch {
+      setErrorMsg('Network error rejecting owner request.');
+    }
+  };
+
+  // Approve Pending Owner Request from User Directory / Governance
   const handleApproveRequest = async (targetUserId, targetUserName) => {
     if (!token) return;
     setUpdatingRoleId(targetUserId);
@@ -197,6 +403,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       const data = await res.json();
       if (res.ok) {
         setSuccessMsg(data.message || `Owner access approved for ${targetUserName}.`);
+        fetchNotifications();
         fetchPendingRequests();
         fetchUsers();
         fetchAnalytics();
@@ -210,7 +417,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     }
   };
 
-  // Reject Pending Owner Request
+  // Reject Pending Owner Request from User Directory / Governance
   const handleRejectRequest = async (targetUserId, reason = '') => {
     if (!token) return;
     setUpdatingRoleId(targetUserId);
@@ -228,6 +435,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
         setSuccessMsg(data.message || 'Owner access request rejected.');
         setRejectModalUser(null);
         setRejectReason('');
+        fetchNotifications();
         fetchPendingRequests();
         fetchUsers();
         fetchAnalytics();
@@ -238,6 +446,64 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       setErrorMsg('Network error rejecting owner request.');
     } finally {
       setUpdatingRoleId(null);
+    }
+  };
+
+  // Approve user password reset directly from User Directory / Governance
+  const handleApproveUserPasswordReset = async (targetUser) => {
+    if (!token || !targetUser) return;
+    const targetId = targetUser.id || targetUser._id;
+    setResetLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/password-reset/approve`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Password for ${targetUser.name} reset to temporary password Password@123.`);
+        fetchNotifications();
+        fetchUsers();
+        fetchPendingRequests();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reset password.');
+      }
+    } catch {
+      setErrorMsg('Network error executing password reset.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Reject user password reset directly from User Directory / Governance
+  const handleRejectUserPasswordReset = async (targetUser) => {
+    if (!token || !targetUser) return;
+    const targetId = targetUser.id || targetUser._id;
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/password-reset/reject`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: 'Password reset request rejected by administrator.' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || `Password reset request for ${targetUser.name} rejected.`);
+        fetchNotifications();
+        fetchUsers();
+        fetchPendingRequests();
+        fetchAnalytics();
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to reject password reset request.');
+      }
+    } catch {
+      setErrorMsg('Network error rejecting password reset request.');
     }
   };
 
@@ -255,6 +521,40 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     await handleUpdateUserRole(targetId, 'viewer', reason);
     setDowngradeModalUser(null);
     setDowngradeReason('');
+  };
+
+  // Open single-use password recovery modal (Phase 8)
+  const handleOpenResetModal = (targetUser) => {
+    setResetPasswordModalUser(targetUser);
+    setResetResultData(null);
+    setCopiedLink(false);
+  };
+
+  // Execute password recovery token generation
+  const handleExecutePasswordReset = async () => {
+    if (!resetPasswordModalUser || !token) return;
+    const targetId = resetPasswordModalUser.id || resetPasswordModalUser._id;
+    setResetLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResetResultData(data.data);
+        setSuccessMsg(`Single-use recovery token generated for ${resetPasswordModalUser.email}.`);
+      } else {
+        setErrorMsg(data.error?.message || 'Failed to initiate password recovery.');
+      }
+    } catch {
+      setErrorMsg('Network error connecting to password recovery service.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   // Export audit logs (CSV / JSON)
@@ -442,6 +742,20 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
             <Users size={16} />
             <span>User Directory & Governance</span>
           </button>
+          <button
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notifications')}
+            id="admin-notifications-tab-btn"
+          >
+            <Bell size={16} />
+            <span>Notifications</span>
+            {unreadNotificationsCount > 0 && (
+              <span className="notif-tab-badge" id="admin-unread-badge">
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <button
@@ -451,11 +765,12 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
             if (activeTab === 'analytics') fetchAnalytics();
             if (activeTab === 'audit') fetchAuditLogs(auditPagination.page);
             if (activeTab === 'users') fetchUsers();
+            if (activeTab === 'notifications') fetchNotifications();
           }}
-          disabled={loading}
+          disabled={loading || notificationsLoading}
           title="Refresh Data"
         >
-          <RefreshCw size={15} className={loading ? 'spinning' : ''} />
+          <RefreshCw size={15} className={(loading || notificationsLoading) ? 'spinning' : ''} />
           <span>Refresh</span>
         </button>
       </div>
@@ -919,13 +1234,12 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
             <table className="admin-data-table" aria-label="User Governance Directory Table">
               <thead>
                 <tr>
-                  <th>User Name</th>
-                  <th>Email Address</th>
+                  <th>User</th>
                   <th>Effective Role</th>
-                  <th>Requested Role</th>
-                  <th>Approval Status</th>
+                  <th>Owner Access Status</th>
+                  <th>Password Reset Status</th>
                   <th>Account Status</th>
-                  <th>Registration Date</th>
+                  <th>Registered</th>
                   <th>Governance Actions</th>
                 </tr>
               </thead>
@@ -940,46 +1254,76 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                     const label = r === 'admin' ? 'Administrator' : r === 'owner' ? 'Document Owner' : 'Viewer';
                     const roleClass = r === 'admin' ? 'role-admin' : r === 'owner' ? 'role-owner' : 'role-viewer';
 
-                    const reqRole = targetUser.requestedRole
-                      ? (targetUser.requestedRole === 'owner' ? 'Document Owner' : 'Viewer')
-                      : '—';
-
                     const approvalStatus = targetUser.ownerApprovalStatus || 'not_required';
+                    const resetStatus = targetUser.passwordResetStatus || 'not_requested';
 
                     return (
                       <tr key={targetId}>
                         <td>
                           <div className="actor-primary"><strong>{targetUser.name}</strong></div>
-                        </td>
-                        <td>
                           <div className="actor-secondary"><code>{targetUser.email}</code></div>
                         </td>
                         <td>
                           <span className={`user-role-pill ${roleClass}`}>
                             {label}
                           </span>
-                        </td>
-                        <td>
-                          <span className="requested-role-text">
-                            {reqRole}
-                          </span>
+                          {targetUser.requestedRole === 'owner' && approvalStatus === 'pending' && (
+                            <div className="requested-role-subtext">Requested: Document Owner</div>
+                          )}
                         </td>
                         <td>
                           {approvalStatus === 'pending' ? (
-                            <span className="approval-badge badge-pending">
+                            <span
+                              className="approval-badge badge-pending"
+                              title={`Requested: ${targetUser.ownerApprovalRequestedAt ? new Date(targetUser.ownerApprovalRequestedAt).toLocaleString() : 'Pending review'}`}
+                            >
                               <Clock size={11} /> Pending Review
                             </span>
                           ) : approvalStatus === 'approved' ? (
-                            <span className="approval-badge badge-approved">
+                            <span
+                              className="approval-badge badge-approved"
+                              title={`Approved: ${targetUser.ownerApprovalReviewedAt ? new Date(targetUser.ownerApprovalReviewedAt).toLocaleString() : 'Approved'}`}
+                            >
                               <Check size={11} /> Approved
                             </span>
                           ) : approvalStatus === 'rejected' ? (
-                            <span className="approval-badge badge-rejected">
+                            <span
+                              className="approval-badge badge-rejected"
+                              title={`Rejected: ${targetUser.ownerApprovalReviewedAt ? new Date(targetUser.ownerApprovalReviewedAt).toLocaleString() : 'Rejected'}`}
+                            >
                               <X size={11} /> Rejected
                             </span>
                           ) : (
                             <span className="approval-badge badge-neutral">
                               Not Required
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {resetStatus === 'pending' ? (
+                            <span
+                              className="approval-badge badge-pending reset-pending-badge"
+                              title={`Requested: ${targetUser.passwordResetRequestedAt ? new Date(targetUser.passwordResetRequestedAt).toLocaleString() : 'Pending reset'}`}
+                            >
+                              <KeyRound size={11} /> Pending Reset
+                            </span>
+                          ) : resetStatus === 'completed' ? (
+                            <span
+                              className="approval-badge badge-approved"
+                              title={`Reset completed: ${targetUser.passwordResetResolvedAt ? new Date(targetUser.passwordResetResolvedAt).toLocaleString() : 'Completed'}`}
+                            >
+                              <Check size={11} /> Reset Completed
+                            </span>
+                          ) : resetStatus === 'rejected' ? (
+                            <span
+                              className="approval-badge badge-rejected"
+                              title={`Reset rejected: ${targetUser.passwordResetResolvedAt ? new Date(targetUser.passwordResetResolvedAt).toLocaleString() : 'Rejected'}`}
+                            >
+                              <X size={11} /> Reset Rejected
+                            </span>
+                          ) : (
+                            <span className="approval-badge badge-neutral">
+                              None
                             </span>
                           )}
                         </td>
@@ -999,7 +1343,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                               <span className="self-tag">(Current Admin)</span>
                             ) : (
                               <>
-                                {/* Pending quick actions */}
+                                {/* Pending Owner Request Quick Actions */}
                                 {approvalStatus === 'pending' && (
                                   <>
                                     <button
@@ -1010,7 +1354,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                                       title="Approve Owner privileges"
                                     >
                                       <Check size={12} />
-                                      <span>Approve</span>
+                                      <span>Approve Owner</span>
                                     </button>
                                     <button
                                       type="button"
@@ -1024,6 +1368,31 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                                     >
                                       <X size={12} />
                                       <span>Reject</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* Pending Password Reset Quick Actions */}
+                                {resetStatus === 'pending' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="user-action-btn btn-action-reset-mini"
+                                      onClick={() => handleApproveUserPasswordReset(targetUser)}
+                                      disabled={resetLoading}
+                                      title="Reset user password to Password@123"
+                                    >
+                                      <KeyRound size={12} />
+                                      <span>Reset Password</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="user-action-btn btn-reject-mini"
+                                      onClick={() => handleRejectUserPasswordReset(targetUser)}
+                                      title="Reject password reset request"
+                                    >
+                                      <X size={12} />
+                                      <span>Reject Reset</span>
                                     </button>
                                   </>
                                 )}
@@ -1100,6 +1469,17 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                                     </>
                                   )}
                                 </button>
+
+                                {/* Initiate single-use password recovery token (Phase 8) */}
+                                <button
+                                  type="button"
+                                  className="user-action-btn btn-reset-password"
+                                  onClick={() => handleOpenResetModal(targetUser)}
+                                  title={`Initiate secure single-use recovery token for ${targetUser.name}`}
+                                >
+                                  <Key size={12} />
+                                  <span>Token Link</span>
+                                </button>
                               </>
                             )}
                           </div>
@@ -1109,13 +1489,327 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
                   })
                 ) : (
                   <tr>
-                    <td colSpan="8" className="admin-table-empty">
+                    <td colSpan="7" className="admin-table-empty">
                       No user accounts found matching &quot;{userSearchTerm}&quot;.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: ADMINISTRATOR NOTIFICATION CENTER */}
+      {activeTab === 'notifications' && (
+        <div className="admin-tab-content" id="admin-notifications-panel">
+          {/* Header Banner */}
+          <div className="notif-header-banner">
+            <div>
+              <h2 className="notif-banner-title">
+                <BellRing size={20} className="text-primary" />
+                Administrator Notification Center
+              </h2>
+              <p className="notif-banner-subtitle">
+                Real-time review and governance for pending user password resets and document owner access requests.
+              </p>
+            </div>
+            {unreadNotificationsCount > 0 && (
+              <div className="notif-unread-count-pill" id="notif-unread-count-display">
+                <Bell size={13} />
+                <span>{unreadNotificationsCount} Unread {unreadNotificationsCount === 1 ? 'Notification' : 'Notifications'}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Filter & Action Toolbar */}
+          <div className="notif-toolbar">
+            <div className="notif-filter-group" role="tablist">
+              <button
+                type="button"
+                className={`notif-filter-pill ${notificationsFilter === 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setNotificationsFilter('all');
+                  fetchNotifications('all');
+                }}
+                id="filter-notif-all"
+              >
+                All Notifications
+              </button>
+              <button
+                type="button"
+                className={`notif-filter-pill ${notificationsFilter === 'unread' ? 'active' : ''}`}
+                onClick={() => {
+                  setNotificationsFilter('unread');
+                  fetchNotifications('unread');
+                }}
+                id="filter-notif-unread"
+              >
+                Unread {unreadNotificationsCount > 0 ? `(${unreadNotificationsCount})` : ''}
+              </button>
+              <button
+                type="button"
+                className={`notif-filter-pill ${notificationsFilter === 'owner_requests' ? 'active' : ''}`}
+                onClick={() => {
+                  setNotificationsFilter('owner_requests');
+                  fetchNotifications('owner_requests');
+                }}
+                id="filter-notif-owners"
+              >
+                Owner Access Requests
+              </button>
+              <button
+                type="button"
+                className={`notif-filter-pill ${notificationsFilter === 'password_resets' ? 'active' : ''}`}
+                onClick={() => {
+                  setNotificationsFilter('password_resets');
+                  fetchNotifications('password_resets');
+                }}
+                id="filter-notif-resets"
+              >
+                Password Reset Requests
+              </button>
+            </div>
+
+            <div className="notif-toolbar-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleMarkAllNotificationsRead}
+                disabled={notificationsLoading || unreadNotificationsCount === 0}
+                id="btn-mark-all-read"
+              >
+                <CheckCheck size={14} />
+                <span>Mark All as Read</span>
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => fetchNotifications(notificationsFilter)}
+                disabled={notificationsLoading}
+                id="btn-refresh-notifications"
+              >
+                <RefreshCw size={14} className={notificationsLoading ? 'spinning' : ''} />
+                <span>Refresh</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Notifications Card List */}
+          <div className="notif-list-container">
+            {notificationsLoading ? (
+              <div className="admin-loading-state">
+                <RefreshCw size={24} className="spinning text-primary" />
+                <p>Loading administrator notifications...</p>
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="notif-empty-card" id="notif-empty-state">
+                <Bell size={40} className="notif-empty-icon" />
+                <h3 className="notif-empty-title">No Notifications Found</h3>
+                <p className="notif-empty-text">
+                  There are currently no {notificationsFilter !== 'all' ? `${notificationsFilter.replace('_', ' ')} ` : ''}notifications requiring administrator action.
+                </p>
+              </div>
+            ) : (
+              notifications.map((notif) => {
+                const notifId = notif._id || notif.id;
+                const isPasswordReset = notif.type === 'password_reset_request' || notif.type === 'password_reset';
+                const isOwnerRequest = notif.type === 'owner_access_request' || notif.type === 'owner_request';
+                const isPending = notif.status === 'pending';
+
+                let typeTitle = 'System Notification';
+                let typeBadge = 'Notification';
+                let typeIcon = <Bell size={16} />;
+                let typeClass = 'default';
+
+                if (isPasswordReset) {
+                  typeTitle = 'Password Reset Request';
+                  typeBadge = 'Password Reset';
+                  typeIcon = <KeyRound size={16} />;
+                  typeClass = 'reset';
+                } else if (isOwnerRequest) {
+                  typeTitle = 'Owner Access Request';
+                  typeBadge = 'Role Elevation';
+                  typeIcon = <UserPlus size={16} />;
+                  typeClass = 'owner';
+                } else if (notif.title) {
+                  typeTitle = notif.title;
+                }
+
+                return (
+                  <div
+                    key={notifId}
+                    className={`notif-card ${!notif.isRead ? 'unread' : ''} status-${notif.status}`}
+                    id={`notif-card-${notifId}`}
+                  >
+                    <div className="notif-card-header">
+                      <div className="notif-card-title-group">
+                        <div className={`notif-type-icon ${typeClass}`}>
+                          {typeIcon}
+                        </div>
+                        <div>
+                          <h4 className="notif-card-title">{typeTitle}</h4>
+                          <span className={`notif-badge-type ${typeClass}`}>
+                            {typeBadge}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="notif-meta-actions">
+                        <span className={`notif-status-badge ${notif.status}`}>
+                          {notif.status}
+                        </span>
+                        <span className="notif-time-text">
+                          <Clock size={12} />
+                          {new Date(notif.createdAt).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </span>
+                        {!notif.isRead && (
+                          <button
+                            type="button"
+                            className="notif-mark-read-btn"
+                            onClick={() => handleMarkNotificationRead(notifId)}
+                            title="Mark as read"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="notif-card-body">
+                      <div className="notif-user-row">
+                        <span className="notif-user-name">User: {notif.userName}</span>
+                        <span className="notif-user-email">({notif.userEmail})</span>
+                      </div>
+                      <p style={{ margin: 0 }}>{notif.message}</p>
+                      {notif.status !== 'pending' && notif.resolutionNote && (
+                        <div className="notif-resolution-note">
+                          Resolution: {notif.resolutionNote}
+                          {notif.resolvedAt && (
+                            <> • {new Date(notif.resolvedAt).toLocaleString()}</>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="notif-card-actions">
+                      {isPasswordReset && (
+                        <>
+                          {isPending ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="user-action-btn btn-action-reset"
+                                onClick={() => setConfirmResetModal({ isOpen: true, notification: notif })}
+                                id={`btn-reset-pwd-${notifId}`}
+                              >
+                                <KeyRound size={13} />
+                                <span>Reset Password</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="user-action-btn btn-action-reject"
+                                onClick={() => setConfirmRejectModal({ isOpen: true, notification: notif, type: 'password_reset' })}
+                                id={`btn-reject-pwd-${notifId}`}
+                              >
+                                <XCircle size={13} />
+                                <span>Reject Request</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setReviewModalNotification(notif)}
+                              >
+                                <Info size={13} />
+                                <span>Review Request</span>
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setReviewModalNotification(notif)}
+                            >
+                              <Info size={13} />
+                              <span>Review Details</span>
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                      {isOwnerRequest && (
+                        <>
+                          {isPending ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="user-action-btn btn-action-approve"
+                                onClick={() => handleApproveOwnerNotification(notif)}
+                                id={`btn-approve-owner-${notifId}`}
+                              >
+                                <Check size={13} />
+                                <span>Approve Owner Access</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="user-action-btn btn-action-reject"
+                                onClick={() => handleRejectOwnerNotification(notif)}
+                                id={`btn-reject-owner-${notifId}`}
+                              >
+                                <XCircle size={13} />
+                                <span>Reject Request</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setReviewModalNotification(notif)}
+                              >
+                                <Info size={13} />
+                                <span>Review Request</span>
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setReviewModalNotification(notif)}
+                            >
+                              <Info size={13} />
+                              <span>Review Details</span>
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                      {!isPasswordReset && !isOwnerRequest && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setReviewModalNotification(notif)}
+                        >
+                          <Info size={13} />
+                          <span>Review Notification</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -1246,6 +1940,307 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
               >
                 <X size={14} />
                 <span>Confirm Rejection</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation & Token Modal: Admin Initiate Password Recovery (Phase 8) */}
+      {resetPasswordModalUser && (
+        <div className="admin-modal-backdrop" onClick={() => setResetPasswordModalUser(null)} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-pwd-dialog-title"
+          >
+            <div className="admin-modal-header">
+              <div className="modal-header-icon-box" style={{ backgroundColor: 'var(--color-primary-100)', color: 'var(--color-primary-700)' }}>
+                <Key size={22} />
+              </div>
+              <div>
+                <h3 id="reset-pwd-dialog-title" className="admin-modal-title">
+                  Initiate Password Recovery
+                </h3>
+                <p className="admin-modal-subtitle">
+                  Account: <strong>{resetPasswordModalUser.name}</strong> ({resetPasswordModalUser.email})
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              {!resetResultData ? (
+                <>
+                  <p className="modal-consequence-text">
+                    This will generate a cryptographically secure, random single-use recovery token (valid for 1 hour).
+                    The user&apos;s existing password will <strong>never be displayed or returned</strong>.
+                  </p>
+
+                  <div className="modal-guarantee-box">
+                    <div className="guarantee-header">
+                      <ShieldCheck size={16} className="text-success" />
+                      <strong>Zero-Trust Credential Security</strong>
+                    </div>
+                    <p>
+                      Only a SHA-256 hash of the recovery token is stored in the database. The token is automatically invalidated upon first use or expiration.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="modal-guarantee-box" style={{ borderColor: 'var(--color-primary-200)', backgroundColor: 'var(--color-primary-50)' }}>
+                    <div className="guarantee-header">
+                      <CheckCircle2 size={16} className="text-success" />
+                      <strong>Recovery Link Generated Successfully</strong>
+                    </div>
+                    <p style={{ color: 'var(--color-primary-900)' }}>
+                      Single-use token has been hashed and stored with 1-hour expiration.
+                    </p>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '12px' }}>
+                    <label className="form-label" htmlFor="reset-token-url">
+                      One-Time Password Recovery Link:
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        id="reset-token-url"
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}${resetResultData.resetLink}`}
+                        className="form-input"
+                        style={{ fontFamily: 'monospace', fontSize: '11px', flex: 1 }}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}${resetResultData.resetLink}`);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 3000);
+                        }}
+                      >
+                        {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{copiedLink ? 'Copied!' : 'Copy'}</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    <strong>Evaluation / Demo Notice:</strong> In production, this link is delivered directly via authenticated SMTP. In this demonstration environment, share this one-time link securely with the user.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button variant="secondary" onClick={() => setResetPasswordModalUser(null)}>
+                {resetResultData ? 'Close' : 'Cancel'}
+              </Button>
+              {!resetResultData && (
+                <Button
+                  variant="primary"
+                  onClick={handleExecutePasswordReset}
+                  disabled={resetLoading}
+                >
+                  <Key size={14} />
+                  <span>{resetLoading ? 'Generating...' : 'Generate Single-Use Reset Link'}</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Confirmation Modal: Reset Password to Password@123 */}
+      {confirmResetModal.isOpen && confirmResetModal.notification && (
+        <div className="admin-modal-backdrop" onClick={() => setConfirmResetModal({ isOpen: false, notification: null })} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-confirm-title"
+          >
+            <div className="admin-modal-header">
+              <div className="modal-header-icon-box" style={{ backgroundColor: 'var(--color-primary-100)', color: 'var(--color-primary-700)' }}>
+                <KeyRound size={22} />
+              </div>
+              <div>
+                <h3 id="reset-confirm-title" className="admin-modal-title">
+                  Reset Password Confirmation
+                </h3>
+                <p className="admin-modal-subtitle">
+                  Account: <strong>{confirmResetModal.notification.userName}</strong> ({confirmResetModal.notification.userEmail})
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              <div className="modal-guarantee-box" style={{ borderColor: 'var(--color-primary-200)', backgroundColor: 'var(--color-primary-50)' }}>
+                <div className="guarantee-header">
+                  <Key size={16} className="text-primary" />
+                  <strong>Reset this user&apos;s password to Password@123?</strong>
+                </div>
+                <p style={{ color: 'var(--color-primary-900)', marginTop: '6px' }}>
+                  The user&apos;s password will be reset to the temporary credential <code>Password@123</code> (securely hashed with bcrypt).
+                </p>
+              </div>
+
+              <div className="modal-consequence-text" style={{ marginTop: '12px' }}>
+                <p>
+                  <strong>Mandatory temporary-password policy:</strong> On their next login with <code>Password@123</code>, the user will be strictly required to choose a new password before accessing any other protected TrustVault functionality.
+                </p>
+                <p style={{ marginTop: '6px' }}>
+                  All existing active sessions or refresh tokens for this account will be invalidated.
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmResetModal({ isOpen: false, notification: null })}
+                disabled={resetLoading}
+                id="btn-cancel-reset-confirm"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmResetPassword}
+                disabled={resetLoading}
+                id="btn-confirm-reset-password"
+              >
+                <Check size={14} />
+                <span>{resetLoading ? 'Resetting Password...' : 'Confirm Reset to Password@123'}</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Reject Password Reset Request */}
+      {confirmRejectModal.isOpen && confirmRejectModal.notification && (
+        <div className="admin-modal-backdrop" onClick={() => setConfirmRejectModal({ isOpen: false, notification: null, type: '' })} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-reset-title"
+          >
+            <div className="admin-modal-header danger-header">
+              <div className="modal-header-icon-box danger-box">
+                <XCircle size={22} className="text-danger" />
+              </div>
+              <div>
+                <h3 id="reject-reset-title" className="admin-modal-title">
+                  Reject Password Reset Request
+                </h3>
+                <p className="admin-modal-subtitle">
+                  Account: <strong>{confirmRejectModal.notification.userName}</strong> ({confirmRejectModal.notification.userEmail})
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              <p className="modal-consequence-text">
+                Are you sure you want to reject this password reset request? The user&apos;s password will <strong>not</strong> be changed, and the request will be marked as Rejected in the audit log.
+              </p>
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmRejectModal({ isOpen: false, notification: null, type: '' })}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleConfirmRejectReset}
+                id="btn-confirm-reject-reset"
+              >
+                <X size={14} />
+                <span>Confirm Rejection</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Request Details Modal */}
+      {reviewModalNotification && (
+        <div className="admin-modal-backdrop" onClick={() => setReviewModalNotification(null)} role="presentation">
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-dialog-title"
+          >
+            <div className="admin-modal-header">
+              <div className="modal-header-icon-box" style={{ backgroundColor: 'var(--color-primary-100)', color: 'var(--color-primary-700)' }}>
+                <Info size={22} />
+              </div>
+              <div>
+                <h3 id="review-dialog-title" className="admin-modal-title">
+                  Request Specification & Audit Details
+                </h3>
+                <p className="admin-modal-subtitle">
+                  Notification ID: <code>{reviewModalNotification._id || reviewModalNotification.id}</code>
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-modal-body">
+              <div className="notif-review-details-grid" style={{ display: 'grid', gridTemplateColumns: '130px 1fr', rowGap: '10px', fontSize: '13px' }}>
+                <strong>Request Type:</strong>
+                <span style={{ textTransform: 'capitalize' }}>{reviewModalNotification.type?.replace(/_/g, ' ')}</span>
+
+                <strong>Requester Name:</strong>
+                <span>{reviewModalNotification.userName}</span>
+
+                <strong>Registered Email:</strong>
+                <code>{reviewModalNotification.userEmail}</code>
+
+                <strong>Current Status:</strong>
+                <span className={`notif-status-badge ${reviewModalNotification.status}`} style={{ display: 'inline-block', width: 'fit-content' }}>
+                  {reviewModalNotification.status}
+                </span>
+
+                <strong>Submitted At:</strong>
+                <span>{new Date(reviewModalNotification.createdAt).toLocaleString()}</span>
+
+                {reviewModalNotification.resolvedAt && (
+                  <>
+                    <strong>Resolved At:</strong>
+                    <span>{new Date(reviewModalNotification.resolvedAt).toLocaleString()}</span>
+                  </>
+                )}
+
+                {reviewModalNotification.resolvedBy && (
+                  <>
+                    <strong>Resolved By:</strong>
+                    <span>Admin ({reviewModalNotification.resolvedBy})</span>
+                  </>
+                )}
+
+                {reviewModalNotification.resolutionNote && (
+                  <>
+                    <strong>Resolution Note:</strong>
+                    <span>{reviewModalNotification.resolutionNote}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <Button variant="secondary" onClick={() => setReviewModalNotification(null)}>
+                Close
               </Button>
             </div>
           </div>

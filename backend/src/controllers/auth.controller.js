@@ -8,7 +8,11 @@
  * - Never returns passwordHash in responses
  */
 
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { User } from '../models/user.model.js';
+import { AdminNotification } from '../models/notification.model.js';
+import { PasswordResetRequest } from '../models/passwordResetRequest.model.js';
 import { generateToken } from '../utils/token.js';
 import { logAuditEvent } from '../services/audit.service.js';
 
@@ -134,6 +138,19 @@ export async function register(req, res, next) {
           requestedAt: ownerApprovalRequestedAt,
         },
       });
+
+      // Create persistent unread Admin notification
+      await AdminNotification.create({
+        type: 'owner_access_request',
+        userId: String(user._id || user.id),
+        userName: user.name,
+        userEmail: user.email,
+        requestId: String(user._id || user.id),
+        title: 'Document Owner Access Request',
+        message: `${user.name} (${user.email}) requested Document Owner access upon account registration.`,
+        status: 'pending',
+        isRead: false,
+      });
     }
 
     // 5. Generate authentication token
@@ -235,3 +252,303 @@ export async function getMe(req, res) {
     },
   });
 }
+
+/**
+ * Change authenticated user's password
+ * POST /api/auth/change-password
+ */
+export async function changePassword(req, res) {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: {
+          code: 'MISSING_FIELDS',
+          message: 'Current password and new password are required.',
+        },
+      });
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        error: {
+          code: 'PASSWORD_MISMATCH',
+          message: 'New password and confirmation password do not match.',
+        },
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must be at least 8 characters long.',
+        },
+      });
+    }
+
+    if (!/(?=.*[a-zA-Z])(?=.*[0-9])/.test(newPassword)) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must contain at least one letter and one number.',
+        },
+      });
+    }
+
+    const userId = req.user.id || req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User account not found.',
+        },
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_CURRENT_PASSWORD',
+          message: 'Current password does not match.',
+        },
+      });
+    }
+
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      return res.status(400).json({
+        error: {
+          code: 'SAME_PASSWORD',
+          message: 'New password cannot be identical to your current password.',
+        },
+      });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await User.findByIdAndUpdate(userId, {
+      passwordHash,
+      mustChangePassword: false,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    });
+
+    // Record immutable audit event (NEVER log passwords)
+    await logAuditEvent({
+      req,
+      action: 'USER_PASSWORD_CHANGED',
+      documentId: String(userId),
+      documentTitle: `Account: ${user.email}`,
+      metadata: {
+        userId: String(userId),
+        email: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Password successfully updated.',
+    });
+  } catch (error) {
+    console.error('[Change Password Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'PASSWORD_CHANGE_ERROR',
+        message: 'Failed to update password.',
+      },
+    });
+  }
+}
+
+/**
+ * Reset password via single-use token
+ * POST /api/auth/reset-password
+ */
+export async function resetPassword(req, res) {
+  try {
+    const { token, resetToken, newPassword, confirmPassword } = req.body;
+    const providedToken = token || resetToken;
+
+    if (!providedToken || !newPassword) {
+      return res.status(400).json({
+        error: {
+          code: 'MISSING_FIELDS',
+          message: 'Reset token and new password are required.',
+        },
+      });
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        error: {
+          code: 'PASSWORD_MISMATCH',
+          message: 'New password and confirmation password do not match.',
+        },
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must be at least 8 characters long.',
+        },
+      });
+    }
+
+    if (!/(?=.*[a-zA-Z])(?=.*[0-9])/.test(newPassword)) {
+      return res.status(400).json({
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must contain at least one letter and one number.',
+        },
+      });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(providedToken.trim()).digest('hex');
+    const user = await User.findOne({ passwordResetTokenHash: tokenHash });
+
+    if (!user) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_RESET_TOKEN',
+          message: 'The password reset token is invalid or has already been used.',
+        },
+      });
+    }
+
+    if (user.passwordResetExpiresAt && new Date(user.passwordResetExpiresAt) < new Date()) {
+      return res.status(400).json({
+        error: {
+          code: 'EXPIRED_RESET_TOKEN',
+          message: 'The password reset token has expired. Please request a new reset from your administrator.',
+        },
+      });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await User.findByIdAndUpdate(user._id || user.id, {
+      passwordHash,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+      mustChangePassword: false,
+    });
+
+    // Record immutable audit event
+    await logAuditEvent({
+      req,
+      action: 'PASSWORD_RESET_COMPLETED',
+      documentId: String(user._id || user.id),
+      documentTitle: `Account: ${user.email}`,
+      metadata: {
+        userId: String(user._id || user.id),
+        email: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Password successfully reset. You may now log in with your new credentials.',
+    });
+  } catch (error) {
+    console.error('[Reset Password Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'RESET_PASSWORD_ERROR',
+        message: 'Failed to reset password.',
+      },
+    });
+  }
+}
+
+/**
+ * Public Forgot Password submission
+ * POST /api/auth/forgot-password
+ * Creates a PasswordResetRequest in DB and an AdminNotification.
+ * Returns a neutral confirmation to prevent account enumeration.
+ */
+export async function requestPasswordReset(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_EMAIL',
+          message: 'Please provide a valid registered email address.',
+        },
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // Neutral message ensuring user enumeration resistance (Requirement 2.9)
+    const neutralResponse = {
+      status: 'success',
+      message: 'If this email address is registered, your password reset request has been submitted to an Administrator for review.',
+    };
+
+    if (!user) {
+      return res.status(200).json(neutralResponse);
+    }
+
+    // Check for existing pending password reset request to prevent duplicates (Requirement 2.8)
+    const existingPending = await PasswordResetRequest.findOne({
+      userId: String(user._id || user.id),
+      status: 'pending',
+    });
+
+    if (existingPending) {
+      return res.status(200).json(neutralResponse);
+    }
+
+    const resetReq = await PasswordResetRequest.create({
+      userId: String(user._id || user.id),
+      userName: user.name,
+      userEmail: user.email,
+      status: 'pending',
+      requestedAt: new Date(),
+    });
+
+    await AdminNotification.create({
+      type: 'password_reset_request',
+      userId: String(user._id || user.id),
+      userName: user.name,
+      userEmail: user.email,
+      requestId: String(resetReq._id || resetReq.id),
+      title: 'Password Reset Request',
+      message: `${user.name} (${user.email}) requested a password reset.`,
+      status: 'pending',
+      isRead: false,
+    });
+
+    await logAuditEvent({
+      req,
+      action: 'PASSWORD_RESET_REQUESTED',
+      documentId: String(user._id || user.id),
+      documentTitle: `Account: ${user.email}`,
+      metadata: {
+        userId: String(user._id || user.id),
+        email: user.email,
+        requestId: String(resetReq._id || resetReq.id),
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json(neutralResponse);
+  } catch (error) {
+    next(error);
+  }
+}
+

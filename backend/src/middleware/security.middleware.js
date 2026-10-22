@@ -101,3 +101,5 @@ class InMemoryRateLimiter {
 
 export const generalRateLimiter = new InMemoryRateLimiter(60000, 300).middleware();
 export const authRateLimiter = new InMemoryRateLimiter(60000, 60).middleware();
+export const passwordResetRateLimiter = new InMemoryRateLimiter(60000, 15).middleware();
+export const changePasswordRateLimiter = new InMemoryRateLimiter(60000, 15).middleware();

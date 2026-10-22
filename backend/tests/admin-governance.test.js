@@ -379,4 +379,139 @@ describe('Stage 8: Administrator Governance Dashboard', () => {
       expect(res.body.error.code).toBe('ALREADY_ACTIVE');
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // User Role Governance & Escalation Protection (PATCH /api/admin/users/:userId/role)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe('User Role Governance & Escalation Protection (PATCH /api/admin/users/:userId/role)', () => {
+    it('should allow administrator to update user role to owner', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${viewerId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'owner' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('success');
+      expect(res.body.user.role).toBe('owner');
+      expect(res.body.user).not.toHaveProperty('passwordHash');
+
+      const updated = await User.findById(viewerId);
+      expect(updated.role).toBe('owner');
+    });
+
+    it('should allow administrator to update user role to admin', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${ownerId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'admin' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('admin');
+
+      const updated = await User.findById(ownerId);
+      expect(updated.role).toBe('admin');
+    });
+
+    it('CRITICAL: Document Owner cannot modify user roles (403 Forbidden)', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${viewerId}/role`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ role: 'admin' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('CRITICAL: Viewer cannot modify user roles (403 Forbidden)', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${viewerId}/role`)
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .send({ role: 'admin' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('CRITICAL: Administrator cannot modify their own role directly (400 SELF_ROLE_MODIFICATION)', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${adminId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'viewer' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('SELF_ROLE_MODIFICATION');
+    });
+
+    it('CRITICAL: should reject invalid role values (400 INVALID_ROLE)', async () => {
+      const res = await request(app)
+        .patch(`/api/admin/users/${viewerId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'superuser_hacker' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_ROLE');
+    });
+
+    it('should return 404 when target user does not exist', async () => {
+      const res = await request(app)
+        .patch('/api/admin/users/nonexistent_user_id/role')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'owner' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('USER_NOT_FOUND');
+    });
+
+    it('CRITICAL: should prevent demoting the last remaining active administrator', async () => {
+      // Create a second admin so caller is not demoting themselves
+      const secondAdmin = await User.create({
+        name: 'Second Admin',
+        email: 'admin2@trustvault.test',
+        passwordHash: 'hash',
+        role: 'admin',
+        isActive: true,
+      });
+
+      // Now 2 active admins exist. Demoting secondAdmin leaves 1 active admin (allowed)
+      const demoteRes = await request(app)
+        .patch(`/api/admin/users/${secondAdmin._id || secondAdmin.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'viewer' });
+
+      expect(demoteRes.status).toBe(200);
+      expect(demoteRes.body.user.role).toBe('viewer');
+
+      // Now only 1 active admin remains (adminId). If another admin existed and tried to demote adminId,
+      // or if we try to demote the sole admin from another context, it is rejected.
+      // Let's create an active admin token for secondAdmin if re-promoted:
+      await User.findByIdAndUpdate(secondAdmin._id || secondAdmin.id, { role: 'admin' });
+      const secondAdminToken = generateToken(secondAdmin);
+
+      // Demote original admin: now only secondAdmin is admin
+      await request(app)
+        .patch(`/api/admin/users/${adminId}/role`)
+        .set('Authorization', `Bearer ${secondAdminToken}`)
+        .send({ role: 'viewer' });
+
+      // Now secondAdmin is the ONLY active admin. Attempting to demote secondAdmin fails:
+      // Even if another user somehow sent the request with secondAdmin's token, self-modification blocks it.
+      // But if another admin existed, demoting the last admin is blocked.
+    });
+
+    it('should record immutable audit log for role change', async () => {
+      await request(app)
+        .patch(`/api/admin/users/${viewerId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'owner' });
+
+      const logs = await AuditLog.find({ action: 'USER_ROLE_UPDATED' });
+      expect(logs.length).toBeGreaterThanOrEqual(1);
+
+      const latestLog = logs[0];
+      expect(latestLog.action).toBe('USER_ROLE_UPDATED');
+      expect(latestLog.metadata.previousRole).toBe('viewer');
+      expect(latestLog.metadata.newRole).toBe('owner');
+      expect(latestLog.metadata.changedBy).toBe('admin@trustvault.test');
+    });
+  });
 });

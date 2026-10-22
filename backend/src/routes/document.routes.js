@@ -26,6 +26,7 @@ import {
   getDirectoryUsers,
   getDocumentAuditTrail,
   getRecentAuditActivity,
+  updateDocumentVisibility,
 } from '../controllers/document.controller.js';
 
 const router = Router();
@@ -57,6 +58,9 @@ router.get('/:id', requireAuth, getDocumentById);
 
 // Update document metadata (Requires Edit Permission and Input Sanitization)
 router.patch('/:id', requireAuth, validateAndSanitizeDocumentInput, updateDocument);
+
+// Update document visibility (Requires Ownership or Admin)
+router.patch('/:id/visibility', requireAuth, updateDocumentVisibility);
 
 // Secure streaming download with forced attachment disposition
 router.get('/:id/download', requireAuth, downloadDocument);

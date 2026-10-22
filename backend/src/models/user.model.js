@@ -71,6 +71,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    passwordResetTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -86,11 +99,12 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
-// Ensure passwordHash is NEVER returned in JSON representations
+// Ensure passwordHash and passwordResetTokenHash are NEVER returned in JSON representations
 userSchema.methods.toJSON = function () {
   const obj = this.toObject ? this.toObject({ virtuals: true }) : { ...this };
   obj.id = String(this._id);
   delete obj.passwordHash;
+  delete obj.passwordResetTokenHash;
   delete obj.__v;
   return obj;
 };
@@ -124,6 +138,9 @@ class InMemoryUserRepository {
     ownerApprovalReviewedBy = null,
     ownerApprovalReviewedByName = null,
     roleChangeReason = '',
+    passwordResetTokenHash = null,
+    passwordResetExpiresAt = null,
+    mustChangePassword = false,
   }) {
     const normalizedEmail = email.toLowerCase().trim();
     if (this.users.has(normalizedEmail)) {
@@ -157,6 +174,9 @@ class InMemoryUserRepository {
       ownerApprovalReviewedBy,
       ownerApprovalReviewedByName,
       roleChangeReason,
+      passwordResetTokenHash,
+      passwordResetExpiresAt,
+      mustChangePassword: Boolean(mustChangePassword),
       isActive: isActive !== false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -166,6 +186,7 @@ class InMemoryUserRepository {
       toJSON() {
         const copy = { ...this, id: this._id };
         delete copy.passwordHash;
+        delete copy.passwordResetTokenHash;
         delete copy.comparePassword;
         delete copy.toJSON;
         return copy;
@@ -204,6 +225,22 @@ class InMemoryUserRepository {
       for (const u of this.users.values()) {
         if (String(u._id) === queryIdStr || String(u.id) === queryIdStr) return u;
       }
+    }
+    if (query.passwordResetTokenHash) {
+      for (const u of this.users.values()) {
+        if (u.passwordResetTokenHash === query.passwordResetTokenHash) return u;
+      }
+    }
+    // Generic match fallback
+    for (const u of this.users.values()) {
+      let match = true;
+      for (const [k, v] of Object.entries(query)) {
+        if (u[k] !== v) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return u;
     }
     return null;
   }

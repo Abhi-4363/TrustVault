@@ -417,3 +417,141 @@ This document records the exact progression of development prompts, implementati
   - Commit Hash: `648873d`
   - Commit Message: `feat: implement admin user management, owner approval requests, and role revocation workflow`
 
+---
+
+## Prompt Entry 10 — Master Implementation: Document Visibility, Role Governance, Password Management, Admin Recovery, and Challenge Finalization
+
+- **Date / Timestamp**: 2026-10-22T07:23:00+05:30
+- **User Prompt / Instructions**:
+  - Implement Master Implementation requirements for the Snovasys Fresher Hiring Challenge 2026.
+  - Phase 1 & 2: Account roles (`admin`, `owner`, `viewer`), public registration strictly setting effective role to `viewer`, owner requests marked `pending`, and client-supplied role tampering rejected.
+  - Phase 3 & 4: Admin User Management with 8 governance columns, role changes with last-admin lockout prevention, and persistent in-app notifications.
+  - Phase 5: Document Visibility during upload titled "Who can access this document?" with 3 radio cards:
+    1. `Private — Only Me` (selected by default)
+    2. `Share with Specific Users` (directory lookup, searchable recipients, Read/Edit permissions, chips)
+    3. `Share with All Registered Users` (authenticated members only, read default, never public to internet)
+  - Phase 6: Document Access & Dynamic Visibility Update (`PATCH /api/documents/:id/visibility`), with immediate access revocation and ACL clearing when switched to `private`.
+  - Phase 7: Account Settings & Change Password (`POST /api/auth/change-password`) with current password verification, complexity rules, reuse rejection, bcrypt (12 rounds), and visibility toggles.
+  - Phase 8: Admin Forgotten-Password Recovery (`POST /api/admin/users/:userId/reset-password` & `POST /api/auth/reset-password`) using cryptographically secure 32-byte hex token, SHA-256 storage, 1-hour expiration, single-use invalidation, and UI copy-link modal for demo/eval.
+  - Phase 9: Demo login accounts for the evaluator (`admin@trustvault.internal`, `sarah.lead@trustvault.internal`, `alex.dev@trustvault.internal`) pre-filling normal login form with backend credential validation.
+  - Phase 10: Immutable audit logging without credential or token leakage.
+  - Phase 11: Automated testing covering all 39 scenarios with 100% test pass rate and clean production build.
+  - Phase 12 & 13: Full documentation updates and comprehensive final implementation report.
+  - Strict Rule: DO NOT commit, push, or deploy without explicit user approval.
+
+- **What the AI Actually Implemented**:
+  1. **Document Visibility Ingestion & Dynamic Modification**:
+     - `backend/src/controllers/document.controller.js`:
+       - `uploadDocument`: Parses `visibility` and initial `recipients`, populating `acl` and `readers`.
+       - `updateDocumentVisibility`: `PATCH /api/documents/:id/visibility` allows Owners/Admins to switch visibility. Switching to `private` immediately clears ACL and revokes third-party access, logging `DOCUMENT_VISIBILITY_UPDATED`.
+       - `canReadDocument`: Permits `all_authenticated_users` documents to be read/downloaded by any authenticated active account.
+     - `frontend/src/components/dashboard/UploadModal.jsx` & `UploadModal.css`:
+       - Added "Who can access this document?" section with 3 interactive radio cards: `Private — Only Me` (default), `Share with Specific Users`, and `Share with All Registered Users`.
+       - Recipient picker with dropdown populated from `GET /api/documents/users/directory`, Read/Edit permission dropdown, recipient chips with remove buttons.
+  2. **Account Settings & Self Password Change (Phase 7)**:
+     - `backend/src/controllers/auth.controller.js`:
+       - `changePassword`: `POST /api/auth/change-password` verifies current password against bcrypt hash, rejects identical password reuse, enforces complexity (>=8 chars, letter & number), generates new bcrypt hash (12 rounds), clears reset tokens, and logs `USER_PASSWORD_CHANGED`.
+     - `backend/src/routes/auth.routes.js`: Mounted `POST /change-password` (protected by `requireAuth`).
+     - `frontend/src/components/dashboard/AccountSettings.jsx` & `AccountSettings.css`:
+       - Profile parameters: name, email, effective role, requested role, approval status, account status.
+       - Change Password form: current password, new password, confirm new password, show/hide eye toggles, dynamic requirement checklist.
+     - `frontend/src/App.jsx`: Mounted `AccountSettings` under `activeNav === 'profile'` and `activeNav === 'settings'`.
+  3. **Admin Forgotten-Password Recovery (Phase 8)**:
+     - `backend/src/controllers/admin.controller.js`:
+       - `initiatePasswordReset`: `POST /api/admin/users/:userId/reset-password` generates 32-byte hex token, hashes with SHA-256, sets 1-hour expiration, and logs `PASSWORD_RESET_INITIATED` without leaking raw token.
+     - `backend/src/controllers/auth.controller.js`:
+       - `resetPassword`: `POST /api/auth/reset-password` validates token hash, verifies expiration, updates password hash, clears token hash & expiration, and logs `PASSWORD_RESET_COMPLETED`.
+     - `backend/src/routes/auth.routes.js`: Mounted `POST /reset-password` (public).
+     - `frontend/src/components/admin/AdminDashboard.jsx`:
+       - Added "Reset Pwd" button in User Governance table.
+       - Confirmation modal generates token and displays the one-time URL with "Copy Link" button.
+     - `frontend/src/components/auth/AuthLandingPortal.jsx`:
+       - Detects `?token=...` parameter from recovery URL and switches to Reset Password view.
+       - Added "Forgot password / Recovery token?" link in login form.
+  4. **Automated Testing Suite (Phase 11)**:
+     - Created `backend/tests/visibility-and-password-management.test.js` covering 12 comprehensive test scenarios across visibility defaults, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption, and audit cleanliness.
+     - Executed full test suite: **151 of 151 tests passed across all 11 test suites (100% passing)**.
+  5. **Frontend Production Build**:
+     - Executed `npm run build` in `frontend/`: built cleanly in 8.52s with 0 errors.
+  6. **Security Threat Model & Documentation**:
+     - `THREATS.md`: Added `THREAT-15` (Accidental Document Oversharing) and `THREAT-16` (Account Takeover via Reset-Token Replay).
+     - `README.md`: Updated test counts to 151, documented visibility cards, password management, and demo accounts.
+
+- **What the User Reviewed**:
+  - Pending user review of the comprehensive Phase 13 Final Implementation Report.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: **Pending explicit user approval**
+  - Commit Message: **Pending explicit user approval**
+
+---
+
+## Prompt Entry 11 — Combined Account Settings, Password Reset & Admin Notifications
+
+- **Date / Timestamp**: 2026-10-22T08:00:00+05:30
+- **User Prompt / Instructions**:
+  - Combined Account Settings, Password Reset & Admin Notifications for TrustVault:
+    1. **Change Password for Every User**: All authenticated roles (Administrator, Document Owner, Viewer) can change passwords in Account Settings with current password verification, matching/complexity checks, bcrypt hashing (12 rounds), session invalidation, and audit logging (`USER_PASSWORD_CHANGED`) without plaintext passwords.
+    2. **Forgot Password on Login Page**: "Forgot Password?" link, email form, "Send Request to Admin", neutral timing-safe confirmation, database persistence, unread Admin notification creation, deduplication & rate limiting.
+    3. **Admin Notification Center**: Visible Notifications button with live unread badge, filters (All, Unread, Owner Access Requests, Password Reset Requests), mark read, mark all read, review request, refresh.
+    4. **Password Reset Exact Admin Workflow**: Notification with Reset Password and Reject buttons. Confirmation dialog: *"Reset this user's password to Password@123?"*. Resets password to bcrypt hash of `Password@123`, marks completed, updates notification, logs audit. Mandatory temporary-password policy: next login requires immediate password change before vault access is unlocked; only change-password and logout permitted.
+    5. **Owner Access Request Notifications**: Integrate existing registration and approval workflow with Review, Approve, Reject actions.
+    6. **Persistence & Security**: Persist requests and notifications in MongoDB with resilient in-memory fallback.
+    7. **Automated Tests**: Unit & integration tests for all workflows; zero regression across all existing tests.
+    8. **UI and Documentation**: Update README.md, THREATS.md (THREAT-17, 18, 19), and PROMPTS.md.
+    9. **Constraint**: Do not commit, push, or deploy without explicit user approval.
+
+- **What the AI Actually Implemented**:
+  1. **Database Models & In-Memory Fallback**:
+     - `backend/src/models/notification.model.js`: Created `AdminNotification` model with Mongoose schema + resilient `InMemoryNotificationRepository` fallback.
+     - `backend/src/models/passwordResetRequest.model.js`: Created `PasswordResetRequest` model with Mongoose schema + resilient `InMemoryPasswordResetRepository` fallback.
+     - `backend/src/models/audit.model.js`: Added valid actions: `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_APPROVED`, `PASSWORD_RESET_REJECTED`, `ADMIN_PASSWORD_RESET`, `ADMIN_NOTIFICATION_MARKED_READ`, `ADMIN_NOTIFICATIONS_CLEARED`.
+  2. **Security Middleware & Rate Limiting**:
+     - `backend/src/middleware/security.middleware.js`: Added `passwordResetRateLimiter` (15/min) and `changePasswordRateLimiter` (15/min).
+     - `backend/src/middleware/auth.middleware.js`: Attached `mustChangePassword` to `req.user`. Added guard: when `mustChangePassword === true`, requests to any route other than `/api/auth/change-password` and `/api/auth/me` are blocked with `403 PASSWORD_CHANGE_REQUIRED`.
+  3. **Controllers & Endpoints**:
+     - `backend/src/controllers/auth.controller.js`:
+       - `requestPasswordReset`: Mounted `POST /api/auth/forgot-password` with deduplication check and anti-enumeration neutral response.
+       - `register`: When `requestedRole === 'owner'`, creates unread `owner_access_request` `AdminNotification`.
+     - `backend/src/controllers/admin.controller.js`:
+       - `listNotifications` (`GET /api/admin/notifications`) with filters (`all`, `unread`, `owner_requests`, `password_resets`).
+       - `markNotificationRead` (`PATCH /api/admin/notifications/:id/read`).
+       - `markAllNotificationsRead` (`POST /api/admin/notifications/mark-all-read`).
+       - `approvePasswordResetNotification` (`POST /api/admin/notifications/:id/reset-password`): Resets password to `Password@123`, sets `mustChangePassword: true`, marks completed, logs audit.
+       - `rejectPasswordResetNotification` (`POST /api/admin/notifications/:id/reject-password-reset`).
+       - `approveOwnerRequestNotification` (`POST /api/admin/notifications/:id/approve-owner`).
+       - `rejectOwnerRequestNotification` (`POST /api/admin/notifications/:id/reject-owner`).
+     - `backend/src/routes/admin.routes.js`: Protected all notification endpoints with `requireAuth` + `requireRole('admin')`.
+  4. **Frontend Components & Modals**:
+     - `frontend/src/components/auth/ForcedPasswordChangeModal.jsx` & CSS: Full-screen modal that traps users with `mustChangePassword === true`, permitting only password change and sign out.
+     - `frontend/src/App.jsx`: Renders `ForcedPasswordChangeModal` when `user.mustChangePassword === true`.
+     - `frontend/src/components/auth/AuthLandingPortal.jsx`: Added "Forgot Password?" link, email form, "Send Request to Admin" button, and neutral submission message.
+     - `frontend/src/components/auth/AuthModals.jsx`: Added "Forgot Password?" link and mode in the popup modal.
+     - `frontend/src/components/admin/AdminDashboard.jsx` & CSS:
+       - Notifications tab button with live unread badge (`notif-tab-badge`).
+       - Toolbar with filter pills (`All Notifications`, `Unread`, `Owner Access Requests`, `Password Reset Requests`), "Mark All as Read", and "Refresh".
+       - Notification cards displaying request type, user name, email, submission timestamp, and status.
+       - Password Reset Confirmation Modal: *"Reset this user's password to Password@123?"*.
+       - Reject Confirmation Modal and Review Request Modal.
+  5. **Automated Testing**:
+     - Created `backend/tests/admin-notifications-and-password-reset.test.js` with 22 comprehensive test scenarios covering all requirements.
+     - Executed full test suite: **173 of 173 tests passed across all 12 test suites (100% passing)**.
+  6. **Production Build**:
+     - Ran `npm run build` in `frontend/`: 1631 modules transformed, 0 errors, built in 3.5s.
+  7. **Documentation**:
+     - `THREATS.md`: Added `THREAT-17` (Password-Reset Abuse), `THREAT-18` (Notification Authorization), and `THREAT-19` (Temporary Password Retention).
+     - `README.md`: Updated test counts to 173 across 12 suites, expanded Section 10 with Notification Center and Temporary Password workflows.
+
+- **Specific Mistakes Encountered & How They Were Resolved**:
+  1. *Test Import Error*: In `admin-notifications-and-password-reset.test.js`, initially imported `bcrypt` which is not installed (`bcryptjs` is the project's dependency). Fixed by importing `bcryptjs`.
+  2. *Response Field Consistency*: Tests initially expected `res.body.success === true`, but controller endpoints consistently returned `{ status: 'success', message: ... }`. Updated test assertions to match standard TrustVault convention.
+  3. *User Model Property*: Test initially looked for `userInDb.password` instead of `userInDb.passwordHash`. Corrected to verify `userInDb.passwordHash` and utilized `userInDb.comparePassword(...)`.
+  4. *Registration Payload*: Registration controller reads `req.body.requestedRole` rather than `req.body.isOwnerRequested`. Updated test payload to pass `requestedRole: 'owner'`.
+  5. *Live Dev Server Background Process*: The backend server task was running `node server.js` without `--watch`, meaning route additions weren't picked up until the task was stopped and restarted with `npm run dev`.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: **Pending explicit user approval**
+  - Commit Message: **Pending explicit user approval**
+
+
+

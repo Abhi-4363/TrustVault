@@ -55,6 +55,7 @@ export async function runSeed(isStandalone = false) {
   console.log('\n[1/4] Seeding corporate identities...');
   const salt = await bcrypt.genSalt(12);
   const passwordHash = await bcrypt.hash('TrustVault2026!', salt);
+  const abhiPasswordHash = await bcrypt.hash('Abhi@9346192300', salt);
 
   const seedUsersData = [
     {
@@ -102,6 +103,20 @@ export async function runSeed(isStandalone = false) {
       passwordHash,
       isActive: true,
     },
+    {
+      name: 'Konagalla Abhirama Rao',
+      email: 'abhiram.konagalla604@gmail.com',
+      role: 'owner',
+      requestedRole: 'owner',
+      ownerApprovalStatus: 'approved',
+      ownerApprovalRequestedAt: new Date(Date.now() - 3600000),
+      ownerApprovalReviewedAt: new Date(),
+      ownerApprovalReviewedByName: 'Marcus Vance',
+      roleChangeReason: 'Owner privileges approved by Administrator.',
+      password: 'Abhi@9346192300',
+      passwordHash: abhiPasswordHash,
+      isActive: true,
+    },
   ];
 
   const createdUsers = {};
@@ -109,6 +124,16 @@ export async function runSeed(isStandalone = false) {
     let existing = await User.findOne({ email: u.email });
     if (!existing) {
       existing = await User.create(u);
+    } else {
+      await User.findByIdAndUpdate(existing._id || existing.id, {
+        passwordHash: u.passwordHash,
+        role: u.role,
+        requestedRole: u.requestedRole || existing.requestedRole,
+        ownerApprovalStatus: u.ownerApprovalStatus || existing.ownerApprovalStatus,
+        ownerApprovalReviewedAt: u.ownerApprovalReviewedAt || existing.ownerApprovalReviewedAt,
+        ownerApprovalReviewedByName: u.ownerApprovalReviewedByName || existing.ownerApprovalReviewedByName,
+        roleChangeReason: u.roleChangeReason || existing.roleChangeReason,
+      });
     }
     createdUsers[u.email] = existing;
     console.log(`   ✔ ${u.name} <${u.email}> (${u.role.toUpperCase()})`);
