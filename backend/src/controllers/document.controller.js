@@ -768,6 +768,7 @@ export async function getDocumentPermissions(req, res) {
     return res.status(200).json({
       documentId: id,
       ownerId: doc.ownerId,
+      visibility: doc.visibility || 'private',
       acl: doc.acl || [],
     });
   } catch (error) {
@@ -901,9 +902,14 @@ export async function grantDocumentPermission(req, res) {
       currentReaders.push(targetEmail);
     }
 
+    const docUpdates = { acl: currentAcl, readers: currentReaders };
+    if (!doc.visibility || doc.visibility === 'private') {
+      docUpdates.visibility = 'selected_users';
+    }
+
     const updatedDoc = await Document.findByIdAndUpdate(
       id,
-      { acl: currentAcl, readers: currentReaders },
+      docUpdates,
       { new: true }
     );
 
@@ -922,6 +928,7 @@ export async function grantDocumentPermission(req, res) {
 
     return res.status(200).json({
       message: `Successfully granted '${permissionLevel}' access to ${targetEmail}.`,
+      visibility: updatedDoc.visibility || 'selected_users',
       acl: updatedDoc.acl,
     });
   } catch (error) {
@@ -1049,10 +1056,13 @@ export async function updateDocumentVisibility(req, res) {
     const { id } = req.params;
     const { visibility, recipients } = req.body;
 
-    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users'];
-    const normVisibility = String(visibility || '').toLowerCase().trim();
+    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users', 'specific_users'];
+    let normVisibility = String(visibility || '').toLowerCase().trim();
+    if (normVisibility === 'specific_users') {
+      normVisibility = 'selected_users';
+    }
 
-    if (!VALID_VISIBILITY.includes(normVisibility)) {
+    if (!['private', 'selected_users', 'all_authenticated_users'].includes(normVisibility)) {
       return res.status(400).json({
         error: {
           code: 'INVALID_VISIBILITY',
@@ -1095,9 +1105,20 @@ export async function updateDocumentVisibility(req, res) {
     const updates = { visibility: normVisibility };
 
     // When visibility changes:
-    // All Users -> Private: block all other users immediately, clear ACL
-    // Specific Users -> Private: remove prior recipient grants
+    // All Users -> Private: block all other users immediately, clear ACL and readers
+    // Specific Users -> Private: remove prior recipient grants and register immediate revocation
     if (normVisibility === 'private') {
+      if (Array.isArray(doc.acl)) {
+        doc.acl.forEach((entry) => {
+          if (entry.userId) registerImmediateRevocation(id, String(entry.userId));
+          if (entry.email) registerImmediateRevocation(id, String(entry.email).toLowerCase().trim());
+        });
+      }
+      if (Array.isArray(doc.readers)) {
+        doc.readers.forEach((r) => {
+          registerImmediateRevocation(id, String(r).toLowerCase().trim());
+        });
+      }
       updates.acl = [];
       updates.readers = [];
     } else if (normVisibility === 'selected_users' && recipients) {
@@ -1125,6 +1146,18 @@ export async function updateDocumentVisibility(req, res) {
               grantedAt: new Date(),
             });
           }
+        }
+        // Register immediate revocation for removed users
+        if (Array.isArray(doc.acl)) {
+          doc.acl.forEach((oldEntry) => {
+            const stillPresent = newAcl.some(
+              (n) => String(n.userId) === String(oldEntry.userId) || (n.email && n.email.toLowerCase().trim() === (oldEntry.email || '').toLowerCase().trim())
+            );
+            if (!stillPresent) {
+              if (oldEntry.userId) registerImmediateRevocation(id, String(oldEntry.userId));
+              if (oldEntry.email) registerImmediateRevocation(id, String(oldEntry.email).toLowerCase().trim());
+            }
+          });
         }
         updates.acl = newAcl;
         updates.readers = newAcl.map((e) => e.userId);
@@ -1298,7 +1331,14 @@ export async function searchDocuments(req, res) {
     const allDocs = await Document.find();
 
     // 2. Strict Zero-Trust Authorization Filter: Only documents accessible to requesting user
-    const accessibleDocs = allDocs.filter((doc) => canReadDocument(doc, req.user));
+    const callerId = String(req.user.id || req.user._id);
+    const callerEmail = (req.user.email || '').toLowerCase().trim();
+    const accessibleDocs = allDocs.filter(
+      (doc) =>
+        !isAccessImmediatelyRevoked(doc._id, callerId) &&
+        (!callerEmail || !isAccessImmediatelyRevoked(doc._id, callerEmail)) &&
+        canReadDocument(doc, req.user)
+    );
 
     // 3. Search matching across title, description, originalName, tags, owner, category, and date
     const matchedDocs = accessibleDocs.filter((doc) => {

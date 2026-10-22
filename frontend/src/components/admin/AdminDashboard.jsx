@@ -71,7 +71,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
   const [resetLoading, setResetLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // 4. Administrator Notification Center State (Stage 9)
+  // 4. Administrator Notification Center State
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsFilter, setNotificationsFilter] = useState('all');
@@ -169,7 +169,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     }
   }, [token, isAdmin]);
 
-  // Fetch Pending Owner Requests (Stage 8)
+  // Fetch Pending Owner Requests
   const fetchPendingRequests = useCallback(async () => {
     if (!token || !isAdmin) return;
     try {
@@ -186,7 +186,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     }
   }, [token, isAdmin]);
 
-  // Fetch Administrator Notifications (Stage 9)
+  // Fetch Administrator Notifications
   const fetchNotifications = useCallback(async (filterParam) => {
     if (!token || !isAdmin) return;
     const targetFilter = filterParam !== undefined ? filterParam : notificationsFilter;
@@ -1128,7 +1128,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       {/* TAB 3: USER DIRECTORY & GOVERNANCE */}
       {activeTab === 'users' && (
         <div className="admin-tab-content">
-          {/* Dedicated Pending Owner Requests Queue (Stage 8) */}
+          {/* Dedicated Pending Owner Requests Queue */}
           <div className="pending-requests-card" aria-labelledby="pending-requests-title">
             <div className="pending-requests-header">
               <div className="pending-header-title">

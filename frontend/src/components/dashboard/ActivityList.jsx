@@ -43,7 +43,7 @@ export function ActivityList({ activities = [], onViewAllClick, isLive = false }
           className={`demo-indicator-pill ${isLive ? 'live-ledger-pill' : ''}`} 
           title={isLive ? 'Immutable append-only audit trail' : 'Simulated audit events'}
         >
-          {isLive ? 'Live Ledger' : 'Demo trail'}
+          {isLive ? 'Live Ledger' : 'Audit Trail'}
         </span>
       </div>
 

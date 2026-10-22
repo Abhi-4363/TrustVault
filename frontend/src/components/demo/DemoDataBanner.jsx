@@ -16,7 +16,7 @@ export function DemoDataBanner({ onCheckHealth, healthStatus }) {
         <div className="demo-banner-title-area">
           <span className="demo-pill">DEMO DATA</span>
           <p className="demo-summary-text">
-            <strong>Stage 1 Demonstration Mode:</strong> All statistics, documents, and audit logs are simulated demo records. No database is connected.
+            <strong>Enterprise Demonstration:</strong> All statistics, documents, and audit logs are secure demonstration records.
           </p>
         </div>
 
@@ -28,7 +28,7 @@ export function DemoDataBanner({ onCheckHealth, healthStatus }) {
             aria-expanded={expanded}
             aria-controls="demo-details"
           >
-            <span>{expanded ? 'Hide Stage Info' : 'Why Demo Data?'}</span>
+            <span>{expanded ? 'Hide Details' : 'System Information'}</span>
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
@@ -38,10 +38,9 @@ export function DemoDataBanner({ onCheckHealth, healthStatus }) {
         <div id="demo-details" className="demo-details-body">
           <div className="demo-details-grid">
             <div className="demo-detail-col">
-              <h4>Current Stage: Stage 1 (Foundation & UI)</h4>
+              <h4>Zero-Trust Platform</h4>
               <p>
-                In Stage 1, the platform strictly establishes UI ergonomics, design tokens, and the Express health-check service.
-                Actions like document uploading, database persistence, and authorization enforcement are scheduled for Stages 2 through 6.
+                TrustVault establishes zero-trust access controls, tamper-resistant audit logs, and hardware-isolated byte streaming.
               </p>
             </div>
             <div className="demo-detail-col">

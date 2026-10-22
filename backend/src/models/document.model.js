@@ -111,6 +111,7 @@ const documentSchema = new mongoose.Schema(
         message: 'Visibility must be private, selected_users, or all_authenticated_users',
       },
       default: 'private',
+      set: (v) => (String(v || '').toLowerCase().trim() === 'specific_users' ? 'selected_users' : String(v || '').toLowerCase().trim()),
     },
     acl: {
       type: [aclEntrySchema],
@@ -236,6 +237,10 @@ class InMemoryDocumentRepository {
       if (!key.startsWith('$')) {
         doc[key] = val;
       }
+    }
+
+    if (doc.visibility === 'specific_users') {
+      doc.visibility = 'selected_users';
     }
 
     doc.updatedAt = new Date();

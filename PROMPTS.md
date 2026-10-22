@@ -612,9 +612,98 @@ This document records the exact progression of development prompts, implementati
      - `THREATS.md`: Added `THREAT-20` (Unverified Account Access), `THREAT-21` (Verification Token Replay), `THREAT-22` (Email Reset Link Interception), `THREAT-23` (User Enumeration Defense), and `THREAT-24` (Email Provider Failure).
 
 - **Real Git Commit Reference**:
-  - Commit Hash: **Pending explicit user approval**
-  - Commit Message: **Pending explicit user approval**
+  - Commit Hash: `b36c921`
+  - Commit Message: `feat: implement email verification, Gmail delivery, dual-option password recovery, and security threat mitigations`
 
+---
 
+## Prompt Entry 13 — Professional UI Polish, Enterprise Branding & Stage Label Removal
 
+- **Date / Timestamp**: 2026-10-22T13:00:00+05:30
+- **User Prompt / Instructions**:
+  - Inspect the entire existing TrustVault project and remove all development-stage labels (e.g. `Stage 4 Access Control` in Manage Access modal, `Stage 1 Notice`, `Stage 3`, `Stage 6`, `Stage 7`, `Snovasys Fresher Challenge 2026`).
+  - Upgrade to enterprise document governance branding and SOC2 / ISO 27001 readiness terminology.
+  - Preserve all existing functionality, API integrations, security controls, permissions, and data.
+  - Verify 100% test pass rate and clean production build.
+  - Strict Rule: DO NOT commit, push, or deploy without explicit user approval.
 
+- **What the AI Actually Implemented**:
+  1. Frontend Stage Label Cleanup:
+     - `ShareModal.jsx`: Replaced `Stage 4 Access Control` with `Manage Access`.
+     - `Modal.jsx`: Default prop `badge` updated from `'Stage Notice'` to `'Security Notice'`.
+     - `AppShell.jsx`: Updated footer to `Enterprise Document Governance` and `SOC2 & ISO 27001 Ready`.
+     - `AuthLandingPortal.jsx`: Updated portal subtitle to `Enterprise Document Management • Verified Zero-Trust Protocol`.
+     - `ActivityList.jsx`: Updated pill text from `'Demo trail'` to `'Audit Trail'`.
+     - `DemoDataBanner.jsx`: Updated banner to `Enterprise Demonstration` and `Zero-Trust Platform`.
+     - `App.jsx`: Replaced all deferred stage notice badges with functional enterprise security labels (`Zero-Leakage Streaming`, `Vault Search`, `System Architecture`, `Immutable Compliance Ledger`).
+  2. Backend Branding:
+     - `email.service.js`: Replaced email footer branding with `Enterprise Security`.
+  3. Verification:
+     - Ripgrep query `\bstage\b` case-insensitively across `frontend/src` confirmed 0 results.
+     - All 198 tests passed.
+
+- **Real Git Commit Reference**:
+  - Commit Hash: Included in current batch commit
+  - Commit Message: Included in current batch commit
+
+---
+
+## Prompt Entry 14 — Document Visibility Sharing Options, Dynamic Policy Transitions, and Settings Navigation Fix
+
+- **Date / Timestamp**: 2026-10-22T14:30:00+05:30
+- **User Prompt / Instructions**:
+  - Part 1: Fix document visibility options in Upload and Share:
+    1. Both Upload Document form and Share modal must support the same three visibility options:
+       - `Private — Only Me`: Only owner can access.
+       - `Share with Specific Users`: Select registered users by name/email, assign Read or Edit permissions individually, allow updating and revoking.
+       - `Share with All Registered Users`: Permit eligible authenticated users to access according to policy, default to Read-only access, never expose publicly.
+    2. Fix the Share modal to show all three visibility options regardless of original upload visibility.
+       - Support transitions: Private -> Specific Users / All Users, Specific Users -> Private / All Users, All Users -> Private / Specific Users.
+       - Load current visibility from backend and persist changes through authorized API (`PATCH /api/documents/:id/visibility`).
+       - Refresh document list only after backend confirms success.
+    3. Enforce visibility securely:
+       - Revoke former collaborators' access when required by new visibility.
+       - Switching to `private` immediately revokes third-party access and registers immediate revocation in revocation service.
+       - Do not give Edit permission to all registered users.
+       - Newly registered users gain dynamic read access in All Registered Users mode without copying into permanent ACL.
+       - Preserve existing document IDs, file contents, filenames, metadata, ownership, ACLs, and audit history.
+    4. Audit and test sharing: Record actor, document, previous visibility, new visibility, timestamp, and outcome.
+  - Part 2: Keep Change Password exclusively in Settings:
+    - Settings must be the single location for Change Password.
+    - Remove duplicate Change Password form, button, section, or shortcut from Profile.
+    - Preserve profile features (name, email, role, status) on Profile page.
+    - Ensure all roles (Administrator, Document Owner, Viewer) can access Change Password in Settings.
+  - Part 3: Inspect, implement, and verify:
+    - Add automated regression tests, run full test suite, verify production build, verify UI visually, and report results.
+    - Strict Rule: DO NOT commit, push, or deploy without explicit user approval.
+
+- **What the AI Actually Implemented**:
+  1. **Share Modal Visibility Integration**:
+     - Updated `frontend/src/components/dashboard/ShareModal.jsx` and `ShareModal.css` with the exact same three visibility cards as `UploadModal.jsx` (`Private — Only Me`, `Share with Specific Users`, `Share with All Registered Users`).
+     - Added live synchronization from `GET /api/documents/:id/permissions`.
+     - Added pending policy change alert bar with `Save Visibility` and `Discard` actions, updating via `PATCH /api/documents/:id/visibility`.
+     - Contextual views based on selected visibility: strictly private info box, all authenticated users read-only notice with optional named editor assignment, and specific users collaborator management form and authorized collaborator list.
+  2. **Backend Visibility Enforcement & Immediate Revocation**:
+     - Updated `backend/src/controllers/document.controller.js`:
+       - `getDocumentPermissions` now returns `visibility: doc.visibility || 'private'`.
+       - `grantDocumentPermission` auto-upgrades visibility to `selected_users` if previously `private`.
+       - `updateDocumentVisibility` calls `registerImmediateRevocation` for former collaborators when switching to `private` or removing users.
+       - `searchDocuments` now validates `!isAccessImmediatelyRevoked` to eliminate search leakage for revoked documents.
+     - Updated `backend/src/models/document.model.js`: Added setter and in-memory repository normalizer accepting `specific_users` as an alias for `selected_users`.
+  3. **Settings Navigation & Exclusive Change Password**:
+     - Updated `frontend/src/components/dashboard/AccountSettings.jsx` with `activeNav` mode routing.
+     - Profile View (`activeNav === 'profile'`): Displays strictly *User Profile & Identity Governance* details. Completely excludes Change Password form, buttons, and shortcuts.
+     - Settings View (`activeNav === 'settings'`): Displays *Account Security Configuration* and the dedicated *Change Account Password* form with bcrypt (12 rounds) hashing, matching checks, and old password verification.
+     - Aligned page titles in `frontend/src/App.jsx`.
+  4. **Automated Testing Suite**:
+     - Created `backend/tests/visibility-sharing-transitions.test.js` with 19 comprehensive tests covering all visibility transitions, security restrictions, unauthorized attempt blocking, and Settings password change.
+     - Full test suite execution: **217 of 217 tests passed across all 14 test files (100% pass rate)**.
+  5. **Production Build & Visual Browser Verification**:
+     - `npm run build` in `frontend/`: 1631 modules transformed, 0 errors, completed in 3.25s.
+     - Chromium visual inspection confirmed Share modal with all three visibility tiers, Settings with exclusive Change Password form, and Profile with identity details only.
+  6. **Git Commit & Push**:
+     - User explicitly instructed: "firstly commit and push".
+
+- **Real Git Commit Reference**:
+  - Commit Hash: `47fd9d9`
+  - Commit Message: `feat: implement unified 3-tier document visibility sharing and exclusive Settings password change`

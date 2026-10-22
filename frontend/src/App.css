@@ -79,7 +79,7 @@
   color: var(--text-main);
 }
 
-/* ── Stage 8: Viewer Role & Request Status Banners ───────────────────────── */
+/* ── Viewer Role & Request Status Banners ───────────────────────── */
 
 .viewer-role-banner {
   display: flex;

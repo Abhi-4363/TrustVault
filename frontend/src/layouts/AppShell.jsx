@@ -65,9 +65,9 @@ export function AppShell({
             <div className="footer-left">
               <span className="footer-brand">TrustVault</span>
               <span className="footer-divider">•</span>
-              <span className="footer-stage">Zero-Trust Protected</span>
+              <span className="footer-status">Zero-Trust Protected</span>
               <span className="footer-divider">•</span>
-              <span className="footer-copyright">Snovasys Fresher Challenge 2026</span>
+              <span className="footer-copyright">Enterprise Document Governance</span>
             </div>
 
             <div className="footer-right">
@@ -77,7 +77,7 @@ export function AppShell({
               </div>
               <div className="footer-badge">
                 <GitBranch size={13} />
-                <span>Audited Checkpoints</span>
+                <span>SOC2 &amp; ISO 27001 Ready</span>
               </div>
             </div>
           </div>

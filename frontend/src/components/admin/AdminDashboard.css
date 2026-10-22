@@ -1,5 +1,5 @@
 /* ==============================================================================
-   TrustVault — Admin Governance Dashboard Styles (Stage 8)
+   TrustVault — Admin Governance Dashboard Styles
    Enterprise-grade, accessible styling matching high-assurance security standards
    ============================================================================== */
 
@@ -758,7 +758,7 @@
   font-size: var(--text-sm);
 }
 
-/* ── Stage 8: Pending Requests Queue & Badges ────────────────────────────── */
+/* ── Pending Requests Queue & Badges ────────────────────────────── */
 
 .tab-pending-badge {
   display: inline-flex;
@@ -1112,7 +1112,7 @@
   border-top: 1px solid var(--border-light);
 }
 
-/* ── Administrator Notification Center (Stage 9) ────────────────────────── */
+/* ── Administrator Notification Center ────────────────────────── */
 
 .notif-tab-badge {
   display: inline-flex;

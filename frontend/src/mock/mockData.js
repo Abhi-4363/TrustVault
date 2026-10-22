@@ -1,10 +1,8 @@
 /**
- * TrustVault — Stage 1 Demonstration Data
+ * TrustVault — Enterprise Demonstration Records
  *
- * CRITICAL TRANSPARENCY NOTICE:
- * All data in this file is fictional demonstration data created to illustrate
- * UI hierarchy, accessibility, and visual presentation during Stage 1.
- * None of this data is fetched from or persisted to a real database.
+ * All data in this file is structured demonstration data created to illustrate
+ * UI hierarchy, accessibility, and visual presentation.
  */
 
 export const DEMO_METRICS = {

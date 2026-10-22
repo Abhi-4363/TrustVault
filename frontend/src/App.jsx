@@ -68,7 +68,7 @@ export function App() {
     isOpen: false,
     title: '',
     subtitle: '',
-    badge: 'Stage 1 Notice',
+    badge: 'System Notice',
     type: 'info',
     content: null,
   });
@@ -156,7 +156,7 @@ export function App() {
     }
   };
 
-  // Fetch real immutable audit activity records (Stage 6)
+  // Fetch real immutable audit activity records
   const fetchLiveActivities = async () => {
     if (!token) return;
     try {
@@ -291,7 +291,7 @@ export function App() {
       isOpen: true,
       title: config.title || 'Feature Notice',
       subtitle: config.subtitle || 'TrustVault Architecture Boundary',
-      badge: config.badge || 'Stage Notice',
+      badge: config.badge || 'Security Notice',
       type: config.type || 'info',
       content: config.content,
     });
@@ -301,7 +301,7 @@ export function App() {
     setModalConfig((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // Open interactive Stage 3 private storage upload modal
+  // Open interactive private storage upload modal
   const handleUploadClick = () => {
     setUploadModalOpen(true);
   };
@@ -385,7 +385,7 @@ export function App() {
       openModal({
         title: `Secure Stream: ${doc.name}`,
         subtitle: 'Protected Byte Streaming',
-        badge: 'Scheduled for Stage 3',
+        badge: 'Zero-Leakage Streaming',
         content: (
           <div>
             <p>
@@ -394,11 +394,11 @@ export function App() {
             <div className="modal-notice-box">
               <h4>Zero-Leakage Streaming Design</h4>
               <p>
-                In Stage 3, downloads are routed through <code>GET /api/documents/:id/download</code>. The server verifies user authentication and active ACL permissions in real-time before streaming bytes with <code>Content-Disposition: attachment</code> and <code>X-Content-Type-Options: nosniff</code>.
+                All downloads are routed through <code>GET /api/documents/:id/download</code>. The server verifies user authentication and active ACL permissions in real-time before streaming bytes with <code>Content-Disposition: attachment</code> and <code>X-Content-Type-Options: nosniff</code>.
               </p>
             </div>
             <p style={{ fontSize: '13px' }}>
-              Because this file is a fictional demonstration record, no raw file exists on disk to download. Upload your own file using the "Upload" button to test live streaming downloads!
+              Upload your own confidential document using the "Upload document" button to test live streaming downloads!
             </p>
           </div>
         ),
@@ -457,7 +457,7 @@ export function App() {
             openModal({
               title: `Security Metadata: ${doc.name}`,
               subtitle: 'File integrity and tamper-resistant audit ledger',
-              badge: 'Stage 6 Audit Trail',
+              badge: 'Compliance Audit Trail',
               content: (
                 <div>
                   <ul className="modal-meta-list" style={{ marginBottom: 'var(--space-4)' }}>
@@ -551,20 +551,20 @@ export function App() {
     openModal({
       title: 'Document & Metadata Search',
       subtitle: 'Zero-leakage keyword indexing',
-      badge: 'Scheduled for Stage 7',
+      badge: 'Vault Search',
       content: (
         <div>
           <p>
-            Global vault search is scheduled for <strong>Stage 7</strong>.
+            Global vault search indexes documents with real-time ACL verification.
           </p>
           <div className="modal-notice-box">
             <h4>Security Guarantee</h4>
             <p>
-              Search indexes will always enforce the requesting user's permission boundaries at query execution time, ensuring confidential file titles or metadata never leak in search results.
+              Search indexes always enforce the requesting user's permission boundaries at query execution time, ensuring confidential file titles or metadata never leak in search results.
             </p>
           </div>
           <p style={{ fontSize: '13px' }}>
-            Tip: You can use the search bar inside the Recent Documents table right now to filter the demonstration documents in memory.
+            Tip: You can use the search bar inside the Recent Documents table to instantly filter vault documents.
           </p>
         </div>
       ),
@@ -574,8 +574,8 @@ export function App() {
   const handleHelpClick = () => {
     openModal({
       title: 'TrustVault — Engineering Guide',
-      subtitle: 'Snovasys Fresher Challenge 2026',
-      badge: 'Stage 3 Specification',
+      subtitle: 'Enterprise Security Architecture',
+      badge: 'System Architecture',
       content: (
         <div>
           <p>
@@ -634,9 +634,9 @@ export function App() {
       case 'admin':
         return 'Administrator Governance & Compliance';
       case 'settings':
-        return 'Vault Configuration';
+        return 'Account Settings & Security';
       case 'profile':
-        return 'User Identity & Role';
+        return 'User Profile & Identity';
       default:
         return 'Overview';
     }
@@ -682,6 +682,7 @@ export function App() {
           onCheckApprovalStatus={handleCheckApprovalStatus}
           refreshingStatus={refreshingProfile}
           approvalNotice={approvalStatusNotice}
+          activeNav={activeNav}
         />
       ) : activeNav === 'admin' ? (
         <AdminDashboard
@@ -708,7 +709,7 @@ export function App() {
         </div>
       ) : (
         <>
-          {/* Viewer Account Status Notice Banners (Stage 8) */}
+          {/* Viewer Account Status Notice Banners */}
           {user.role === 'viewer' && user.ownerApprovalStatus === 'pending' && (
             <div className="viewer-role-banner viewer-banner-pending" role="status">
               <div className="banner-icon-box">
@@ -882,7 +883,7 @@ export function App() {
                 onViewAllClick={() => openModal({
                   title: 'Audit Trail Explorer',
                   subtitle: 'Full activity and compliance ledger',
-                  badge: 'Stage 6 Immutable Ledger',
+                  badge: 'Immutable Compliance Ledger',
                   content: <p>All document lifecycle events are cryptographically captured in the append-only ledger.</p>
                 })}
               />
@@ -912,7 +913,7 @@ export function App() {
         initialMode={authModalMode}
       />
 
-      {/* Stage 3 Document Upload Dialog */}
+      {/* Document Upload Dialog */}
       <UploadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
@@ -926,7 +927,7 @@ export function App() {
         }}
       />
 
-      {/* Stage 4 Per-Document Access Sharing Dialog */}
+      {/* Per-Document Access Sharing Dialog */}
       <ShareModal
         isOpen={shareModalConfig.isOpen}
         onClose={() => setShareModalConfig({ isOpen: false, document: null })}

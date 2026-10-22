@@ -13,7 +13,7 @@ export function Modal({
   title,
   subtitle,
   children,
-  badge = 'Stage Notice',
+  badge = 'Security Notice',
   confirmLabel = 'Understood',
   onConfirm,
   type = 'info', // 'info' | 'notice'

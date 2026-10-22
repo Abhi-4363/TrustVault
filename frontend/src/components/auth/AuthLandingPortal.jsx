@@ -320,7 +320,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
 
           <div className="auth-compliance-footer">
             <Shield size={14} className="compliance-shield" aria-hidden="true" />
-            <span>Snovasys Fresher Challenge 2026 • Verified Zero-Trust Protocol</span>
+            <span>Enterprise Document Management • Verified Zero-Trust Protocol</span>
           </div>
         </div>
 

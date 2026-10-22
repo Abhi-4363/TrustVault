@@ -180,7 +180,7 @@ This verification link will expire in 24 hours. If you did not create an account
     </div>
     <p class="desc" style="margin-top: 20px; font-size: 12px;">This single-use verification link will expire in 24 hours. If you did not create a TrustVault account, no further action is required.</p>
     <div class="footer">
-      TrustVault Secure Document Management Platform • Snovasys Challenge 2026
+      TrustVault Secure Document Management Platform • Enterprise Security
     </div>
   </div>
 </body>
@@ -240,7 +240,7 @@ If you did not request a password reset, please ignore this email. Your current 
     </div>
     <p class="desc" style="margin-top: 20px; font-size: 12px;">This single-use recovery link is valid for <strong>15 minutes</strong>. If you did not make this request, you can safely ignore this email; your password remains unchanged.</p>
     <div class="footer">
-      TrustVault Secure Document Management Platform • Snovasys Challenge 2026
+      TrustVault Secure Document Management Platform • Enterprise Security
     </div>
   </div>
 </body>
