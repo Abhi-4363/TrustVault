@@ -37,6 +37,29 @@ export function AppSidebar({
   userRole = null,
   pendingRequestsCount = 0,
 }) {
+  // Lock body scroll on mobile when sidebar drawer is open
+  React.useEffect(() => {
+    if (isMobileOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isMobileOpen]);
+
+  // Handle Escape key to close mobile drawer
+  React.useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onCloseMobile) {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileOpen, onCloseMobile]);
+
   const normalizedRole = String(userRole || '').toLowerCase().trim();
   const isAdmin = normalizedRole === 'admin';
   const isViewer = normalizedRole === 'viewer' || normalizedRole === 'member';

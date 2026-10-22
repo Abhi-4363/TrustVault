@@ -102,3 +102,13 @@
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+@media (max-width: 480px) {
+  .summary-card {
+    padding: var(--space-4);
+  }
+  .summary-card-value {
+    font-size: var(--text-2xl);
+  }
+}
+

@@ -54,6 +54,8 @@ export function AppShell({
           onOpenLogin={onOpenLogin}
           onOpenRegister={onOpenRegister}
           showMenuToggle={isAuthenticated}
+          showSearch={isAuthenticated}
+          isMobileSidebarOpen={isMobileNavOpen}
         />
 
         <main className="app-content-container" id="main-content" tabIndex="-1">

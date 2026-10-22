@@ -47,10 +47,12 @@ export function App() {
   const [backendConnected, setBackendConnected] = useState(false);
 
   // Authentication Context
-  const { user, token, logout, refreshProfile } = useAuth();
+  const { user, token, logout, refreshProfile, requestOwnerAccess } = useAuth();
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [refreshingProfile, setRefreshingProfile] = useState(false);
   const [approvalStatusNotice, setApprovalStatusNotice] = useState('');
+  const [submittingOwnerRequest, setSubmittingOwnerRequest] = useState(false);
+  const [ownerRequestNotice, setOwnerRequestNotice] = useState({ type: '', message: '' });
 
   // Auth, Upload, Share & Edit Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -269,11 +271,11 @@ export function App() {
       const updatedUser = await refreshProfile();
       if (updatedUser) {
         if (updatedUser.role === 'owner') {
-          setApprovalStatusNotice('Congratulations! Your Document Owner privileges have been approved by an Administrator.');
+          setApprovalStatusNotice('Owner access approved.');
         } else if (updatedUser.ownerApprovalStatus === 'rejected') {
-          setApprovalStatusNotice('Your request for Document Owner access was reviewed and declined.');
+          setApprovalStatusNotice('Your Owner access request was declined.');
         } else if (updatedUser.ownerApprovalStatus === 'pending') {
-          setApprovalStatusNotice('Your request is still awaiting Administrator review.');
+          setApprovalStatusNotice('Owner access request pending administrator approval.');
         } else {
           setApprovalStatusNotice('Profile refreshed.');
         }
@@ -285,6 +287,56 @@ export function App() {
       setTimeout(() => setApprovalStatusNotice(''), 6000);
     }
   };
+
+  // Submit Owner access request from Viewer dashboard
+  const handleRequestOwnerAccess = async () => {
+    setSubmittingOwnerRequest(true);
+    setOwnerRequestNotice({ type: '', message: '' });
+    try {
+      const res = await requestOwnerAccess();
+      setOwnerRequestNotice({
+        type: 'success',
+        message: res.message || 'Owner access request pending administrator approval.',
+      });
+      // Also fetch updated documents and activities
+      fetchVaultDocuments();
+      fetchLiveActivities();
+    } catch (err) {
+      setOwnerRequestNotice({
+        type: 'error',
+        message: err.message || 'Failed to submit Owner access request.',
+      });
+    } finally {
+      setSubmittingOwnerRequest(false);
+    }
+  };
+
+  // Auto-refresh profile periodically and upon tab focus for Viewers awaiting Owner approval
+  useEffect(() => {
+    if (!token || !user || user.role !== 'viewer' || user.ownerApprovalStatus !== 'pending') {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        await refreshProfile();
+      } catch {
+        // silent polling failure
+      }
+    }, 12000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshProfile().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [token, user?.role, user?.ownerApprovalStatus]);
 
   const openModal = (config) => {
     setModalConfig({
@@ -571,6 +623,19 @@ export function App() {
     });
   };
 
+  // Global search keyboard shortcut (Ctrl+K / Cmd+K) - only active for authenticated users
+  useEffect(() => {
+    if (!user) return;
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        handleSearchFocus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user]);
+
   const handleHelpClick = () => {
     openModal({
       title: 'TrustVault — Engineering Guide',
@@ -683,6 +748,9 @@ export function App() {
           refreshingStatus={refreshingProfile}
           approvalNotice={approvalStatusNotice}
           activeNav={activeNav}
+          onProfileUpdated={() => {
+            fetchVaultDocuments();
+          }}
         />
       ) : activeNav === 'admin' ? (
         <AdminDashboard
@@ -709,21 +777,60 @@ export function App() {
         </div>
       ) : (
         <>
+          {/* Viewer Owner Access Request Feedback Banner */}
+          {ownerRequestNotice.message && (
+            <div
+              className={`viewer-role-banner ${ownerRequestNotice.type === 'success' ? 'viewer-banner-downgraded' : 'viewer-banner-rejected'}`}
+              role="alert"
+              id="owner-request-feedback"
+            >
+              <div className="banner-icon-box">
+                {ownerRequestNotice.type === 'success' ? (
+                  <ShieldCheck size={20} className="text-info" />
+                ) : (
+                  <AlertTriangle size={20} className="text-danger" />
+                )}
+              </div>
+              <div className="banner-content">
+                <div className="banner-title-row">
+                  <strong>{ownerRequestNotice.type === 'success' ? 'Owner Access Request Submitted' : 'Owner Request Notice'}</strong>
+                  <span className={`banner-badge ${ownerRequestNotice.type === 'success' ? 'badge-info' : 'badge-rejected'}`}>
+                    {ownerRequestNotice.type === 'success' ? 'Request Recorded' : 'Action Required'}
+                  </span>
+                </div>
+                <p className="banner-description">{ownerRequestNotice.message}</p>
+              </div>
+              <button
+                type="button"
+                className="banner-refresh-btn"
+                onClick={() => setOwnerRequestNotice({ type: '', message: '' })}
+                aria-label="Dismiss notice"
+              >
+                <span>Dismiss</span>
+              </button>
+            </div>
+          )}
+
           {/* Viewer Account Status Notice Banners */}
           {user.role === 'viewer' && user.ownerApprovalStatus === 'pending' && (
-            <div className="viewer-role-banner viewer-banner-pending" role="status">
+            <div className="viewer-role-banner viewer-banner-pending" role="status" id="viewer-pending-status-banner">
               <div className="banner-icon-box">
                 <Clock size={20} className="text-warning" />
               </div>
               <div className="banner-content">
                 <div className="banner-title-row">
-                  <strong>Document Owner Access Request Pending Administrator Approval</strong>
+                  <strong>Owner access request pending administrator approval.</strong>
                   <span className="banner-badge badge-pending">Under Review</span>
                 </div>
                 <p className="banner-description">
-                  Your request to ingest corporate documents and manage collaborator ACLs was submitted on{' '}
-                  <strong>{new Date(user.ownerApprovalRequestedAt || user.createdAt).toLocaleDateString()}</strong>.
-                  Your account is fully functional with standard Viewer privileges while awaiting Administrator review.
+                  {user.ownerApprovalRequestedAt ? (
+                    <>
+                      Submitted on <strong>{new Date(user.ownerApprovalRequestedAt).toLocaleString()}</strong>.{' '}
+                    </>
+                  ) : (
+                    <>Your request is currently awaiting administrator review.{' '}</>
+                  )}
+                  Your account retains standard Viewer privileges while awaiting Administrator review.
                 </p>
                 {approvalStatusNotice && (
                   <div className="banner-live-notice">{approvalStatusNotice}</div>
@@ -735,6 +842,7 @@ export function App() {
                 onClick={handleCheckApprovalStatus}
                 disabled={refreshingProfile}
                 title="Check if Administrator has approved your Owner access request"
+                id="btn-refresh-approval-status"
               >
                 <RefreshCw size={13} className={refreshingProfile ? 'spinner' : ''} />
                 <span>{refreshingProfile ? 'Checking...' : 'Check Status'}</span>
@@ -743,20 +851,23 @@ export function App() {
           )}
 
           {user.role === 'viewer' && user.ownerApprovalStatus === 'rejected' && (
-            <div className="viewer-role-banner viewer-banner-rejected" role="status">
+            <div className="viewer-role-banner viewer-banner-rejected" role="status" id="viewer-rejected-status-banner">
               <div className="banner-icon-box">
                 <AlertTriangle size={20} className="text-danger" />
               </div>
               <div className="banner-content">
                 <div className="banner-title-row">
-                  <strong>Document Owner Request Reviewed — Retained as Viewer</strong>
+                  <strong>Your Owner access request was declined.</strong>
                   <span className="banner-badge badge-rejected">Request Declined</span>
                 </div>
                 <p className="banner-description">
                   An Administrator reviewed your request for Owner privileges: &quot;
                   <em>{user.roleChangeReason || 'Owner access request rejected by administrator.'}</em>
-                  &quot;. Your account retains full Viewer access to review files shared with you.
+                  &quot;. Your account retains Viewer access to documents shared with you. You may submit another request when ready.
                 </p>
+                {approvalStatusNotice && (
+                  <div className="banner-live-notice">{approvalStatusNotice}</div>
+                )}
               </div>
             </div>
           )}
@@ -786,7 +897,7 @@ export function App() {
                 ? 'My confidential documents'
                 : activeNav === 'shared-with-me'
                 ? 'Documents shared with me'
-                : 'Document overview'
+                : `Welcome back, ${user.name}`
             }
             description={
               activeNav === 'my-documents'
@@ -802,6 +913,10 @@ export function App() {
             onUploadClick={handleUploadClick}
             onViewSharedClick={() => setActiveNav('shared-with-me')}
             isViewer={user.role === 'viewer'}
+            onRequestOwnerAccess={handleRequestOwnerAccess}
+            ownerApprovalStatus={user.ownerApprovalStatus}
+            ownerApprovalRequestedAt={user.ownerApprovalRequestedAt}
+            isSubmittingOwnerRequest={submittingOwnerRequest}
           />
 
           {/* Summary Cards Row */}

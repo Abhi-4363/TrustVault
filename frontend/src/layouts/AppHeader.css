@@ -286,6 +286,10 @@
   }
   .mobile-menu-trigger {
     display: flex;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
   }
   .header-search-wrapper {
     display: none;
@@ -299,4 +303,29 @@
   .api-status-pill {
     display: none;
   }
+  .header-left {
+    gap: var(--space-2);
+  }
 }
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 0 var(--space-3);
+  }
+  .breadcrumb-root,
+  .breadcrumb-separator {
+    display: none;
+  }
+  .breadcrumb-current {
+    font-size: var(--text-xs);
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .profile-dropdown-menu {
+    right: 0;
+    width: min(240px, calc(100vw - 16px));
+  }
+}
+

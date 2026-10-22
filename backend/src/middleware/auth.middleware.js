@@ -76,6 +76,11 @@ export async function requireAuth(req, res, next) {
       mustChangePassword: Boolean(user.mustChangePassword),
       isActive: user.isActive !== false,
       isEmailVerified: user.isEmailVerified !== false,
+      dateOfBirth: user.dateOfBirth || null,
+      termsVersionAccepted: user.termsVersionAccepted || null,
+      privacyVersionAcknowledged: user.privacyVersionAcknowledged || null,
+      termsAcceptedAt: user.termsAcceptedAt || null,
+      termsPolicyEffectiveDate: user.termsPolicyEffectiveDate || null,
       createdAt: user.createdAt,
     };
 

@@ -114,31 +114,43 @@
   font-weight: var(--font-normal);
 }
 
-.input-wrapper {
+.auth-modal .input-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
-.input-icon {
+.auth-modal .input-icon {
   position: absolute;
   left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-muted);
   pointer-events: none;
+  z-index: 2;
 }
 
-.form-input {
+.auth-modal .form-input {
   width: 100%;
-  padding: 10px 12px 10px 38px;
+  padding: 10px 12px 10px 40px !important;
   font-size: var(--text-sm);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   background-color: var(--bg-card);
   color: var(--text-main);
   transition: all var(--transition-fast);
+  box-sizing: border-box;
 }
 
-.form-input:focus {
+.auth-modal .input-wrapper input[type="password"],
+.auth-modal .input-wrapper input#auth-password,
+.auth-modal .input-wrapper input#auth-confirm-password {
+  padding-left: 40px !important;
+  padding-right: 42px !important;
+}
+
+.auth-modal .form-input:focus {
   outline: none;
   border-color: var(--color-primary-500);
   box-shadow: 0 0 0 2px var(--color-primary-100);

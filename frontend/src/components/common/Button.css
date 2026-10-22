@@ -99,3 +99,20 @@
 .btn-icon {
   flex-shrink: 0;
 }
+
+@media (max-width: 640px) {
+  .btn {
+    min-height: 38px;
+  }
+  .btn-sm {
+    min-height: 34px;
+    padding: var(--space-1-5) var(--space-3);
+  }
+  .btn-md {
+    min-height: 42px;
+  }
+  .btn-lg {
+    min-height: 46px;
+  }
+}
+

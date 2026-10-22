@@ -101,6 +101,27 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    dateOfBirth: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    termsVersionAccepted: {
+      type: String,
+      default: null,
+    },
+    privacyVersionAcknowledged: {
+      type: String,
+      default: null,
+    },
+    termsAcceptedAt: {
+      type: Date,
+      default: null,
+    },
+    termsPolicyEffectiveDate: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -158,6 +179,11 @@ class InMemoryUserRepository {
     emailVerificationTokenHash = null,
     emailVerificationExpiresAt = null,
     mustChangePassword = false,
+    dateOfBirth = null,
+    termsVersionAccepted = null,
+    privacyVersionAcknowledged = null,
+    termsAcceptedAt = null,
+    termsPolicyEffectiveDate = null,
   }) {
     const normalizedEmail = email.toLowerCase().trim();
     if (this.users.has(normalizedEmail)) {
@@ -198,6 +224,11 @@ class InMemoryUserRepository {
       emailVerificationExpiresAt,
       mustChangePassword: Boolean(mustChangePassword),
       isActive: isActive !== false,
+      dateOfBirth: dateOfBirth ? String(dateOfBirth).trim() : null,
+      termsVersionAccepted: termsVersionAccepted || null,
+      privacyVersionAcknowledged: privacyVersionAcknowledged || null,
+      termsAcceptedAt: termsAcceptedAt ? new Date(termsAcceptedAt) : null,
+      termsPolicyEffectiveDate: termsPolicyEffectiveDate || null,
       createdAt: new Date(),
       updatedAt: new Date(),
       async comparePassword(candidatePassword) {
@@ -344,6 +375,11 @@ export const User = {
     ownerApprovalReviewedBy = null,
     ownerApprovalReviewedByName = null,
     roleChangeReason = '',
+    dateOfBirth = null,
+    termsVersionAccepted = null,
+    privacyVersionAcknowledged = null,
+    termsAcceptedAt = null,
+    termsPolicyEffectiveDate = null,
   }) {
     // Support seeding a user with a pre‑hashed password (e.g., admin bootstrap).
     // If a passwordHash is provided directly, we skip bcrypt hashing to avoid
@@ -367,6 +403,11 @@ export const User = {
         ownerApprovalReviewedBy,
         ownerApprovalReviewedByName,
         roleChangeReason,
+        dateOfBirth,
+        termsVersionAccepted,
+        privacyVersionAcknowledged,
+        termsAcceptedAt,
+        termsPolicyEffectiveDate,
       });
     }
 
@@ -394,6 +435,11 @@ export const User = {
       ownerApprovalReviewedBy,
       ownerApprovalReviewedByName,
       roleChangeReason,
+      dateOfBirth: dateOfBirth ? String(dateOfBirth).trim() : null,
+      termsVersionAccepted: termsVersionAccepted || null,
+      privacyVersionAcknowledged: privacyVersionAcknowledged || null,
+      termsAcceptedAt: termsAcceptedAt ? new Date(termsAcceptedAt) : null,
+      termsPolicyEffectiveDate: termsPolicyEffectiveDate || null,
     });
 
     await user.save();

@@ -27,9 +27,16 @@ export function AppHeader({
   onOpenLogin,
   onOpenRegister,
   showMenuToggle = true,
+  showSearch,
+  isMobileSidebarOpen = false,
 }) {
   const { user, isAuthenticated, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  // Search bar is only displayed for authenticated vault sessions
+  const isSearchVisible = showSearch !== undefined 
+    ? (showSearch && Boolean(isAuthenticated && user)) 
+    : Boolean(isAuthenticated && user);
 
   const formatRoleLabel = (role) => {
     if (!role) return 'Viewer';
@@ -65,6 +72,8 @@ export function AppHeader({
             className="mobile-menu-trigger"
             onClick={onMenuToggle}
             aria-label="Open mobile navigation menu"
+            aria-expanded={isMobileSidebarOpen}
+            id="mobile-nav-toggle-btn"
           >
             <Menu size={20} />
           </button>
@@ -88,18 +97,21 @@ export function AppHeader({
       </div>
 
       <div className="header-right">
-        {/* Global Quick Search */}
-        <div className="header-search-wrapper">
-          <Search size={15} className="header-search-icon" aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Search vault (Ctrl + K)..."
-            className="header-search-input"
-            onClick={onSearchFocus}
-            readOnly
-            aria-label="Search documents and audit logs"
-          />
-        </div>
+        {/* Global Quick Search - Only rendered on authenticated application pages */}
+        {isSearchVisible && (
+          <div className="header-search-wrapper" id="header-search-wrapper">
+            <Search size={15} className="header-search-icon" aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Search vault (Ctrl + K)..."
+              className="header-search-input"
+              onClick={onSearchFocus}
+              readOnly
+              aria-label="Search documents and audit logs"
+              id="header-vault-search"
+            />
+          </div>
+        )}
 
         {/* Backend API Health Status Indicator */}
         <div 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Key, 
@@ -13,8 +13,12 @@ import {
   Clock, 
   Check, 
   X,
-  RefreshCw
+  RefreshCw,
+  Edit2,
+  Calendar,
+  Loader2
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import './AccountSettings.css';
 
@@ -25,8 +29,11 @@ export function AccountSettings({
   onCheckApprovalStatus, 
   refreshingStatus, 
   approvalNotice,
-  activeNav = 'settings'
+  activeNav = 'settings',
+  onProfileUpdated,
 }) {
+  const { updateProfile } = useAuth();
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -38,6 +45,130 @@ export function AccountSettings({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Profile Edit States
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [isEditingDob, setIsEditingDob] = useState(false);
+  const [editDob, setEditDob] = useState(user?.dateOfBirth || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+
+  useEffect(() => {
+    if (user?.name && !isEditingName) {
+      setEditName(user.name);
+    }
+    if (user?.dateOfBirth && !isEditingDob) {
+      setEditDob(user.dateOfBirth);
+    }
+  }, [user, isEditingName, isEditingDob]);
+
+  const calculateAge = (dobString) => {
+    if (!dobString) return null;
+    const parts = dobString.split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    const birthDate = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (birthDate > today) return -1;
+    let age = now.getFullYear() - year;
+    const m = now.getMonth() - (month - 1);
+    if (m < 0 || (m === 0 && now.getDate() < day)) {
+      age--;
+    }
+    return age;
+  };
+
+  const handleSaveName = async () => {
+    setProfileError('');
+    setProfileSuccess('');
+
+    const trimmed = editName.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setProfileError('Full name is required and must be at least 2 characters.');
+      return;
+    }
+    if (trimmed.length > 50) {
+      setProfileError('Full name cannot exceed 50 characters.');
+      return;
+    }
+    if (/[<>]/.test(trimmed)) {
+      setProfileError('Full name contains invalid characters.');
+      return;
+    }
+
+    if (trimmed === user?.name) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const updated = await updateProfile({ name: trimmed });
+      setProfileSuccess('Profile name updated successfully.');
+      setIsEditingName(false);
+      onProfileUpdated?.(updated);
+    } catch (err) {
+      setProfileError(err.message || 'Failed to update profile name.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleCancelName = () => {
+    setEditName(user?.name || '');
+    setIsEditingName(false);
+    setProfileError('');
+  };
+
+  const handleSaveDob = async () => {
+    setProfileError('');
+    setProfileSuccess('');
+
+    if (!editDob) {
+      setProfileError('Date of birth is required.');
+      return;
+    }
+
+    const age = calculateAge(editDob);
+    if (age === -1) {
+      setProfileError('Date of birth cannot be in the future.');
+      return;
+    }
+    if (age === null || isNaN(age)) {
+      setProfileError('Please provide a valid calendar date of birth.');
+      return;
+    }
+    if (age < 13) {
+      setProfileError('You must be at least 13 years old.');
+      return;
+    }
+
+    if (editDob === user?.dateOfBirth) {
+      setIsEditingDob(false);
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const updated = await updateProfile({ dateOfBirth: editDob });
+      setProfileSuccess('Date of birth updated successfully.');
+      setIsEditingDob(false);
+      onProfileUpdated?.(updated);
+    } catch (err) {
+      setProfileError(err.message || 'Failed to update date of birth.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleCancelDob = () => {
+    setEditDob(user?.dateOfBirth || '');
+    setIsEditingDob(false);
+    setProfileError('');
+  };
 
   // Password rules checks
   const hasMinLength = newPassword.length >= 8;
@@ -137,17 +268,160 @@ export function AccountSettings({
           </div>
 
           <div className="settings-card-body">
+            {profileSuccess && (
+              <div className="profile-alert-banner success" role="alert">
+                <CheckCircle2 size={16} />
+                <span>{profileSuccess}</span>
+              </div>
+            )}
+
+            {profileError && (
+              <div className="profile-alert-banner error" role="alert">
+                <AlertCircle size={16} />
+                <span>{profileError}</span>
+              </div>
+            )}
+
             <div className="profile-details-grid">
-              <div className="profile-field">
+              {/* Full Name with Edit capability */}
+              <div className="profile-field profile-field-editable">
                 <span className="field-label">Full Name</span>
-                <span className="field-value"><strong>{user?.name}</strong></span>
+                {isEditingName ? (
+                  <div className="profile-edit-inline-form">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter full name"
+                      className="form-input profile-inline-input"
+                      disabled={profileSaving}
+                      maxLength={50}
+                      autoFocus
+                    />
+                    <div className="profile-edit-actions">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleSaveName}
+                        disabled={profileSaving}
+                        className="profile-save-btn"
+                      >
+                        {profileSaving ? <Loader2 size={13} className="spinning" /> : <Check size={13} />}
+                        <span>Save</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCancelName}
+                        disabled={profileSaving}
+                        className="profile-cancel-btn"
+                      >
+                        <X size={13} />
+                        <span>Cancel</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="profile-value-with-action">
+                    <span className="field-value profile-name-highlight">
+                      <strong>{user?.name}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      className="profile-field-edit-btn"
+                      onClick={() => {
+                        setEditName(user?.name || '');
+                        setIsEditingName(true);
+                        setProfileError('');
+                        setProfileSuccess('');
+                      }}
+                      title="Edit Full Name"
+                      aria-label="Edit Full Name"
+                    >
+                      <Edit2 size={13} />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* Email Address (Read-only for security) */}
               <div className="profile-field">
                 <span className="field-label">Email Address</span>
-                <span className="field-value"><code>{user?.email}</code></span>
+                <span className="field-value email-value-wrapper">
+                  <code>{user?.email}</code>
+                  <span className="field-pill-readonly" title="Email address cannot be changed directly for security reasons">
+                    <Lock size={10} /> Read-only
+                  </span>
+                </span>
               </div>
 
+              {/* Date of Birth with Edit capability */}
+              <div className="profile-field profile-field-editable">
+                <span className="field-label">Date of Birth</span>
+                {isEditingDob ? (
+                  <div className="profile-edit-inline-form">
+                    <input
+                      type="date"
+                      value={editDob}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setEditDob(e.target.value)}
+                      className="form-input profile-inline-input"
+                      disabled={profileSaving}
+                      autoFocus
+                    />
+                    <div className="profile-edit-actions">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleSaveDob}
+                        disabled={profileSaving}
+                        className="profile-save-btn"
+                      >
+                        {profileSaving ? <Loader2 size={13} className="spinning" /> : <Check size={13} />}
+                        <span>Save</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCancelDob}
+                        disabled={profileSaving}
+                        className="profile-cancel-btn"
+                      >
+                        <X size={13} />
+                        <span>Cancel</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="profile-value-with-action">
+                    <span className="field-value">
+                      {user?.dateOfBirth ? (
+                        <span>{user.dateOfBirth}</span>
+                      ) : (
+                        <span className="text-muted">Not specified</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="profile-field-edit-btn"
+                      onClick={() => {
+                        setEditDob(user?.dateOfBirth || '');
+                        setIsEditingDob(true);
+                        setProfileError('');
+                        setProfileSuccess('');
+                      }}
+                      title="Edit Date of Birth"
+                      aria-label="Edit Date of Birth"
+                    >
+                      <Edit2 size={13} />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Effective Global Role */}
               <div className="profile-field">
                 <span className="field-label">Effective Global Role</span>
                 <span className="field-value">
@@ -155,6 +429,7 @@ export function AccountSettings({
                 </span>
               </div>
 
+              {/* Requested Account Type */}
               <div className="profile-field">
                 <span className="field-label">Requested Account Type</span>
                 <span className="field-value">
@@ -162,6 +437,7 @@ export function AccountSettings({
                 </span>
               </div>
 
+              {/* Owner Approval Status */}
               <div className="profile-field">
                 <span className="field-label">Owner Approval Status</span>
                 <span className="field-value">
@@ -183,10 +459,54 @@ export function AccountSettings({
                 </span>
               </div>
 
+              {/* Account Status */}
               <div className="profile-field">
                 <span className="field-label">Account Status</span>
                 <span className="field-value">
                   <span className="status-badge-active">Active</span>
+                </span>
+              </div>
+
+              {/* Email Verification Status */}
+              <div className="profile-field">
+                <span className="field-label">Email Verification</span>
+                <span className="field-value">
+                  {user?.isEmailVerified !== false ? (
+                    <span className="status-badge-approved">
+                      <Check size={12} /> Verified
+                    </span>
+                  ) : (
+                    <span className="status-badge-pending">
+                      <Clock size={12} /> Pending Verification
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Account Created Date */}
+              <div className="profile-field">
+                <span className="field-label">Account Created</span>
+                <span className="field-value">
+                  {user?.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'N/A'}
+                </span>
+              </div>
+
+              {/* Terms Acceptance Record */}
+              <div className="profile-field">
+                <span className="field-label">Governance & Terms Policy</span>
+                <span className="field-value terms-accepted-record">
+                  <ShieldCheck size={13} className="terms-icon" />
+                  <span>
+                    {user?.termsVersionAccepted ? `Terms v${user.termsVersionAccepted}` : 'Standard Policy'}
+                    {user?.termsAcceptedAt &&
+                      ` (Accepted ${new Date(user.termsAcceptedAt).toLocaleDateString()})`}
+                  </span>
                 </span>
               </div>
             </div>

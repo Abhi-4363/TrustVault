@@ -8,12 +8,15 @@ import {
   register, 
   login, 
   getMe, 
+  getProfile,
+  updateProfile,
   changePassword, 
   resetPassword,
   requestPasswordReset,
   requestEmailPasswordReset,
   verifyEmail,
   resendVerification,
+  requestOwnerAccess,
 } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { 
@@ -47,6 +50,10 @@ router.post('/reset-password-email', passwordResetRateLimiter, resetPassword);
 
 // Protected Identity & Security Endpoints
 router.get('/me', requireAuth, getMe);
+router.get('/profile', requireAuth, getProfile);
+router.put('/profile', requireAuth, authRateLimiter, updateProfile);
+router.patch('/profile', requireAuth, authRateLimiter, updateProfile);
 router.post('/change-password', requireAuth, changePasswordRateLimiter, changePassword);
+router.post('/request-owner-access', requireAuth, authRateLimiter, requestOwnerAccess);
 
 export default router;

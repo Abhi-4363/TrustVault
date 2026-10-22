@@ -14,10 +14,14 @@ import {
   Key,
   Send,
   HelpCircle,
-  UserCog
+  UserCog,
+  Calendar,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
+import TermsAndPrivacyModals from '../legal/TermsAndPrivacyModals';
 import './AuthLandingPortal.css';
 
 export function AuthLandingPortal({ initialMode = 'login' }) {
@@ -28,6 +32,12 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalType, setLegalModalType] = useState('terms'); // 'terms' | 'privacy'
   const [resetToken, setResetToken] = useState('');
   const [requestedRole, setRequestedRole] = useState('viewer'); // 'viewer' | 'owner'
   const [error, setError] = useState('');
@@ -41,6 +51,39 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [devVerifyUrl, setDevVerifyUrl] = useState('');
   const [devResetUrl, setDevResetUrl] = useState('');
+
+  const getTodayMaxDate = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const calculateAge = (dobString) => {
+    if (!dobString) return null;
+    const parts = dobString.split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    const birthDate = new Date(year, month - 1, day);
+    if (
+      birthDate.getFullYear() !== year ||
+      birthDate.getMonth() !== month - 1 ||
+      birthDate.getDate() !== day
+    ) {
+      return null;
+    }
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (birthDate > today) return -1;
+    let age = now.getFullYear() - year;
+    const m = now.getMonth() - (month - 1);
+    if (m < 0 || (m === 0 && now.getDate() < day)) {
+      age--;
+    }
+    return age;
+  };
+
+  const openLegalModal = (type) => {
+    setLegalModalType(type);
+    setLegalModalOpen(true);
+  };
 
   // Check URL parameters on mount for ?verifyToken=... or ?resetToken=...
   useEffect(() => {
@@ -210,6 +253,18 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
         setError('Full name is required (minimum 2 characters).');
         return;
       }
+      if (name.trim().length > 50) {
+        setError('Full name cannot exceed 50 characters.');
+        return;
+      }
+      if (/[<>]/.test(name.trim())) {
+        setError('Full name contains invalid characters.');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setError('Please provide a valid work email address.');
+        return;
+      }
       if (password.length < 8) {
         setError('Password must be at least 8 characters long.');
         return;
@@ -218,12 +273,45 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
         setError('Password must contain at least one letter and one number.');
         return;
       }
+      if (password !== confirmPassword) {
+        setError('Password and confirmation password do not match.');
+        return;
+      }
+      if (!dateOfBirth) {
+        setError('Date of birth is required.');
+        return;
+      }
+      const age = calculateAge(dateOfBirth);
+      if (age === -1) {
+        setError('Date of birth cannot be in the future.');
+        return;
+      }
+      if (age === null || isNaN(age)) {
+        setError('Please provide a valid calendar date of birth.');
+        return;
+      }
+      if (age < 13) {
+        setError('You must be at least 13 years old to register for TrustVault.');
+        return;
+      }
+      if (!termsAccepted) {
+        setError('You must agree to the Terms & Conditions and acknowledge the Privacy Policy to create an account.');
+        return;
+      }
     }
 
     setLoading(true);
     try {
       if (mode === 'register') {
-        const regResult = await register(name.trim(), email.trim(), password, requestedRole);
+        const regResult = await register({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          confirmPassword,
+          dateOfBirth,
+          termsAccepted: true,
+          requestedRole,
+        });
         if (regResult.isEmailVerified === false) {
           setUnverifiedEmail(email.trim());
           if (regResult.devVerifyUrl) {
@@ -634,113 +722,242 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                       </div>
                     </div>
 
-                    {mode !== 'forgot' && mode !== 'resend' && (
+                    {mode === 'register' && (
                       <div className="form-group">
                         <div className="label-row">
-                          <label htmlFor="portal-password" className="form-label">
-                            Password <span className="required-star">*</span>
+                          <label htmlFor="portal-dob" className="form-label">
+                            Date of Birth <span className="required-star">*</span>
                           </label>
-                          {mode === 'register' && (
-                            <span className="label-hint">Min 8 chars (letters & numbers)</span>
-                          )}
+                          <span className="label-hint">Minimum age: 13</span>
                         </div>
                         <div className="input-with-icon">
-                          <Lock size={16} className="field-icon" aria-hidden="true" />
+                          <Calendar size={16} className="field-icon" aria-hidden="true" />
                           <input
-                            id="portal-password"
-                            type="password"
+                            id="portal-dob"
+                            type="date"
                             required
-                            placeholder="••••••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            max={getTodayMaxDate()}
+                            value={dateOfBirth}
+                            onChange={(e) => setDateOfBirth(e.target.value)}
                             className="form-input"
                             disabled={loading}
-                            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                           />
                         </div>
-                        {mode === 'login' && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => switchMode('forgot')}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--color-primary-600)',
-                                fontSize: '11.5px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: 0,
-                              }}
-                            >
-                              Forgot Password?
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => switchMode('resend')}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--text-muted, #94a3b8)',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                padding: 0,
-                              }}
-                            >
-                              Verify email / Resend?
-                            </button>
-                          </div>
-                        )}
+                        <p className="field-subtext">
+                          TrustVault requires users to be at least 13 years old to register.
+                        </p>
                       </div>
                     )}
 
-                    {mode === 'register' && (
-                      <div className="form-group role-selector-group">
-                        <label className="form-label">
-                          Requested Account Type <span className="required-star">*</span>
-                        </label>
-                        <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
-                          <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
+                    {mode !== 'forgot' && mode !== 'resend' && (
+                      <>
+                        <div className="form-group">
+                          <div className="label-row">
+                            <label htmlFor="portal-password" className="form-label">
+                              Password <span className="required-star">*</span>
+                            </label>
+                            {mode === 'register' && (
+                              <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                            )}
+                          </div>
+                          <div className="input-with-icon password-input-wrapper">
+                            <Lock size={16} className="field-icon" aria-hidden="true" />
                             <input
-                              type="radio"
-                              name="requestedRole"
-                              value="viewer"
-                              checked={requestedRole === 'viewer'}
-                              onChange={() => setRequestedRole('viewer')}
-                              className="sr-only"
+                              id="portal-password"
+                              type={showPassword ? 'text' : 'password'}
+                              required
+                              placeholder="••••••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              className="form-input"
+                              disabled={loading}
+                              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                             />
-                            <div className="type-card-content">
-                              <div className="type-card-header">
-                                <span className="type-card-title">Viewer</span>
-                                <span className="type-card-badge badge-viewer">Standard Access</span>
-                              </div>
-                              <p className="type-card-desc">
-                                Read documents shared with you. Ready upon email verification.
-                              </p>
+                            <button
+                              type="button"
+                              className="password-toggle-btn"
+                              onClick={() => setShowPassword(!showPassword)}
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                              tabIndex={-1}
+                            >
+                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+                          {mode === 'login' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => switchMode('forgot')}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--color-primary-600)',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                Forgot Password?
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => switchMode('resend')}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--text-muted, #94a3b8)',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                Verify email / Resend?
+                              </button>
                             </div>
-                          </label>
+                          )}
+                        </div>
 
-                          <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
-                            <input
-                              type="radio"
-                              name="requestedRole"
-                              value="owner"
-                              checked={requestedRole === 'owner'}
-                              onChange={() => setRequestedRole('owner')}
-                              className="sr-only"
-                            />
-                            <div className="type-card-content">
-                              <div className="type-card-header">
-                                <span className="type-card-title">Document Owner</span>
-                                <span className="type-card-badge badge-owner">Requires Approval</span>
+                        {mode === 'register' && (
+                          <>
+                            <div className="form-group">
+                              <label htmlFor="portal-confirm-password" className="form-label">
+                                Confirm Password <span className="required-star">*</span>
+                              </label>
+                              <div className="input-with-icon password-input-wrapper">
+                                <Lock size={16} className="field-icon" aria-hidden="true" />
+                                <input
+                                  id="portal-confirm-password"
+                                  type={showConfirmPassword ? 'text' : 'password'}
+                                  required
+                                  placeholder="Re-enter your password..."
+                                  value={confirmPassword}
+                                  onChange={(e) => setConfirmPassword(e.target.value)}
+                                  className="form-input"
+                                  disabled={loading}
+                                  autoComplete="new-password"
+                                />
+                                <button
+                                  type="button"
+                                  className="password-toggle-btn"
+                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                                  tabIndex={-1}
+                                >
+                                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                               </div>
-                              <p className="type-card-desc">
-                                Upload confidential files and manage collaborator ACLs. Requires Admin approval.
-                              </p>
                             </div>
+
+                            <div className="password-rules-callout" aria-live="polite">
+                              <span className="password-rules-title">Password requirements:</span>
+                              <div className="password-rules-grid">
+                                <span className={`rule-chip ${password.length >= 8 ? 'met' : ''}`}>
+                                  {password.length >= 8 ? '✓' : '•'} 8+ characters
+                                </span>
+                                <span className={`rule-chip ${/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password) ? 'met' : ''}`}>
+                                  {/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password) ? '✓' : '•'} Letters &amp; numbers
+                                </span>
+                                <span className={`rule-chip ${confirmPassword && password === confirmPassword ? 'met' : ''}`}>
+                                  {confirmPassword && password === confirmPassword ? '✓' : '•'} Passwords match
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {mode === 'register' && (
+                      <>
+                        <div className="form-group role-selector-group">
+                          <label className="form-label">
+                            Requested Account Type <span className="required-star">*</span>
+                          </label>
+                          <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
+                            <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
+                              <input
+                                type="radio"
+                                name="requestedRole"
+                                value="viewer"
+                                checked={requestedRole === 'viewer'}
+                                onChange={() => setRequestedRole('viewer')}
+                                className="sr-only"
+                              />
+                              <div className="type-card-content">
+                                <div className="type-card-header">
+                                  <span className="type-card-title">Viewer</span>
+                                  <span className="type-card-badge badge-viewer">Standard Access</span>
+                                </div>
+                                <p className="type-card-desc">
+                                  Read documents shared with you. Ready upon email verification.
+                                </p>
+                              </div>
+                            </label>
+
+                            <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
+                              <input
+                                type="radio"
+                                name="requestedRole"
+                                value="owner"
+                                checked={requestedRole === 'owner'}
+                                onChange={() => setRequestedRole('owner')}
+                                className="sr-only"
+                              />
+                              <div className="type-card-content">
+                                <div className="type-card-header">
+                                  <span className="type-card-title">Document Owner</span>
+                                  <span className="type-card-badge badge-owner">Requires Approval</span>
+                                </div>
+                                <p className="type-card-desc">
+                                  Upload confidential files and manage collaborator ACLs. Requires Admin approval.
+                                </p>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="form-group terms-checkbox-group">
+                          <label className="terms-checkbox-label" htmlFor="portal-terms-checkbox">
+                            <input
+                              id="portal-terms-checkbox"
+                              type="checkbox"
+                              checked={termsAccepted}
+                              onChange={(e) => setTermsAccepted(e.target.checked)}
+                              className="terms-checkbox-input"
+                              disabled={loading}
+                              required
+                            />
+                            <span className="terms-checkbox-text">
+                              I agree to the{' '}
+                              <button
+                                type="button"
+                                className="legal-link-btn"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openLegalModal('terms');
+                                }}
+                              >
+                                Terms &amp; Conditions
+                              </button>{' '}
+                              and acknowledge the{' '}
+                              <button
+                                type="button"
+                                className="legal-link-btn"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openLegalModal('privacy');
+                                }}
+                              >
+                                Privacy Policy
+                              </button>
+                              . <span className="required-star">*</span>
+                            </span>
                           </label>
                         </div>
-                      </div>
+                      </>
                     )}
                   </>
                 )}
@@ -921,6 +1138,14 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
         </div>
 
       </div>
+
+      {/* Terms & Conditions and Privacy Policy Dialog */}
+      <TermsAndPrivacyModals
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        type={legalModalType}
+        onSwitchType={setLegalModalType}
+      />
     </div>
   );
 }

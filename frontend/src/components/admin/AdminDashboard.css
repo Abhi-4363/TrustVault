@@ -613,7 +613,9 @@
 }
 
 .user-search-input {
-  min-width: 320px;
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
 }
 
 .user-search-input input {
@@ -1019,7 +1021,10 @@
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
   width: 100%;
-  max-width: 520px;
+  max-width: min(520px, calc(100vw - 20px));
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   animation: scaleIn 0.2s ease-out;
 }
@@ -1070,6 +1075,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  overflow-y: auto;
 }
 
 .modal-guarantee-box {
@@ -1433,4 +1439,238 @@
 .btn-action-approve:hover {
   background-color: #15803d;
 }
+
+/* ==============================================================================
+   Admin Dashboard Responsive Styles
+   ============================================================================== */
+
+@media (max-width: 900px) {
+  .admin-nav-tabs-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .admin-nav-tabs {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .admin-tab-btn {
+    flex: 1 1 calc(50% - var(--space-2));
+    justify-content: center;
+    min-height: 40px;
+    text-align: center;
+  }
+
+  .admin-refresh-btn {
+    align-self: flex-end;
+    min-height: 36px;
+  }
+
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-analytics-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .notif-header-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+}
+
+@media (max-width: 768px) {
+  .audit-controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .audit-filters-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .filter-input-wrap {
+    width: 100%;
+  }
+
+  .filter-input-wrap select,
+  .filter-input-wrap input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .audit-export-group {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .audit-export-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 38px;
+  }
+
+  .admin-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-data-table {
+    min-width: 650px;
+  }
+
+  .pending-requests-table-wrap {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-lg);
+  }
+
+  .pending-data-table {
+    min-width: 600px;
+  }
+
+  .users-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .user-search-input {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .user-search-input input {
+    height: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-stats-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .admin-tab-btn {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .notif-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .notif-meta-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .notif-user-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .notif-user-email {
+    word-break: break-all;
+  }
+
+  .notif-card-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .notif-card-actions button,
+  .notif-card-actions > * {
+    width: 100%;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  .notif-filters-toolbar {
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .notif-filter-pill {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-governance-container {
+    gap: var(--space-4);
+  }
+
+  .admin-tab-btn {
+    font-size: var(--text-xs);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .admin-stat-card {
+    padding: var(--space-4);
+  }
+
+  .admin-panel-card {
+    padding: var(--space-4);
+  }
+
+  .admin-modal-backdrop {
+    padding: var(--space-2);
+  }
+
+  .admin-modal-card {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-modal-header {
+    padding: var(--space-4);
+  }
+
+  .admin-modal-body {
+    padding: var(--space-4);
+  }
+
+  .admin-modal-footer {
+    padding: var(--space-3) var(--space-4);
+    flex-direction: column-reverse;
+    gap: var(--space-2);
+  }
+
+  .admin-modal-footer button,
+  .admin-modal-footer > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pending-requests-card {
+    padding: var(--space-4);
+  }
+
+  .notif-card {
+    padding: var(--space-3) var(--space-3-5, 14px);
+  }
+}
+
 

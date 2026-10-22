@@ -3,8 +3,8 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-217%20passed-brightgreen.svg)]()
-[![Security](https://img.shields.io/badge/threats%20mitigated-24%2F24%20verified-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-246%20passed-brightgreen.svg)]()
+[![Security](https://img.shields.io/badge/threats%20mitigated-28%2F28%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
 
@@ -331,6 +331,58 @@ To enable real transactional email delivery using your Gmail account:
 
 ---
 
+## 10. Registration, Terms & Conditions, Date of Birth & User Profile Architecture
+
+TrustVault incorporates an enterprise identity registration and self-service profile lifecycle designed around strict input validation, legal compliance versioning, and zero privilege escalation.
+
+### 1. Sign-Up Form Specification & Layout
+The public registration form presents fields in the following deliberate sequence:
+1. **Full Name**: Required, trimmed of leading/trailing whitespace, minimum 2 to 50 characters. Validates against XSS patterns while permitting international Unicode names, spaces, hyphens, and apostrophes.
+2. **Work Email Address**: Required, RFC-5322 format validated on both frontend and backend, normalized to lowercase, guarded by database uniqueness.
+3. **Date of Birth**: Positioned immediately above the password fields. Native touch-friendly date picker with `max` bounded to the current date.
+4. **Password & Confirm Password**: Visibility toggle (`Eye`/`EyeOff`), live checklist chips verifying requirements (8+ chars, letters & numbers, confirmation match). Hashed with 12 bcrypt salt rounds; raw passwords never logged or persisted.
+5. **Requested Account Role**: Selection between `Viewer` (standard read access upon email verification) and `Document Owner` (requires Admin review before file uploads are permitted).
+6. **Terms & Conditions Acceptance Checkbox**: Must be actively checked before submission (`[ ] I agree to the Terms & Conditions and acknowledge the Privacy Policy.`). Checkbox contains independent clickable links opening accessible legal modals without toggling the checkbox or resetting form data.
+7. **Create Account Button**: Disabled during submission with an inline spinner to prevent double-submits.
+8. **Sign In Link**: Effortless switching back to the authentication screen for existing users.
+
+### 2. Date of Birth Policy & Minimum Age Enforcement
+- **Configurable Age Policy**: Enforces a minimum age policy (configurable via `config.auth.minAge`, defaulting to **13 years old**).
+- **Exact Age Calculation**: Calculates age by taking into account the exact birth year, month, and day rather than merely subtracting birth year from current year.
+- **Strict Calendar Validation**: Rejects malformed dates (e.g. February 30th, April 31st), leap year anomalies, and future dates on both client and server.
+- **Timezone Drift Defense**: Persisted consistently as a date-only string in `YYYY-MM-DD` format (ISO 8601 calendar date), preventing UTC timezone shifts from altering the user's displayed birthday.
+- **Privacy Enforcement**: Date of birth is excluded from audit ledgers to protect sensitive PII.
+
+### 3. Terms & Conditions and Privacy Policy Versioning
+- **Version Tracking**:
+  - `CURRENT_TERMS_VERSION = '1.0.0'`
+  - `CURRENT_PRIVACY_VERSION = '1.0.0'`
+  - `TERMS_POLICY_EFFECTIVE_DATE = '2026-10-22'`
+- **Auditable Server Timestamp**: The user model records `termsVersionAccepted`, `privacyVersionAcknowledged`, `termsPolicyEffectiveDate`, and a strictly server-generated timestamp `termsAcceptedAt`. Client-supplied timestamps are never trusted.
+- **15-Section Terms of Service**: Covers eligibility, document ownership, authorized use, prohibited content, collaborator permissions, access revocation, audit logs, security incident reporting, and account termination.
+- **11-Section Privacy Policy**: Transparently discloses registration data collected, document metadata, audit logging, security controls, retention policies, and user data correction rights.
+- **Modal Accessibility**: Dedicated accessible modal dialog with tab switching, keyboard navigation, `Escape` key dismissal, focus trapping, and scrollable responsive viewport.
+
+### 4. Editable User Profile & Immediate Name Synchronization
+- **Profile View**: Displays user's full name with a prominent `[Edit]` button, email address (read-only with security lock badge), account role badge, approval status, date of birth with `[Edit]` button, email verification badge, terms version accepted (`v1.0.0`), and account creation timestamp.
+- **Self-Service Editing**: Users can edit their display name and date of birth inline or in a dialog with Save/Cancel controls, frontend validation, server-side validation, and instant visual feedback.
+- **Mass Assignment Protection**: Attempts to alter `role`, `isAdmin`, `isEmailVerified`, or permissions via `PUT /api/auth/profile` are strictly rejected or stripped.
+- **Cross-Collection Name Propagation**:
+  When a user saves a new name, the backend atomically updates:
+  1. The primary user identity record (`User.name`).
+  2. All document records owned by the user (`Document.ownerName`).
+  3. All collaborator entries where the user appears in permission lists (`Document.acl[].name`).
+  4. Pending admin notification center cards (`AdminNotification.userName`).
+  5. Active password reset requests (`PasswordResetRequest.userName`).
+  6. Emits an immutable `PROFILE_UPDATED` audit record noting the actor ID, affected user ID, and modified field names (`changedFields: ['name']`) while keeping historical audit log snapshots intact.
+- **Client Synchronization**: The frontend updates React authentication context immediately, updating the AppHeader avatar initials, user dropdown menu, overview welcome banner (`Welcome back, <Name>`), and profile display without requiring a page refresh or re-login.
+
+### 5. Transparent Limitations & Legal Placeholders
+- **Compliance Scope**: Collecting a date of birth and recording terms acceptance satisfies application policy requirements but does not by itself certify compliance with every global jurisdiction (e.g. COPPA, GDPR, CCPA).
+- **Placeholders**: Corporate entity registration details, physical headquarters address, and official legal counsel contact email are marked with explicit placeholders (`[TrustVault Legal Entity Placeholder]`, `legal@trustvault.internal`) pending formal corporate formation.
+
+---
+
 ## 11. Evaluator Interactive Walkthrough Guide
 
 To experience all enterprise security capabilities in the live browser:
@@ -388,8 +440,28 @@ To experience all enterprise security capabilities in the live browser:
 
 ---
 
-## 12. License & Submission Metadata
+---
 
-- **Author**: Snovasys Fresher Challenge 2026
+## 12. Submission Deliverables & Documentation Index
+
+All required hiring challenge deliverables are documented in full detail:
+
+| Document | Purpose & Description |
+| :--- | :--- |
+| **[`TECHNICAL_WRITEUP.md`](file:///c:/TrustVault/TECHNICAL_WRITEUP.md)** | Architectural deep-dive: permission model rationale, private storage quarantine, revocation mechanics, AI collaboration review, and deliberate omissions. |
+| **[`DEMO_SCRIPT.md`](file:///c:/TrustVault/DEMO_SCRIPT.md)** | Minute-by-minute 5-minute video demonstration walkthrough script, click actions, and recording checklist. |
+| **[`THREATS.md`](file:///c:/TrustVault/THREATS.md)** | Complete threat model catalog covering 28 security attack vectors, code mitigations, and automated test citations. |
+| **[`PROMPTS.md`](file:///c:/TrustVault/PROMPTS.md)** | Dated chronological prompt and development audit log with 18 entries, AI mistakes identified during review, corrections, and commit references. |
+| **[`docs/API_DOCUMENTATION.md`](file:///c:/TrustVault/docs/API_DOCUMENTATION.md)** | Exhaustive REST API specification documenting all endpoints, RBAC permissions, JSON request/response formats, and error codes. |
+| **[`docs/DEPLOYMENT.md`](file:///c:/TrustVault/docs/DEPLOYMENT.md)** | Clean-clone quickstart instructions, environment configuration, database seeding, and production cloud deployment on Render. |
+
+---
+
+## 13. License & Submission Metadata
+
+- **Author**: Snovasys Fresher Challenge 2026 Candidate
 - **Architecture**: Zero-Trust Document Security & Governance
 - **Repository**: [https://github.com/Abhi-4363/TrustVault](https://github.com/Abhi-4363/TrustVault)
+- **Automated Test Results**: 16 test files passed, 246/246 tests passing (100% pass rate)
+- **Production Build**: 0 errors, Vite 6 production bundle verified
+

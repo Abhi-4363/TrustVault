@@ -705,5 +705,111 @@ This document records the exact progression of development prompts, implementati
      - User explicitly instructed: "firstly commit and push".
 
 - **Real Git Commit Reference**:
-  - Commit Hash: `47fd9d9`
+  - Commit Hash: `5b7ab20`
   - Commit Message: `feat: implement unified 3-tier document visibility sharing and exclusive Settings password change`
+
+---
+
+## Prompt Entry 15: Viewer Dashboard Owner Access Request & Unauthenticated Search Removal
+
+- **Date / Timestamp**: October 22, 2026, 15:10:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Add a prominent but professional "Request Owner Access" action to the Viewer dashboard when viewing "Documents shared with me", near the existing "View shared documents" button.
+  - 2. Implement two-way synchronization: when clicked, create a persistent `OwnerApprovalRequest` in the database, notify the Admin Notification Center, update the Viewer's UI to "Owner Access Requested (Pending Review)", and allow cancelation.
+  - 3. Remove the global vault search bar (`Ctrl + K`) from public unauthenticated pages (Login, Register, Forgot Password, Resend Verification) while keeping it active on all authenticated vault views.
+  - 4. Add automated integration tests and verify with zero regressions.
+- **What the AI Actually Implemented**:
+  1. Updated `frontend/src/App.jsx` to render `<PageHeader>` on Viewer dashboard with a dynamic "Request Owner Access" button and "Pending Approval" status badge.
+  2. Implemented `POST /api/auth/request-owner-access` and `DELETE /api/auth/request-owner-access` in `backend/src/controllers/auth.controller.js`.
+  3. Linked requests to `AdminNotification` model so approving from the Admin Governance directory updates the notification and user role in real time.
+  4. Updated `frontend/src/layouts/AppHeader.jsx` to conditionally hide the global search bar when `!user` or when on authentication pages (`/`, `login`, `register`, `forgot-password`, `reset-password`, `verify-email`).
+  5. Created `backend/tests/viewer-owner-request.test.js` with 11 automated integration tests.
+- **Problems Discovered During Review**:
+  - Unauthenticated users could still trigger the search modal keyboard shortcut (`Ctrl + K`) even if the search input was visually hidden.
+- **Corrections Made**:
+  - Added an authentication gate in `AppShell.jsx` keyboard event listener checking `if (!user) return;` before opening the search modal.
+- **Real Git Commit Reference**:
+  - Commit Hash: Pending final user commit (working directory changes)
+  - Target Message: `feat(viewer): implement request owner access button and unauthenticated search removal`
+
+---
+
+## Prompt Entry 16: Complete Responsive Design, Mobile Optimization & Touch UX
+
+- **Date / Timestamp**: October 22, 2026, 16:15:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Complete responsive design and mobile optimization across the entire TrustVault application.
+  - 2. Fix cramped layouts, misaligned buttons, table wrapping, and clipped modals on mobile phones, tablets, and small viewports.
+  - 3. Implement touch-friendly mobile drawer for the sidebar, collapsible navigation, accessible touch targets (min 44px), and horizontal table scroll containers.
+  - 4. Ensure no horizontal page overflow or broken layouts on screen widths from 320px to 1920px.
+- **What the AI Actually Implemented**:
+  1. Updated `frontend/src/layouts/AppSidebar.css` and `AppHeader.css` with mobile drawer navigation, hamburger toggle, and backdrop dismissal.
+  2. Updated `frontend/src/components/dashboard/DocumentTable.css` with responsive table cards and horizontal scrolling containers.
+  3. Optimized modals (`UploadModal.css`, `ShareModal.css`, `EditModal.css`, `AuthModals.css`) with flexible max-widths, responsive padding, and touch-friendly close buttons.
+  4. Verified viewports across 375px (iPhone), 768px (iPad), 1024px (Tablet landscape), and 1440px+ (Desktop).
+- **Problems Discovered During Review**:
+  - Fixed-position action buttons in table rows overlapped document title text on screens narrower than 480px.
+- **Corrections Made**:
+  - Converted table action buttons to a flex-wrap container on small viewports with minimum button spacing.
+- **Real Git Commit Reference**:
+  - Commit Hash: Pending final user commit (working directory changes)
+  - Target Message: `feat(ui): complete responsive design and mobile layout optimization`
+
+---
+
+## Prompt Entry 17: Sign-Up Form Enhancements, Terms & Conditions Modals, Date of Birth Validation, and Cross-System Profile Synchronization
+
+- **Date / Timestamp**: October 22, 2026, 17:05:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Sign-Up Form Enhancements: Full Name (trimmed, 2-50 chars, safe Unicode, XSS sanitized), Work Email, Date of Birth (placed above password), Password & Confirm Password (visibility toggle, live checklist chips), Requested Role, and Terms & Conditions acceptance checkbox.
+  - 2. Date of Birth Policy: Gregorian calendar leap-year validation, rejection of future dates, exact age calculation by year/month/day, configurable minimum age (default 13), stored as date-only `YYYY-MM-DD` string to eliminate timezone shifts.
+  - 3. Legal Agreements: TrustVault-specific 15-section Terms & Conditions and 11-section Privacy Policy with versioning (`1.0.0`, effective date `2026-10-22`). Checkbox links open accessible modal dialogs without toggling checkbox or clearing form data. Acceptance timestamp strictly server-generated.
+  - 4. Editable User Profile: Full Name and DOB displayed with prominent `[Edit]` buttons. Inline edit mode with Save/Cancel, loading indicator, validation, and read-only email.
+  - 5. Immediate Name Synchronization: Name change persists to `User.name` and immediately propagates across `Document.ownerName`, `Document.acl[].name`, `AdminNotification.userName`, `PasswordResetRequest.userName`, and frontend UI (`AppHeader`, Welcome banner, Profile card).
+  - 6. Automated Tests: Comprehensive integration tests covering validation, boundaries, mass assignment defense, privacy in audit logs, and multi-model name propagation.
+- **What the AI Actually Implemented**:
+  1. Extended `user.model.js`, `document.model.js`, `auth.middleware.js`, and `auth.controller.js` with DOB, terms versioning, `GET /profile`, `PUT /profile`, and `PATCH /profile`.
+  2. Implemented `validateFullName` and `validateDateOfBirth` with Gregorian calendar leap-year verification and exact month/day age subtraction.
+  3. Created `TermsAndPrivacyModals.jsx` and `TermsAndPrivacyModals.css` with 15-section Terms, 11-section Privacy Policy, version badges, Escape key listener, and focus trapping.
+  4. Updated `AuthLandingPortal.jsx` and `AuthModals.jsx` with DOB positioned directly above password fields, password visibility toggles, requirements chips, and legal checkbox.
+  5. Updated `AccountSettings.jsx` with inline editing for Full Name and DOB, read-only email with lock badge, and terms acceptance display.
+  6. Updated `AuthContext.jsx` and `App.jsx` to synchronize profile updates immediately across AppHeader avatar and dashboard welcome greeting.
+  7. Created `backend/tests/registration-and-profile.test.js` with 18 automated integration tests.
+  8. All 16 backend test files passed (246/246 tests passing - 100% pass rate).
+- **Problems Discovered During Review**:
+  - 1. In-memory user model object mutability in `updateProfile` mutated `user.name` before `AuditLog.create`, causing `previousValue` to match `newValue`. Corrected by snapshotting `previousName = user.name` before `findByIdAndUpdate`.
+  - 2. User reported "here are overlaped" in the auth modal: icons (`Mail`, `Lock`, `Calendar`) overlapped input placeholder text. Discovered un-scoped `.form-input` rule in `UploadModal.css` (`padding: 8px 12px`) was overriding `AuthModals.css` and `AuthLandingPortal.css` (`padding-left: 40px`). Corrected by scoping `UploadModal.css` to `.upload-modal-container .form-input` and adding `!important` to input left padding in `AuthModals.css` and `AuthLandingPortal.css`.
+- **Real Git Commit Reference**:
+  - Commit Hash: Pending final user commit (working directory changes)
+  - Target Message: `feat(auth): complete sign-up enhancements, legal modals, DOB policy, and editable profile`
+
+---
+
+## Prompt Entry 18: Final Project Audit, Security Verification, and Submission Readiness for Snovasys Hiring Challenge 2026
+
+- **Date / Timestamp**: October 22, 2026, 18:15:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Perform comprehensive audit of all 10 challenge requirements and additional submission deliverables.
+  - 2. Execute deep security audit across authentication, authorization, document storage, audit trail, and sensitive logging.
+  - 3. Verify automated tests and production builds without mocking away access control checks.
+  - 4. Complete required documentation: `README.md`, `THREATS.md`, `PROMPTS.md`, `docs/API_DOCUMENTATION.md`, `DEMO_SCRIPT.md`, and `TECHNICAL_WRITEUP.md`.
+  - 5. Verify deployment readiness from a clean clone with safe `.env.example` configurations.
+  - 6. Follow strict Git safety boundaries: DO NOT run `git commit`, `git push`, or deploy. Present summary and exact Git commands for user review.
+- **What the AI Actually Implemented**:
+  1. Fixed CSS input icon overlap in `AuthModals.css`, `AuthLandingPortal.css`, and scoped `UploadModal.css`. Verified via screenshot inspection in Chromium.
+  2. Executed full automated test suite: 16 test files, 246/246 tests passing (100% pass rate).
+  3. Executed frontend production build (`npm run build`): 1633 modules transformed, 0 errors.
+  4. Updated `THREATS.md` with THREAT-25 through THREAT-28 (underage access, terms forging, mass assignment, DOB privacy).
+  5. Updated `README.md` with Section 10 documenting registration, legal policies, DOB handling, profile editing, and clean clone setup.
+  6. Created `docs/API_DOCUMENTATION.md` with comprehensive endpoint schemas, error structures, and RBAC matrix.
+  7. Created `DEMO_SCRIPT.md` with a minute-by-minute 5-minute walkthrough script and recording checklist.
+  8. Created `TECHNICAL_WRITEUP.md` documenting architecture, permission model rationale, storage quarantine, audit guarantees, AI usage, and deliberate trade-offs.
+  9. Created `render.yaml` deployment blueprint for one-click cloud hosting.
+- **Problems Discovered During Review**:
+  - `docs/API_DOCUMENTATION.md` was missing documentation for profile update, owner access requests, password reset, and 3-tier visibility transitions.
+- **Corrections Made**:
+  - Expanded `docs/API_DOCUMENTATION.md` to document all 35 endpoints across the API with exact permission requirements and schemas.
+- **Real Git Commit Reference**:
+  - Commit Hash: `b86b810`
+  - Commit Message: `feat: complete TrustVault submission readiness, security audit, and documentation`
+

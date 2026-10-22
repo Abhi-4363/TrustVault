@@ -222,6 +222,7 @@
 
   .viewer-role-banner {
     flex-direction: column;
+    padding: var(--space-3) var(--space-4);
   }
 
   .viewer-role-banner .banner-refresh-btn {
@@ -229,3 +230,23 @@
     margin-top: 4px;
   }
 }
+
+@media (max-width: 440px) {
+  .viewer-role-banner .banner-title-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .viewer-role-banner .banner-refresh-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 38px;
+  }
+
+  .modal-meta-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+

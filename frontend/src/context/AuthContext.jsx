@@ -86,25 +86,47 @@ export function AuthProvider({ children }) {
   };
 
   // Register new account
-  const register = async (name, email, password, requestedRole = 'viewer') => {
+  const register = async (nameOrData, email, password, requestedRole = 'viewer', dateOfBirth, termsAccepted, confirmPassword) => {
+    let payload;
+    if (typeof nameOrData === 'object' && nameOrData !== null) {
+      payload = {
+        name: nameOrData.name,
+        email: nameOrData.email,
+        password: nameOrData.password,
+        confirmPassword: nameOrData.confirmPassword,
+        dateOfBirth: nameOrData.dateOfBirth,
+        termsAccepted: Boolean(nameOrData.termsAccepted),
+        requestedRole: nameOrData.requestedRole || 'viewer',
+        accountType: nameOrData.requestedRole || 'viewer',
+      };
+    } else {
+      payload = {
+        name: nameOrData,
+        email,
+        password,
+        confirmPassword,
+        dateOfBirth,
+        termsAccepted: Boolean(termsAccepted),
+        requestedRole,
+        accountType: requestedRole,
+      };
+    }
+
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        requestedRole,
-        accountType: requestedRole,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Registration failed');
+      const err = new Error(data.error?.message || 'Registration failed');
+      err.code = data.error?.code;
+      err.details = data.error;
+      throw err;
     }
 
     const { user: newUser, token: newToken, isEmailVerified } = data.data;
@@ -123,6 +145,45 @@ export function AuthProvider({ children }) {
       devVerifyUrl: data.data?.devVerifyUrl,
       message: data.message 
     };
+  };
+
+  // Update authenticated user profile (name, dateOfBirth)
+  const updateProfile = async (profileData) => {
+    if (!token) throw new Error('Authentication required.');
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const err = new Error(data.error?.message || 'Failed to update profile.');
+      err.code = data.error?.code;
+      err.details = data.error;
+      throw err;
+    }
+
+    const updatedUser = data.data.user;
+    setUser(updatedUser);
+    return updatedUser;
+  };
+
+  // Fetch fresh profile details from /api/auth/profile
+  const fetchProfile = async () => {
+    if (!token) return null;
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setUser(data.data.user);
+      return data.data.user;
+    }
+    return null;
   };
 
   // Log in with existing credentials
@@ -157,6 +218,30 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Request Document Owner access for the currently authenticated Viewer
+  const requestOwnerAccess = async () => {
+    if (!token) throw new Error('Authentication required.');
+    const response = await fetch(`${API_BASE_URL}/auth/request-owner-access`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const err = new Error(data.error?.message || 'Failed to submit Owner access request.');
+      err.code = data.error?.code;
+      err.details = data.error;
+      throw err;
+    }
+
+    // Refresh profile to reflect pending state
+    await refreshProfile();
+    return data;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -170,6 +255,9 @@ export function AuthProvider({ children }) {
         setSession,
         verifyEmailToken,
         refreshProfile,
+        fetchProfile,
+        updateProfile,
+        requestOwnerAccess,
       }}
     >
       {children}

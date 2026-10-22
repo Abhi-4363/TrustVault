@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
+import { TermsAndPrivacyModals } from '../legal/TermsAndPrivacyModals';
 import './AuthModals.css';
 
 export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
@@ -9,11 +10,18 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [requestedRole, setRequestedRole] = useState('viewer');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
   const [forgotNotice, setForgotNotice] = useState('');
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalType, setLegalModalType] = useState('terms');
 
   const { login, register } = useAuth();
 
@@ -54,8 +62,25 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
     try {
       if (mode === 'register') {
         if (!name.trim()) throw new Error('Please enter your full name');
+        if (!dateOfBirth) throw new Error('Date of birth is required');
+
+        // Age check: minimum 13
+        const birthDate = new Date(dateOfBirth + 'T00:00:00Z');
+        const today = new Date();
+        let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+        const monthDiff = today.getUTCMonth() - birthDate.getUTCMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < birthDate.getUTCDate())) {
+          age--;
+        }
+        if (age < 13) {
+          throw new Error('TrustVault requires users to be at least 13 years old to register.');
+        }
+
         if (password.length < 8) throw new Error('Password must be at least 8 characters long');
-        await register(name, email, password, requestedRole);
+        if (password !== confirmPassword) throw new Error('Passwords do not match');
+        if (!termsAccepted) throw new Error('You must accept the Terms & Conditions and acknowledge the Privacy Policy');
+
+        await register(name, email, password, requestedRole, dateOfBirth, termsAccepted, confirmPassword);
       } else {
         await login(email, password);
       }
@@ -195,92 +220,225 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
                 </div>
               </div>
 
-              {mode !== 'forgot' && (
+              {mode === 'register' && (
                 <div className="form-group">
-                  <label htmlFor="auth-password" className="form-label">
-                    Password {mode === 'register' && <span className="label-hint">(min 8 chars, 1 letter, 1 number)</span>}
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label htmlFor="auth-dob" className="form-label" style={{ margin: 0 }}>
+                      Date of Birth <span style={{ color: 'var(--color-danger-500, #ef4444)' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted, #94a3b8)' }}>Min age: 13</span>
+                  </div>
                   <div className="input-wrapper">
-                    <Lock size={16} className="input-icon" aria-hidden="true" />
+                    <Calendar size={16} className="input-icon" aria-hidden="true" />
                     <input
-                      id="auth-password"
-                      type="password"
+                      id="auth-dob"
+                      type="date"
                       required
-                      placeholder="••••••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      max={new Date().toISOString().split('T')[0]}
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
                       className="form-input"
                       disabled={isLoading}
                     />
                   </div>
-                  {mode === 'login' && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={() => switchMode('forgot')}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--color-primary-600, #2563eb)',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {mode === 'register' && (
-                <div className="form-group" style={{ marginTop: '8px' }}>
-                  <label className="form-label">
-                    Requested Account Role
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setRequestedRole('viewer')}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: requestedRole === 'viewer' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
-                        backgroundColor: requestedRole === 'viewer' ? '#eff6ff' : 'transparent',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        fontSize: '11.5px'
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Viewer</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Immediate read access</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRequestedRole('owner')}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: requestedRole === 'owner' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
-                        backgroundColor: requestedRole === 'owner' ? '#eff6ff' : 'transparent',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        fontSize: '11.5px'
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Document Owner</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Requires Admin approval</div>
-                    </button>
+              {mode !== 'forgot' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="auth-password" className="form-label">
+                      Password {mode === 'register' && <span className="label-hint">(min 8 chars, 1 letter, 1 number)</span>}
+                    </label>
+                    <div className="input-wrapper" style={{ position: 'relative' }}>
+                      <Lock size={16} className="input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="form-input"
+                        disabled={isLoading}
+                        style={{ paddingRight: '36px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted, #94a3b8)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {mode === 'login' && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => switchMode('forgot')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-primary-600, #2563eb)',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    {requestedRole === 'owner'
-                      ? 'Owner requests are reviewed by an Administrator. You will gain Viewer privileges immediately while waiting.'
-                      : 'Standard read-only account with access to shared files.'}
-                  </p>
-                </div>
+
+                  {mode === 'register' && (
+                    <div className="form-group">
+                      <label htmlFor="auth-confirm-password" className="form-label">
+                        Confirm Password <span style={{ color: 'var(--color-danger-500, #ef4444)' }}>*</span>
+                      </label>
+                      <div className="input-wrapper" style={{ position: 'relative' }}>
+                        <Lock size={16} className="input-icon" aria-hidden="true" />
+                        <input
+                          id="auth-confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Re-enter your password..."
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="form-input"
+                          disabled={isLoading}
+                          style={{ paddingRight: '36px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted, #94a3b8)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: 0
+                          }}
+                          aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                        >
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {mode === 'register' && (
+                <>
+                  <div className="form-group" style={{ marginTop: '8px' }}>
+                    <label className="form-label">
+                      Requested Account Role
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setRequestedRole('viewer')}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '8px',
+                          border: requestedRole === 'viewer' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                          backgroundColor: requestedRole === 'viewer' ? '#eff6ff' : 'transparent',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '11.5px'
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Viewer</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Immediate read access</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRequestedRole('owner')}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '8px',
+                          border: requestedRole === 'owner' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                          backgroundColor: requestedRole === 'owner' ? '#eff6ff' : 'transparent',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '11.5px'
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Document Owner</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Requires Admin approval</div>
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                      {requestedRole === 'owner'
+                        ? 'Owner requests are reviewed by an Administrator. You will gain Viewer privileges immediately while waiting.'
+                        : 'Standard read-only account with access to shared files.'}
+                    </p>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '12px', marginBottom: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        style={{ marginTop: '2px', cursor: 'pointer' }}
+                        required
+                        disabled={isLoading}
+                      />
+                      <span>
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLegalModalType('terms');
+                            setLegalModalOpen(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-primary-600, #2563eb)', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                        >
+                          Terms &amp; Conditions
+                        </button>{' '}
+                        and acknowledge the{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLegalModalType('privacy');
+                            setLegalModalOpen(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-primary-600, #2563eb)', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                        >
+                          Privacy Policy
+                        </button>
+                        . <span style={{ color: 'var(--color-danger-500, #ef4444)' }}>*</span>
+                      </span>
+                    </label>
+                  </div>
+                </>
               )}
 
               <Button
@@ -350,6 +508,13 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
           </div>
         </div>
       </div>
+
+      <TermsAndPrivacyModals
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        type={legalModalType}
+        onSwitchType={setLegalModalType}
+      />
     </div>
   );
 }

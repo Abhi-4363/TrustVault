@@ -278,3 +278,168 @@
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+
+/* Responsive Document Table & Mobile Card View */
+@media (max-width: 768px) {
+  .table-header-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .table-controls {
+    flex-direction: column;
+    width: 100%;
+    gap: var(--space-2);
+  }
+
+  .table-search-box {
+    width: 100%;
+  }
+
+  .table-search-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .table-search-input:focus {
+    width: 100%;
+  }
+
+  .table-filter-group {
+    width: 100%;
+  }
+
+  .table-filter-select {
+    width: 100%;
+  }
+
+  .enterprise-table thead {
+    display: none;
+  }
+
+  .enterprise-table,
+  .enterprise-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .table-responsive-wrapper {
+    padding: var(--space-3);
+  }
+
+  .enterprise-table tr.table-row {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    gap: var(--space-2-5, 10px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .enterprise-table td {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: none;
+    width: 100%;
+  }
+
+  .enterprise-table td.td-name {
+    display: block;
+    width: 100%;
+  }
+
+  .document-cell {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .doc-title {
+    max-width: 100%;
+    white-space: normal;
+    word-break: break-word;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+  }
+
+  .doc-title-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .td-owner::before {
+    content: "Owner: ";
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .td-date::before {
+    content: "Updated: ";
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .td-access::before {
+    content: "Access: ";
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .td-actions {
+    display: flex !important;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border-light);
+    padding-top: var(--space-3) !important;
+    margin-top: 4px;
+    width: 100%;
+  }
+
+  .action-buttons-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  .row-action-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-responsive-wrapper {
+    padding: var(--space-2);
+  }
+
+  .enterprise-table tr.table-row {
+    padding: var(--space-3);
+  }
+
+  .action-buttons-group {
+    gap: var(--space-1-5);
+  }
+
+  .row-action-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+

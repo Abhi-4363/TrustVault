@@ -255,6 +255,55 @@ class InMemoryDocumentRepository {
     }
     return null;
   }
+
+  async updateMany(query = {}, update = {}) {
+    let count = 0;
+    const queryEntries = Object.entries(query);
+    for (const doc of this.documents.values()) {
+      let matches = true;
+      for (const [key, val] of queryEntries) {
+        if (String(doc[key]) !== String(val)) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        if (update.$set) {
+          Object.assign(doc, update.$set);
+        } else {
+          for (const [key, val] of Object.entries(update)) {
+            if (!key.startsWith('$')) {
+              doc[key] = val;
+            }
+          }
+        }
+        doc.updatedAt = new Date();
+        count++;
+      }
+    }
+    return { modifiedCount: count, matchedCount: count };
+  }
+
+  async updateAclUserName(userId, newName) {
+    const userIdStr = String(userId);
+    let count = 0;
+    for (const doc of this.documents.values()) {
+      let modified = false;
+      if (Array.isArray(doc.acl)) {
+        doc.acl.forEach((entry) => {
+          if (String(entry.userId) === userIdStr) {
+            entry.name = newName;
+            modified = true;
+          }
+        });
+      }
+      if (modified) {
+        doc.updatedAt = new Date();
+        count++;
+      }
+    }
+    return count;
+  }
 }
 
 export const inMemoryDocumentStore = new InMemoryDocumentRepository();
@@ -309,6 +358,24 @@ export const Document = {
       return inMemoryDocumentStore.findByIdAndDelete(id);
     }
     return MongooseDocumentModel.findByIdAndDelete(id).exec();
+  },
+
+  async updateMany(query = {}, update = {}) {
+    if (!this.isMongooseActive()) {
+      return inMemoryDocumentStore.updateMany(query, update);
+    }
+    return MongooseDocumentModel.updateMany(query, update).exec();
+  },
+
+  async updateAclUserName(userId, newName) {
+    if (!this.isMongooseActive()) {
+      return inMemoryDocumentStore.updateAclUserName(userId, newName);
+    }
+    return MongooseDocumentModel.updateMany(
+      { 'acl.userId': userId },
+      { $set: { 'acl.$[elem].name': newName } },
+      { arrayFilters: [{ 'elem.userId': userId }] }
+    ).exec();
   },
 
   clearInMemory() {
