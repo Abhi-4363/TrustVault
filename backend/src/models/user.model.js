@@ -80,6 +80,19 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    emailVerificationExpiresAt: {
+      type: Date,
+      default: null,
+    },
     mustChangePassword: {
       type: Boolean,
       default: false,
@@ -99,12 +112,13 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
-// Ensure passwordHash and passwordResetTokenHash are NEVER returned in JSON representations
+// Ensure passwordHash, passwordResetTokenHash, and emailVerificationTokenHash are NEVER returned in JSON representations
 userSchema.methods.toJSON = function () {
   const obj = this.toObject ? this.toObject({ virtuals: true }) : { ...this };
   obj.id = String(this._id);
   delete obj.passwordHash;
   delete obj.passwordResetTokenHash;
+  delete obj.emailVerificationTokenHash;
   delete obj.__v;
   return obj;
 };
@@ -140,6 +154,9 @@ class InMemoryUserRepository {
     roleChangeReason = '',
     passwordResetTokenHash = null,
     passwordResetExpiresAt = null,
+    isEmailVerified = true,
+    emailVerificationTokenHash = null,
+    emailVerificationExpiresAt = null,
     mustChangePassword = false,
   }) {
     const normalizedEmail = email.toLowerCase().trim();
@@ -176,6 +193,9 @@ class InMemoryUserRepository {
       roleChangeReason,
       passwordResetTokenHash,
       passwordResetExpiresAt,
+      isEmailVerified: Boolean(isEmailVerified),
+      emailVerificationTokenHash,
+      emailVerificationExpiresAt,
       mustChangePassword: Boolean(mustChangePassword),
       isActive: isActive !== false,
       createdAt: new Date(),
@@ -187,6 +207,7 @@ class InMemoryUserRepository {
         const copy = { ...this, id: this._id };
         delete copy.passwordHash;
         delete copy.passwordResetTokenHash;
+        delete copy.emailVerificationTokenHash;
         delete copy.comparePassword;
         delete copy.toJSON;
         return copy;
@@ -231,6 +252,11 @@ class InMemoryUserRepository {
         if (u.passwordResetTokenHash === query.passwordResetTokenHash) return u;
       }
     }
+    if (query.emailVerificationTokenHash) {
+      for (const u of this.users.values()) {
+        if (u.emailVerificationTokenHash === query.emailVerificationTokenHash) return u;
+      }
+    }
     // Generic match fallback
     for (const u of this.users.values()) {
       let match = true;
@@ -261,6 +287,33 @@ class InMemoryUserRepository {
     }
     return list;
   }
+
+  async deleteMany(query = {}) {
+    if (query.email && query.email.$nin) {
+      const keep = query.email.$nin.map((e) => String(e).toLowerCase().trim());
+      for (const email of Array.from(this.users.keys())) {
+        if (!keep.includes(email)) {
+          this.users.delete(email);
+        }
+      }
+      return { acknowledged: true };
+    }
+    if (Object.keys(query).length === 0) {
+      this.users.clear();
+      return { acknowledged: true };
+    }
+    for (const [email, user] of Array.from(this.users.entries())) {
+      let match = true;
+      for (const [k, v] of Object.entries(query)) {
+        if (user[k] !== v) {
+          match = false;
+          break;
+        }
+      }
+      if (match) this.users.delete(email);
+    }
+    return { acknowledged: true };
+  }
 }
 
 export const inMemoryUserStore = new InMemoryUserRepository();
@@ -281,6 +334,9 @@ export const User = {
     passwordHash,
     role = 'viewer',
     isActive = true,
+    isEmailVerified = true,
+    emailVerificationTokenHash = null,
+    emailVerificationExpiresAt = null,
     requestedRole = null,
     ownerApprovalStatus = 'not_required',
     ownerApprovalRequestedAt = null,
@@ -301,6 +357,9 @@ export const User = {
         role,
         passwordHash,
         isActive,
+        isEmailVerified,
+        emailVerificationTokenHash,
+        emailVerificationExpiresAt,
         requestedRole,
         ownerApprovalStatus,
         ownerApprovalRequestedAt,
@@ -325,6 +384,9 @@ export const User = {
       passwordHash: finalHash,
       role,
       isActive: isActive !== false,
+      isEmailVerified: Boolean(isEmailVerified),
+      emailVerificationTokenHash,
+      emailVerificationExpiresAt,
       requestedRole,
       ownerApprovalStatus,
       ownerApprovalRequestedAt,
@@ -376,6 +438,13 @@ export const User = {
       return inMemoryUserStore.findByIdAndUpdate(id, updateData, options);
     }
     return MongooseUserModel.findByIdAndUpdate(id, updateData, options).exec();
+  },
+
+  async deleteMany(query = {}) {
+    if (!this.isMongooseActive()) {
+      return inMemoryUserStore.deleteMany(query);
+    }
+    return MongooseUserModel.deleteMany(query).exec();
   },
 
   clearInMemory() {

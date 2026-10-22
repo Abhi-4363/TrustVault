@@ -75,8 +75,25 @@ export async function requireAuth(req, res, next) {
       roleChangeReason: user.roleChangeReason || '',
       mustChangePassword: Boolean(user.mustChangePassword),
       isActive: user.isActive !== false,
+      isEmailVerified: user.isEmailVerified !== false,
       createdAt: user.createdAt,
     };
+
+    // Email verification boundary:
+    // Unverified accounts cannot access documents, upload, download, or manage permissions
+    if (user.isEmailVerified === false) {
+      const allowedUnverifiedPaths = ['/api/auth/me', '/api/auth/resend-verification'];
+      const currentUrl = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
+      const isAllowed = allowedUnverifiedPaths.some((p) => currentUrl.endsWith(p) || currentUrl === p);
+      if (!isAllowed) {
+        return res.status(403).json({
+          error: {
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'Your email address is not verified. Please check your inbox or request a new verification link.',
+          },
+        });
+      }
+    }
 
     // Mandatory temporary password policy:
     // When mustChangePassword is true, user can ONLY call /api/auth/change-password and /api/auth/me

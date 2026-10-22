@@ -550,8 +550,71 @@ This document records the exact progression of development prompts, implementati
   5. *Live Dev Server Background Process*: The backend server task was running `node server.js` without `--watch`, meaning route additions weren't picked up until the task was stopped and restarted with `npm run dev`.
 
 - **Real Git Commit Reference**:
+  - Commit Hash: `436c610`
+  - Commit Message: `fix admin notifications and sync user requests`
+
+---
+
+## Prompt Entry 12 — Email Verification, Gmail Delivery, Dual-Option Password Recovery & Security Hardening
+
+- **Date / Timestamp**: 2026-10-22T11:05:00+05:30
+- **User Prompt / Instructions**:
+  - Implement complete email verification, Gmail delivery (`trustvaultOff@gmail.com`), two password recovery options (Option A: Admin Assisted; Option B: Self-Service Email Reset Link), and Admin Notifications integration.
+  - Phase 1: Baseline inspection, report architecture, test baseline (179 passing), and missing features before editing.
+  - Phase 2: Configure email delivery via Nodemailer with Gmail SMTP, safe logging, and in-memory test adapter fallback.
+  - Phase 3: Registration creates unverified accounts (`isEmailVerified: false`), issues 32-byte single-use cryptographic verification token (SHA-256 hash stored at rest, 24h expiry), dispatches email, blocks unverified access to vault documents (`403 EMAIL_NOT_VERIFIED`), verifies token, and auto-authenticates user. Includes rate-limited resend verification.
+  - Phase 4: Dual-option Forgot Password page:
+    - Option A (Admin-assisted): Submits request to Admin Notification Center; Admin resets to `Password@123` with forced password change.
+    - Option B (Self-service email link): 15-minute expiring single-use token sent to email; allows user to choose their own password without Admin intervention.
+  - Phase 5: Admin Notifications & User Directory synchronization preserved.
+  - Phase 6: Security hardening (rate limiting, anti-enumeration neutral responses, zero plaintext tokens/hashes).
+  - Phase 7: Automated test suite addition; zero regressions on existing tests.
+  - Phase 8: Documentation updates in `README.md` and `THREATS.md` (THREAT-20 to THREAT-24).
+  - Strict Rule: DO NOT commit, push, or deploy without explicit user approval.
+
+- **What the AI Actually Implemented**:
+  1. **Nodemailer & Email Delivery Service**:
+     - Installed `nodemailer` in `backend/package.json`.
+     - Created `backend/src/services/email.service.js`: Nodemailer transporter with Gmail SMTP (`smtp.gmail.com:587`), TLS certificate verification, safe error logging, and `sentEmails` in-memory test recording queue.
+     - Added `sendVerificationEmail`, `sendPasswordResetEmail`, and `sendTestEmail`.
+     - Updated `backend/src/config/env.js` and `backend/.env.example` with email configuration variables.
+  2. **Database Models & User Schema Updates**:
+     - `backend/src/models/user.model.js`: Added `isEmailVerified: { type: Boolean, default: false }`, `emailVerificationTokenHash: { type: String, select: false }`, `emailVerificationExpiresAt: { type: Date }`.
+     - Updated `InMemoryUserRepository` and `User.create` universal adapter to support email verification fields and query lookups.
+     - Updated `seed.js` to ensure corporate demo users are provisioned as verified.
+  3. **Security Middleware & Access Boundaries**:
+     - `backend/src/middleware/auth.middleware.js`: Added guard: users with `isEmailVerified === false` are blocked from accessing confidential documents, uploads, downloads, or permissions with `403 EMAIL_NOT_VERIFIED` (whitelisting only `/api/auth/me` and `/api/auth/resend-verification`).
+     - `backend/src/routes/auth.routes.js`: Applied `authRateLimiter`, `verificationRateLimiter`, and `passwordResetRateLimiter`.
+  4. **Authentication & Recovery Endpoints**:
+     - `backend/src/controllers/auth.controller.js`:
+       - `register`: Generates 32-byte crypto verification token, hashes with SHA-256, sets `isEmailVerified: false`, sends verification email, returns unverified status.
+       - `verifyEmail` (`GET /api/auth/verify-email` & `POST /api/auth/verify-email`): Validates token hash and expiry, marks account verified, invalidates token immediately, logs `EMAIL_VERIFIED` audit event, and returns auto-login JWT.
+       - `resendVerification` (`POST /api/auth/resend-verification`): Rate-limited, neutral response, generates fresh token and dispatches email.
+       - `login`: Rejects unverified accounts with `403 EMAIL_NOT_VERIFIED`.
+       - `requestEmailPasswordReset` (`POST /api/auth/forgot-password-email`): Option B self-service reset generating 15-minute single-use token, dispatches reset email, neutral anti-enumeration response.
+       - `resetPassword` (`POST /api/auth/reset-password`): Consumes token atomically, enforces password complexity, updates bcrypt hash, clears `mustChangePassword`, logs `PASSWORD_RESET_COMPLETED`.
+  5. **Frontend Portal Components**:
+     - `frontend/src/context/AuthContext.jsx`: Added `verifyEmailToken` and `setSession`.
+     - `frontend/src/components/auth/AuthLandingPortal.jsx`:
+       - URL parameter detection for `?verifyToken=...` with automatic verification, confirmation, and auto-login.
+       - URL parameter detection for `?resetToken=...` opening password reset form.
+       - Dual-option tab switcher on Forgot Password page: Option B (Email Reset Link) vs Option A (Admin Assisted) with contextual descriptions and submit actions.
+       - Verification pending screen with email highlight and resend link.
+       - Resend verification screen with anti-enumeration confirmation.
+     - `frontend/src/components/auth/AuthLandingPortal.css`: Styled recovery option tabs, callout notices, and verification pending cards.
+  6. **Automated Testing Suite**:
+     - Created `backend/tests/email-and-verification.test.js` with 19 comprehensive test scenarios covering registration, unverified blocking, token expiry, token replay, resend rate limiting, auto-authentication, Option A Admin request, Option B self-service email reset, password complexity, and session cleanup.
+     - Full test suite execution: **198 of 198 tests passed across all 13 test files (100% pass rate)**.
+  7. **Production Build**:
+     - `npm run build` in `frontend/`: 1631 modules transformed, 0 errors, built in 2.90s.
+  8. **Documentation**:
+     - `README.md`: Updated test badge to 198 tests and 24 threats mitigated. Added Sections 6–9 covering Email Verification, Dual-Option Password Recovery, Gmail SMTP Setup Guide, and Delivery Failure Behavior.
+     - `THREATS.md`: Added `THREAT-20` (Unverified Account Access), `THREAT-21` (Verification Token Replay), `THREAT-22` (Email Reset Link Interception), `THREAT-23` (User Enumeration Defense), and `THREAT-24` (Email Provider Failure).
+
+- **Real Git Commit Reference**:
   - Commit Hash: **Pending explicit user approval**
   - Commit Message: **Pending explicit user approval**
+
 
 
 

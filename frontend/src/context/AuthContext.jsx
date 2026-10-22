@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
           const result = await response.json();
           setUser(result.data.user);
         } else {
-          // Token expired or invalid
+          // Token expired, deactivated, or invalid
           logout();
         }
       } catch (err) {
@@ -41,6 +41,31 @@ export function AuthProvider({ children }) {
 
     verifySession();
   }, [token]);
+
+  // Manually set session upon verification or custom login
+  const setSession = (authUser, authToken) => {
+    if (authToken) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, authToken);
+      setToken(authToken);
+    }
+    setUser(authUser);
+  };
+
+  // Verify email token (autoLogin optional, default false)
+  const verifyEmailToken = async (rawToken, autoLogin = false) => {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email?token=${encodeURIComponent(rawToken)}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Email verification failed.');
+    }
+
+    const { user: verifiedUser, token: authToken } = data.data;
+    if (autoLogin) {
+      setSession(verifiedUser, authToken);
+    }
+    return { user: verifiedUser, token: authToken, message: data.message };
+  };
 
   // Refresh current user session profile
   const refreshProfile = async () => {
@@ -60,7 +85,7 @@ export function AuthProvider({ children }) {
     return null;
   };
 
-  // Register new account (public accounts default to viewer, owner requests are queued)
+  // Register new account
   const register = async (name, email, password, requestedRole = 'viewer') => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
@@ -82,11 +107,22 @@ export function AuthProvider({ children }) {
       throw new Error(data.error?.message || 'Registration failed');
     }
 
-    const { user: newUser, token: newToken } = data.data;
-    localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
-    setToken(newToken);
-    setUser(newUser);
-    return { user: newUser, token: newToken, message: data.message };
+    const { user: newUser, token: newToken, isEmailVerified } = data.data;
+
+    // Only establish active authenticated session if account is verified
+    if (isEmailVerified !== false && newToken) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+      setToken(newToken);
+      setUser(newUser);
+    }
+
+    return { 
+      user: newUser, 
+      token: newToken, 
+      isEmailVerified: isEmailVerified !== false, 
+      devVerifyUrl: data.data?.devVerifyUrl,
+      message: data.message 
+    };
   };
 
   // Log in with existing credentials
@@ -102,7 +138,9 @@ export function AuthProvider({ children }) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Invalid email or password');
+      const err = new Error(data.error?.message || 'Invalid email or password');
+      err.code = data.error?.code;
+      throw err;
     }
 
     const { user: authUser, token: authToken } = data.data;
@@ -129,6 +167,8 @@ export function AuthProvider({ children }) {
         register,
         login,
         logout,
+        setSession,
+        verifyEmailToken,
         refreshProfile,
       }}
     >

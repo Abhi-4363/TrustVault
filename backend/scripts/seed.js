@@ -55,7 +55,14 @@ export async function runSeed(isStandalone = false) {
   console.log('\n[1/4] Seeding corporate identities...');
   const salt = await bcrypt.genSalt(12);
   const passwordHash = await bcrypt.hash('TrustVault2026!', salt);
-  const abhiPasswordHash = await bcrypt.hash('Abhi@9346192300', salt);
+
+  const allowedEmails = [
+    'admin@trustvault.internal',
+    'sarah.lead@trustvault.internal',
+    'alex.dev@trustvault.internal',
+    'jordan.req@trustvault.internal',
+  ];
+  await User.deleteMany({ email: { $nin: allowedEmails } });
 
   const seedUsersData = [
     {
@@ -69,14 +76,6 @@ export async function runSeed(isStandalone = false) {
     {
       name: 'Sarah Jenkins',
       email: 'sarah.lead@trustvault.internal',
-      role: 'owner',
-      password: 'TrustVault2026!',
-      passwordHash,
-      isActive: true,
-    },
-    {
-      name: 'Elena Rostova',
-      email: 'elena.legal@trustvault.internal',
       role: 'owner',
       password: 'TrustVault2026!',
       passwordHash,
@@ -103,31 +102,18 @@ export async function runSeed(isStandalone = false) {
       passwordHash,
       isActive: true,
     },
-    {
-      name: 'Konagalla Abhirama Rao',
-      email: 'abhiram.konagalla604@gmail.com',
-      role: 'owner',
-      requestedRole: 'owner',
-      ownerApprovalStatus: 'approved',
-      ownerApprovalRequestedAt: new Date(Date.now() - 3600000),
-      ownerApprovalReviewedAt: new Date(),
-      ownerApprovalReviewedByName: 'Marcus Vance',
-      roleChangeReason: 'Owner privileges approved by Administrator.',
-      password: 'Abhi@9346192300',
-      passwordHash: abhiPasswordHash,
-      isActive: true,
-    },
   ];
 
   const createdUsers = {};
   for (const u of seedUsersData) {
     let existing = await User.findOne({ email: u.email });
     if (!existing) {
-      existing = await User.create(u);
+      existing = await User.create({ ...u, isEmailVerified: true });
     } else {
       await User.findByIdAndUpdate(existing._id || existing.id, {
         passwordHash: u.passwordHash,
         role: u.role,
+        isEmailVerified: true,
         requestedRole: u.requestedRole || existing.requestedRole,
         ownerApprovalStatus: u.ownerApprovalStatus || existing.ownerApprovalStatus,
         ownerApprovalReviewedAt: u.ownerApprovalReviewedAt || existing.ownerApprovalReviewedAt,
@@ -142,7 +128,6 @@ export async function runSeed(isStandalone = false) {
   const marcus = createdUsers['admin@trustvault.internal'];
   const sarah = createdUsers['sarah.lead@trustvault.internal'];
   const alex = createdUsers['alex.dev@trustvault.internal'];
-  const elena = createdUsers['elena.legal@trustvault.internal'];
 
   // Helper to create and write a secure storage file
   function createDiskFile(originalName) {
@@ -168,21 +153,21 @@ export async function runSeed(isStandalone = false) {
       tags: ['compliance', 'audit', 'iso27001', 'confidential'],
       acl: [
         {
-          userId: elena._id || elena.id,
-          email: elena.email,
-          name: elena.name,
-          userEmail: elena.email,
-          userName: elena.name,
-          permissionLevel: 'edit',
-          grantedBy: marcus._id || marcus.id,
-          grantedAt: new Date(Date.now() - 86400000 * 2),
-        },
-        {
           userId: sarah._id || sarah.id,
           email: sarah.email,
           name: sarah.name,
           userEmail: sarah.email,
           userName: sarah.name,
+          permissionLevel: 'edit',
+          grantedBy: marcus._id || marcus.id,
+          grantedAt: new Date(Date.now() - 86400000 * 2),
+        },
+        {
+          userId: alex._id || alex.id,
+          email: alex.email,
+          name: alex.name,
+          userEmail: alex.email,
+          userName: alex.name,
           permissionLevel: 'read',
           grantedBy: marcus._id || marcus.id,
           grantedAt: new Date(Date.now() - 86400000),
@@ -228,9 +213,9 @@ export async function runSeed(isStandalone = false) {
       title: 'Global Privacy Framework & GDPR Data Map',
       description: 'Cross-border data transfer impact assessment and DPIA guidelines.',
       originalName: 'Global-Privacy-GDPR-Framework.pdf',
-      ownerId: elena._id || elena.id,
-      ownerName: elena.name,
-      ownerEmail: elena.email,
+      ownerId: sarah._id || sarah.id,
+      ownerName: sarah.name,
+      ownerEmail: sarah.email,
       fileSize: 310500,
       mimeType: 'application/pdf',
       tags: ['legal', 'privacy', 'gdpr'],
@@ -242,7 +227,7 @@ export async function runSeed(isStandalone = false) {
           userEmail: marcus.email,
           userName: marcus.name,
           permissionLevel: 'read',
-          grantedBy: elena._id || elena.id,
+          grantedBy: sarah._id || sarah.id,
           grantedAt: new Date(Date.now() - 21600000),
         },
       ],
@@ -294,9 +279,9 @@ export async function runSeed(isStandalone = false) {
       },
       {
         action: 'DOCUMENT_READ',
-        actorId: elena._id || elena.id,
-        actorEmail: elena.email,
-        actorName: elena.name,
+        actorId: sarah._id || sarah.id,
+        actorEmail: sarah.email,
+        actorName: sarah.name,
         targetDocumentId: createdDocs[0]._id || createdDocs[0].id,
         targetDocumentTitle: createdDocs[0].title,
         ipAddress: '192.168.1.45',
@@ -305,9 +290,9 @@ export async function runSeed(isStandalone = false) {
       },
       {
         action: 'DOCUMENT_DOWNLOAD',
-        actorId: elena._id || elena.id,
-        actorEmail: elena.email,
-        actorName: elena.name,
+        actorId: sarah._id || sarah.id,
+        actorEmail: sarah.email,
+        actorName: sarah.name,
         targetDocumentId: createdDocs[0]._id || createdDocs[0].id,
         targetDocumentTitle: createdDocs[0].title,
         ipAddress: '192.168.1.45',
@@ -362,7 +347,6 @@ export async function runSeed(isStandalone = false) {
   console.log('----------------------------------------------------');
   console.log(' 👑 Admin:          admin@trustvault.internal       / TrustVault2026!');
   console.log(' 📄 Document Owner: sarah.lead@trustvault.internal  / TrustVault2026!');
-  console.log(' 📄 Document Owner: elena.legal@trustvault.internal / TrustVault2026!');
   console.log(' 👁 Viewer:         alex.dev@trustvault.internal    / TrustVault2026!');
   console.log(' ⏳ Pending Owner:  jordan.req@trustvault.internal  / TrustVault2026!');
   console.log('----------------------------------------------------');

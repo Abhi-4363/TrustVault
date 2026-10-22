@@ -3,10 +3,11 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-151%20passed-brightgreen.svg)]()
-[![Security](https://img.shields.io/badge/threats%20mitigated-16%2F16%20verified-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-198%20passed-brightgreen.svg)]()
+[![Security](https://img.shields.io/badge/threats%20mitigated-24%2F24%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
+
 
 ---
 
@@ -113,7 +114,6 @@ The login portal includes a **Quick Demo Accounts** selection with verified cred
 | :--- | :---: | :--- | :--- | :--- |
 | **Marcus Vance** | `admin` | `admin@trustvault.internal` | `TrustVault2026!` | Chief Security Officer — Full access to Governance Dashboard, Owner Approval Queue, Global Audit Trail, Role Assignment, and Password Recovery |
 | **Sarah Jenkins** | `owner` | `sarah.lead@trustvault.internal` | `TrustVault2026!` | Document Owner (VP Engineering) — Uploads documents, selects visibility, manages ACLs for owned files, and reviews audit history |
-| **Elena Rostova** | `owner` | `elena.legal@trustvault.internal` | `TrustVault2026!` | Document Owner (Compliance Counsel) — Uploads compliance documents, collaborates and manages permissions on legal files |
 | **Alex Mercer** | `viewer` | `alex.dev@trustvault.internal` | `TrustVault2026!` | Viewer (Platform Engineer) — Read-only collaborator; views and downloads explicitly shared files, blocked from uploading |
 | **Jordan Lee** | `viewer` (pending) | `jordan.req@trustvault.internal` | `TrustVault2026!` | Pending Document Owner Requester — Demonstrates the pending owner workflow, awaiting Admin governance decision |
 
@@ -276,6 +276,58 @@ When an Admin clicks **Reset Password** on a pending password reset notification
 - Approving elevates the user's effective role to `owner` and marks the notification `approved`.
 - Rejecting preserves the user's effective role as `viewer` and marks the notification `rejected`.
 - Both actions record immutable compliance audit events (`OWNER_REQUEST_APPROVED`, `OWNER_REQUEST_REJECTED`).
+
+### 6. Email Verification & Automatic Login Flow
+1. **Unverified Account Provisioning**: Public registration creates accounts in an unverified state (`isEmailVerified: false`).
+2. **Cryptographic Single-Use Token**: A 32-byte secure token is generated via `crypto.randomBytes(32)` and persisted exclusively as a SHA-256 hash in the database with a 24-hour expiration window.
+3. **Vault Access Boundary**: Unverified users are strictly blocked from accessing confidential documents, uploads, downloads, and permission management (`403 EMAIL_NOT_VERIFIED`).
+4. **Verification Link Dispatch**: A verification email is sent via `trustvaultOff@gmail.com` using Nodemailer and Gmail SMTP containing the activation URL:
+   ```text
+   http://localhost:5173/?verifyToken=<single-use-token>
+   ```
+5. **Instant Activation & Auto-Login**: Opening the verification link verifies the token against the database hash, invalidates the token atomically, marks `isEmailVerified: true`, emits an immutable `EMAIL_VERIFIED` audit event, and returns an authenticated JWT session that logs the user directly into the platform without requiring a secondary sign-in step.
+6. **Resend Verification**: Users can request a fresh verification link at any time via `POST /api/auth/resend-verification`. The endpoint enforces sliding-window rate limiting and timing-neutral responses to prevent public email enumeration.
+
+### 7. Dual-Option Password Recovery Architecture
+TrustVault provides two distinct, clearly separated password recovery options on the Forgot Password portal:
+
+| Recovery Feature | Option A: Administrator-Assisted Recovery | Option B: Self-Service Email Reset Link |
+| :--- | :--- | :--- |
+| **Trigger Mechanism** | User clicks "Request Reset from Admin" | User clicks "Send Password Reset Link" |
+| **Backend Endpoint** | `POST /api/auth/forgot-password` | `POST /api/auth/forgot-password-email` |
+| **Admin Intervention** | **Required** (Admin reviews in Notification Center) | **None** (Fully automated via email) |
+| **Resulting Credential** | Temporary demo password: `Password@123` | User sets their own permanent password |
+| **Enforced Policy** | `mustChangePassword: true` forces password change on next login | Password replaces existing credentials immediately |
+| **Token Lifetime** | Admin review queue (until approved/rejected) | Cryptographic token expires in **15 minutes** |
+| **Enumeration Defense** | Neutral response: *"If this email address is registered..."* | Neutral response: *"If an account exists with this email..."* |
+| **Notification Sync** | Creates persistent `PasswordResetRequest` + `AdminNotification` | Direct email delivery; no Admin notification clutter |
+
+### 8. Email Delivery Configuration (Gmail SMTP)
+To enable real transactional email delivery using your Gmail account:
+
+1. **Sender Email Address**: Designate your Google account: `trustvaultOff@gmail.com`.
+2. **Enable 2-Step Verification**: Visit [Google Account Security](https://myaccount.google.com/security) and ensure **2-Step Verification** is turned **ON**.
+3. **Generate an App Password**:
+   - Go to [Google App Passwords](https://myaccount.google.com/apppasswords).
+   - Enter `TrustVault` as the application name and click **Create**.
+   - Google generates a 16-character App Password (e.g., `abcd efgh ijkl mnop`).
+4. **Configure Local Environment (`backend/.env`)**:
+   Add the following variables to your local `backend/.env` file (which is strictly excluded from Git):
+   ```env
+   EMAIL_FROM=trustvaultOff@gmail.com
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=trustvaultOff@gmail.com
+   SMTP_PASS=your_16_character_app_password_without_spaces
+   APP_BASE_URL=http://localhost:5173
+   ```
+5. **Restart Backend**: Restart the Express server (`npm run dev`) and test delivery.
+
+### 9. Delivery Failure Behavior & Diagnostics
+- **Safe Diagnostic Logging**: If SMTP credentials are invalid (e.g. Gmail returns `535 5.7.8 BadCredentials`) or the network is unreachable, TrustVault logs a sanitized operational message without leaking passwords or tokens.
+- **Honest Feedback**: The backend returns clear diagnostic information indicating delivery status without falsely claiming success if provider rejection occurs.
+- **In-Memory Testing Harness**: During automated testing (`NODE_ENV=test`), emails are captured in an in-memory test queue (`sentEmails`), allowing instant and deterministic test assertions without external network dependencies.
 
 ---
 

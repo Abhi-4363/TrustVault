@@ -11,15 +11,19 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
-  Key
+  Key,
+  Send,
+  HelpCircle,
+  UserCog
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import './AuthLandingPortal.css';
 
 export function AuthLandingPortal({ initialMode = 'login' }) {
-  const { login, register } = useAuth();
-  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'reset'
+  const { login, register, verifyEmailToken } = useAuth();
+  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'forgot' | 'reset' | 'resend' | 'verify-pending'
+  const [recoveryOption, setRecoveryOption] = useState('email'); // 'email' (Option B) | 'admin' (Option A)
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,19 +31,47 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [resetToken, setResetToken] = useState('');
   const [requestedRole, setRequestedRole] = useState('viewer'); // 'viewer' | 'owner'
   const [error, setError] = useState('');
+  const [errorAction, setErrorAction] = useState(null);
   const [resetSuccess, setResetSuccess] = useState('');
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
   const [forgotNotice, setForgotNotice] = useState('');
+  const [resendNotice, setResendNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [devVerifyUrl, setDevVerifyUrl] = useState('');
+  const [devResetUrl, setDevResetUrl] = useState('');
 
-  // Check URL parameters for single-use reset token (?token=...)
+  // Check URL parameters on mount for ?verifyToken=... or ?resetToken=...
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const tokenParam = params.get('token');
-      if (tokenParam) {
-        setResetToken(tokenParam);
+      const verifyTokenParam = params.get('verifyToken') || (params.get('mode') === 'verify' ? params.get('token') : null);
+      const resetTokenParam = params.get('resetToken') || params.get('token');
+
+      if (verifyTokenParam) {
+        setVerifyingEmail(true);
+        verifyEmailToken(verifyTokenParam, false)
+          .then((res) => {
+            setResetSuccess('Email address verified successfully! Your account is active. Please sign in with your credentials.');
+            if (res.user?.email) {
+              setEmail(res.user.email);
+            }
+            setMode('login');
+          })
+          .catch((err) => {
+            setError(err.message || 'Verification link is invalid or has expired.');
+            setMode('resend');
+          })
+          .finally(() => {
+            setVerifyingEmail(false);
+            // Clean URL without page reload
+            window.history.replaceState({}, document.title, window.location.pathname);
+          });
+      } else if (resetTokenParam) {
+        setResetToken(resetTokenParam);
         setMode('reset');
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch {
       // Ignore URL parsing errors
@@ -49,9 +81,40 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setErrorAction(null);
     setResetSuccess('');
+    setForgotNotice('');
+    setResendNotice('');
 
-    // Handle Forgot Password mode (Requirement 2: Send Request to Admin)
+    // ── Resend Verification Email ───────────────────────────────────────────
+    if (mode === 'resend') {
+      if (!email.trim()) {
+        setError('Please provide your registered work email address.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim() }),
+        });
+        const data = await response.json();
+        setResendNotice(
+          data.message || 'If an unverified account exists with this email address, a new verification link has been sent.'
+        );
+        if (data.devVerifyUrl) {
+          setDevVerifyUrl(data.devVerifyUrl);
+        }
+      } catch {
+        setError('Network error submitting resend request. Please verify your connection.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ── Forgot Password (Dual-Option) ───────────────────────────────────────
     if (mode === 'forgot') {
       if (!email.trim()) {
         setError('Please provide your registered work email address.');
@@ -59,26 +122,35 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
       }
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+        const endpoint = recoveryOption === 'email'
+          ? 'http://localhost:5000/api/auth/forgot-password-email'
+          : 'http://localhost:5000/api/auth/forgot-password';
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),
         });
         const data = await response.json();
         setForgotSubmitted(true);
+        if (data.devResetUrl) {
+          setDevResetUrl(data.devResetUrl);
+        }
         setForgotNotice(
           data.message ||
-            'If this email address is registered, your password reset request has been submitted to an Administrator for review.'
+            (recoveryOption === 'email'
+              ? 'If an account exists with this email address, a password reset link has been sent to your inbox.'
+              : 'If this email address is registered, your password reset request has been submitted to an Administrator for review.')
         );
       } catch {
-        setError('Network error submitting password reset request to administrator.');
+        setError('Network error submitting recovery request. Please try again.');
       } finally {
         setLoading(false);
       }
       return;
     }
 
-    // Handle Reset Password mode
+    // ── Reset Password with Single-Use Token ────────────────────────────────
     if (mode === 'reset') {
       if (!resetToken.trim()) {
         setError('Please provide your single-use recovery token.');
@@ -127,6 +199,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
       return;
     }
 
+    // ── Login and Registration ──────────────────────────────────────────────
     if (!email.trim() || !password) {
       setError('Please provide both your work email and password.');
       return;
@@ -150,12 +223,33 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
     setLoading(true);
     try {
       if (mode === 'register') {
-        await register(name.trim(), email.trim(), password, requestedRole);
+        const regResult = await register(name.trim(), email.trim(), password, requestedRole);
+        if (regResult.isEmailVerified === false) {
+          setUnverifiedEmail(email.trim());
+          if (regResult.devVerifyUrl) {
+            setDevVerifyUrl(regResult.devVerifyUrl);
+          }
+          setForgotNotice(
+            regResult.message ||
+              'Account registered! Please check your inbox to verify your email address before signing in.'
+          );
+          setMode('verify-pending');
+        }
       } else {
         await login(email.trim(), password);
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed. Please verify your credentials.');
+      if (err.code === 'EMAIL_NOT_VERIFIED' || /verify your email/i.test(err.message)) {
+        setError('Your email address is not yet verified. Please check your inbox or request a new verification link.');
+        setErrorAction({
+          label: 'Resend Verification Email',
+          onClick: () => {
+            switchMode('resend');
+          },
+        });
+      } else {
+        setError(err.message || 'Authentication failed. Please verify your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -164,9 +258,13 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
+    setErrorAction(null);
     setResetSuccess('');
     setForgotSubmitted(false);
     setForgotNotice('');
+    setResendNotice('');
+    setDevVerifyUrl('');
+    setDevResetUrl('');
   };
 
   return (
@@ -235,29 +333,69 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                 <span className="auth-card-brand-name">TrustVault</span>
               </div>
               <h2 className="auth-card-title">
-                {mode === 'login'
-                  ? 'Sign in to your vault'
-                  : mode === 'register'
-                    ? 'Create corporate account'
-                    : mode === 'forgot'
-                      ? 'Forgot Password?'
-                      : 'Reset Account Password'}
+                {verifyingEmail
+                  ? 'Verifying Email Address...'
+                  : mode === 'login'
+                    ? 'Sign in to your vault'
+                    : mode === 'register'
+                      ? 'Create corporate account'
+                      : mode === 'verify-pending'
+                        ? 'Verify Your Email'
+                        : mode === 'resend'
+                          ? 'Resend Verification Link'
+                          : mode === 'forgot'
+                            ? 'Recover Account Access'
+                            : 'Reset Account Password'}
               </h2>
               <p className="auth-card-subtitle">
-                {mode === 'login'
-                  ? 'Enter your corporate credentials to access confidential documents.'
-                  : mode === 'register'
-                    ? 'New accounts are provisioned with Viewer privileges under organizational security policy.'
-                    : mode === 'forgot'
-                      ? 'Enter your registered work email to request a password reset from an Administrator.'
-                      : 'Enter your single-use recovery token and set a new password.'}
+                {verifyingEmail
+                  ? 'Connecting to security server to validate your single-use verification token...'
+                  : mode === 'login'
+                    ? 'Enter your corporate credentials to access confidential documents.'
+                    : mode === 'register'
+                      ? 'New accounts are provisioned with Viewer privileges under organizational security policy.'
+                      : mode === 'verify-pending'
+                        ? 'Please verify your work email address to activate your vault access.'
+                        : mode === 'resend'
+                          ? 'Enter your registered work email to receive a fresh verification link.'
+                          : mode === 'forgot'
+                            ? 'Choose your preferred recovery method below.'
+                            : 'Enter your single-use recovery token and set a new password.'}
               </p>
             </div>
 
+            {verifyingEmail && (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <Loader2 size={32} className="spinner text-primary" style={{ margin: '0 auto 12px' }} />
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Validating email token...</p>
+              </div>
+            )}
+
             {error && (
-              <div className="auth-error-banner" role="alert">
-                <AlertCircle size={16} className="error-icon" aria-hidden="true" />
-                <span>{error}</span>
+              <div className="auth-error-banner" role="alert" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} className="error-icon" aria-hidden="true" />
+                  <span>{error}</span>
+                </div>
+                {errorAction && (
+                  <button
+                    type="button"
+                    onClick={errorAction.onClick}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-primary-700, #1d4ed8)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline',
+                      marginTop: '4px',
+                    }}
+                  >
+                    {errorAction.label} &rarr;
+                  </button>
+                )}
               </div>
             )}
 
@@ -283,30 +421,30 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               </div>
             )}
 
-            {mode === 'forgot' && forgotSubmitted ? (
-              <div 
-                className="auth-success-box"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '10px',
-                  padding: '18px',
-                  marginBottom: '16px',
-                  color: '#166534',
-                }}
-                role="status"
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '14px' }}>
-                  <CheckCircle2 size={18} className="text-success" />
-                  <span>Request Submitted to Administrator</span>
+            {/* ── Mode: Verification Pending Notice ─────────────────────────── */}
+            {mode === 'verify-pending' && (
+              <div className="verify-pending-card" role="status">
+                <div className="verify-pending-title">
+                  <Mail size={18} className="text-success" />
+                  <span>Verification Email Dispatched</span>
                 </div>
-                <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: '#14532d' }}>
-                  {forgotNotice}
+                <p className="verify-pending-body">
+                  We sent an email verification link to <span className="verify-email-highlight">{unverifiedEmail || email}</span>.
                 </p>
-                <div style={{ marginTop: '6px' }}>
+                <p className="verify-pending-body" style={{ fontSize: '12px', color: '#15803d' }}>
+                  Please check your inbox (and spam or junk folder) and click the link to activate your account.
+                </p>
+
+
+
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="resend-box-link"
+                    onClick={() => switchMode('resend')}
+                  >
+                    Didn&apos;t receive the email? Resend verification link &rarr;
+                  </button>
                   <Button
                     type="button"
                     variant="primary"
@@ -314,292 +452,344 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
                     onClick={() => switchMode('login')}
                     style={{ width: '100%' }}
                   >
-                    Back to Sign In
+                    Return to Sign In
                   </Button>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {/* ── Mode: Resend Verification Confirmation ───────────────────── */}
+            {mode === 'resend' && resendNotice && (
+              <div className="auth-success-box verify-pending-card" role="status">
+                <div className="verify-pending-title">
+                  <CheckCircle2 size={18} className="text-success" />
+                  <span>Verification Link Sent</span>
+                </div>
+                <p className="verify-pending-body">{resendNotice}</p>
+
+
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => switchMode('login')}
+                  style={{ width: '100%', marginTop: '6px' }}
+                >
+                  Back to Sign In
+                </Button>
+              </div>
+            )}
+
+            {/* ── Form Render ─────────────────────────────────────────────── */}
+            {!verifyingEmail && mode !== 'verify-pending' && !(mode === 'resend' && resendNotice) && !(mode === 'forgot' && forgotSubmitted) && (
               <form onSubmit={handleSubmit} className="auth-form" noValidate>
-              {mode === 'reset' ? (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="portal-reset-token" className="form-label">
-                      Single-Use Recovery Token <span className="required-star">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <Key size={16} className="field-icon" aria-hidden="true" />
-                      <input
-                        id="portal-reset-token"
-                        type="text"
-                        required
-                        placeholder="Paste single-use recovery token..."
-                        value={resetToken}
-                        onChange={(e) => setResetToken(e.target.value)}
-                        className="form-input"
-                        disabled={loading}
-                        autoComplete="off"
-                      />
+                {/* Dual-Option Tabs on Forgot Password Screen */}
+                {mode === 'forgot' && (
+                  <>
+                    <div className="recovery-options-tabs" role="tablist" aria-label="Password Recovery Options">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={recoveryOption === 'email'}
+                        className={`recovery-tab-btn ${recoveryOption === 'email' ? 'active' : ''}`}
+                        onClick={() => setRecoveryOption('email')}
+                      >
+                        <Mail size={14} />
+                        <span>Email Reset Link</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={recoveryOption === 'admin'}
+                        className={`recovery-tab-btn ${recoveryOption === 'admin' ? 'active' : ''}`}
+                        onClick={() => setRecoveryOption('admin')}
+                      >
+                        <UserCog size={14} />
+                        <span>Admin Assisted</span>
+                      </button>
                     </div>
-                  </div>
 
-                  <div className="form-group">
-                    <div className="label-row">
-                      <label htmlFor="portal-new-password" className="form-label">
-                        New Password <span className="required-star">*</span>
-                      </label>
-                      <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                    <div className="recovery-info-callout">
+                      {recoveryOption === 'email' ? (
+                        <>
+                          <strong>Option B — Self-Service Email Link:</strong> We will send a single-use password reset link to your email. You can choose a new password directly (link valid for 15 minutes).
+                        </>
+                      ) : (
+                        <>
+                          <strong>Option A — Administrator Reset:</strong> An Administrator will review your account and assign a temporary password (<code>Password@123</code>). You will be required to change it on next login.
+                        </>
+                      )}
                     </div>
-                    <div className="input-with-icon">
-                      <Lock size={16} className="field-icon" aria-hidden="true" />
-                      <input
-                        id="portal-new-password"
-                        type="password"
-                        required
-                        placeholder="Enter new password..."
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="form-input"
-                        disabled={loading}
-                        autoComplete="new-password"
-                      />
-                    </div>
-                  </div>
+                  </>
+                )}
 
-                  <div className="form-group">
-                    <label htmlFor="portal-confirm-password" className="form-label">
-                      Confirm New Password <span className="required-star">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <Lock size={16} className="field-icon" aria-hidden="true" />
-                      <input
-                        id="portal-confirm-password"
-                        type="password"
-                        required
-                        placeholder="Re-enter new password..."
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="form-input"
-                        disabled={loading}
-                        autoComplete="new-password"
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {mode === 'register' && (
+                {mode === 'reset' ? (
+                  <>
                     <div className="form-group">
-                      <label htmlFor="portal-name" className="form-label">
-                        Full Name <span className="required-star">*</span>
+                      <label htmlFor="portal-reset-token" className="form-label">
+                        Single-Use Recovery Token <span className="required-star">*</span>
                       </label>
                       <div className="input-with-icon">
-                        <User size={16} className="field-icon" aria-hidden="true" />
+                        <Key size={16} className="field-icon" aria-hidden="true" />
                         <input
-                          id="portal-name"
+                          id="portal-reset-token"
                           type="text"
                           required
-                          placeholder="e.g. Alex Mercer"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Paste single-use recovery token..."
+                          value={resetToken}
+                          onChange={(e) => setResetToken(e.target.value)}
                           className="form-input"
                           disabled={loading}
-                          autoComplete="name"
+                          autoComplete="off"
                         />
                       </div>
                     </div>
-                  )}
 
-                  <div className="form-group">
-                    <label htmlFor="portal-email" className="form-label">
-                      Work Email Address <span className="required-star">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <Mail size={16} className="field-icon" aria-hidden="true" />
-                      <input
-                        id="portal-email"
-                        type="email"
-                        required
-                        placeholder="name@trustvault.internal"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="form-input"
-                        disabled={loading}
-                        autoComplete="email"
-                        autoFocus={mode === 'login' || mode === 'forgot'}
-                      />
-                    </div>
-                  </div>
-
-                  {mode !== 'forgot' && (
                     <div className="form-group">
                       <div className="label-row">
-                        <label htmlFor="portal-password" className="form-label">
-                          Password <span className="required-star">*</span>
+                        <label htmlFor="portal-new-password" className="form-label">
+                          New Password <span className="required-star">*</span>
                         </label>
-                        {mode === 'register' && (
-                          <span className="label-hint">Min 8 chars (letters & numbers)</span>
-                        )}
+                        <span className="label-hint">Min 8 chars (letters & numbers)</span>
                       </div>
                       <div className="input-with-icon">
                         <Lock size={16} className="field-icon" aria-hidden="true" />
                         <input
-                          id="portal-password"
+                          id="portal-new-password"
                           type="password"
                           required
-                          placeholder="••••••••••••"
+                          placeholder="Enter new password..."
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="form-input"
                           disabled={loading}
-                          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                          autoComplete="new-password"
                         />
                       </div>
-                      {mode === 'login' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => switchMode('forgot')}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--color-primary-600)',
-                              fontSize: '11.5px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              padding: 0,
-                            }}
-                          >
-                            Forgot Password?
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => switchMode('reset')}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--text-muted, #94a3b8)',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                              padding: 0,
-                            }}
-                          >
-                            Have recovery token?
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  )}
 
-                  {mode === 'register' && (
-                    <div className="form-group role-selector-group">
-                      <label className="form-label">
-                        Requested Account Type <span className="required-star">*</span>
+                    <div className="form-group">
+                      <label htmlFor="portal-confirm-password" className="form-label">
+                        Confirm New Password <span className="required-star">*</span>
                       </label>
-                      <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
-                        <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
-                          <input
-                            type="radio"
-                            name="requestedRole"
-                            value="viewer"
-                            checked={requestedRole === 'viewer'}
-                            onChange={() => setRequestedRole('viewer')}
-                            className="sr-only"
-                          />
-                          <div className="type-card-content">
-                            <div className="type-card-header">
-                              <span className="type-card-title">Viewer</span>
-                              <span className="type-card-badge badge-viewer">Immediate Access</span>
-                            </div>
-                            <p className="type-card-desc">
-                              Standard read-only access to documents shared with you. Ready immediately upon registration.
-                            </p>
-                          </div>
-                        </label>
-
-                        <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
-                          <input
-                            type="radio"
-                            name="requestedRole"
-                            value="owner"
-                            checked={requestedRole === 'owner'}
-                            onChange={() => setRequestedRole('owner')}
-                            className="sr-only"
-                          />
-                          <div className="type-card-content">
-                            <div className="type-card-header">
-                              <span className="type-card-title">Document Owner</span>
-                              <span className="type-card-badge badge-owner">Requires Approval</span>
-                            </div>
-                            <p className="type-card-desc">
-                              Upload confidential documents and manage collaborator ACLs. Requires Administrator approval before upload rights are activated.
-                            </p>
-                          </div>
-                        </label>
+                      <div className="input-with-icon">
+                        <Lock size={16} className="field-icon" aria-hidden="true" />
+                        <input
+                          id="portal-confirm-password"
+                          type="password"
+                          required
+                          placeholder="Re-enter new password..."
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="form-input"
+                          disabled={loading}
+                          autoComplete="new-password"
+                        />
                       </div>
-                      <p className="account-type-notice">
-                        <Shield size={12} className="notice-icon" aria-hidden="true" />
-                        <span>
-                          {requestedRole === 'owner'
-                            ? 'Your account will be provisioned immediately as a Viewer while your Owner request is queued for Administrator review.'
-                            : 'You can request Owner privileges at any time after registration through an Administrator.'}
-                        </span>
-                      </p>
                     </div>
-                  )}
-                </>
-              )}
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                className="auth-submit-button"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="spinner" aria-hidden="true" />
-                    <span>
-                      {mode === 'reset'
-                        ? 'Updating password...'
-                        : mode === 'forgot'
-                          ? 'Submitting request...'
-                          : mode === 'login'
-                            ? 'Authenticating...'
-                            : 'Provisioning account...'}
-                    </span>
                   </>
                 ) : (
                   <>
-                    <span>
-                      {mode === 'reset'
-                        ? 'Set New Password'
-                        : mode === 'forgot'
-                          ? 'Send Request to Admin'
-                          : mode === 'login'
-                            ? 'Sign In to Vault'
-                            : 'Create Account'}
-                    </span>
-                    <ArrowRight size={16} aria-hidden="true" />
+                    {mode === 'register' && (
+                      <div className="form-group">
+                        <label htmlFor="portal-name" className="form-label">
+                          Full Name <span className="required-star">*</span>
+                        </label>
+                        <div className="input-with-icon">
+                          <User size={16} className="field-icon" aria-hidden="true" />
+                          <input
+                            id="portal-name"
+                            type="text"
+                            required
+                            placeholder="e.g. Alex Mercer"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="form-input"
+                            disabled={loading}
+                            autoComplete="name"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label htmlFor="portal-email" className="form-label">
+                        Work Email Address <span className="required-star">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <Mail size={16} className="field-icon" aria-hidden="true" />
+                        <input
+                          id="portal-email"
+                          type="email"
+                          required
+                          placeholder="name@trustvault.internal"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="form-input"
+                          disabled={loading}
+                          autoComplete="email"
+                          autoFocus={mode === 'login' || mode === 'forgot' || mode === 'resend'}
+                        />
+                      </div>
+                    </div>
+
+                    {mode !== 'forgot' && mode !== 'resend' && (
+                      <div className="form-group">
+                        <div className="label-row">
+                          <label htmlFor="portal-password" className="form-label">
+                            Password <span className="required-star">*</span>
+                          </label>
+                          {mode === 'register' && (
+                            <span className="label-hint">Min 8 chars (letters & numbers)</span>
+                          )}
+                        </div>
+                        <div className="input-with-icon">
+                          <Lock size={16} className="field-icon" aria-hidden="true" />
+                          <input
+                            id="portal-password"
+                            type="password"
+                            required
+                            placeholder="••••••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="form-input"
+                            disabled={loading}
+                            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                          />
+                        </div>
+                        {mode === 'login' && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => switchMode('forgot')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-primary-600)',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              Forgot Password?
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => switchMode('resend')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-muted, #94a3b8)',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              Verify email / Resend?
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {mode === 'register' && (
+                      <div className="form-group role-selector-group">
+                        <label className="form-label">
+                          Requested Account Type <span className="required-star">*</span>
+                        </label>
+                        <div className="account-type-options" role="radiogroup" aria-label="Requested Account Type">
+                          <label className={`account-type-card ${requestedRole === 'viewer' ? 'selected' : ''}`}>
+                            <input
+                              type="radio"
+                              name="requestedRole"
+                              value="viewer"
+                              checked={requestedRole === 'viewer'}
+                              onChange={() => setRequestedRole('viewer')}
+                              className="sr-only"
+                            />
+                            <div className="type-card-content">
+                              <div className="type-card-header">
+                                <span className="type-card-title">Viewer</span>
+                                <span className="type-card-badge badge-viewer">Standard Access</span>
+                              </div>
+                              <p className="type-card-desc">
+                                Read documents shared with you. Ready upon email verification.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className={`account-type-card ${requestedRole === 'owner' ? 'selected' : ''}`}>
+                            <input
+                              type="radio"
+                              name="requestedRole"
+                              value="owner"
+                              checked={requestedRole === 'owner'}
+                              onChange={() => setRequestedRole('owner')}
+                              className="sr-only"
+                            />
+                            <div className="type-card-content">
+                              <div className="type-card-header">
+                                <span className="type-card-title">Document Owner</span>
+                                <span className="type-card-badge badge-owner">Requires Approval</span>
+                              </div>
+                              <p className="type-card-desc">
+                                Upload confidential files and manage collaborator ACLs. Requires Admin approval.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
-              </Button>
-            </form>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  className="auth-submit-button"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="spinner" aria-hidden="true" />
+                      <span>
+                        {mode === 'reset'
+                          ? 'Updating password...'
+                          : mode === 'resend'
+                            ? 'Sending verification...'
+                            : mode === 'forgot'
+                              ? 'Submitting request...'
+                              : mode === 'login'
+                                ? 'Authenticating...'
+                                : 'Provisioning account...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {mode === 'reset'
+                          ? 'Set New Password'
+                          : mode === 'resend'
+                            ? 'Send Verification Email'
+                            : mode === 'forgot'
+                              ? (recoveryOption === 'email' ? 'Send Password Reset Link' : 'Request Reset from Admin')
+                              : mode === 'login'
+                                ? 'Sign In to Vault'
+                                : 'Create Account'}
+                      </span>
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </>
+                  )}
+                </Button>
+              </form>
             )}
 
+            {/* ── Mode Switching Links ────────────────────────────────────── */}
             <div className="auth-switch-container">
-              {mode === 'forgot' ? (
-                <p className="auth-switch-text">
-                  Remember your password?{' '}
-                  <button
-                    type="button"
-                    className="auth-switch-link"
-                    onClick={() => switchMode('login')}
-                  >
-                    Back to Sign in
-                  </button>
-                </p>
-              ) : mode === 'reset' ? (
+              {mode === 'forgot' || mode === 'resend' || mode === 'reset' ? (
                 <p className="auth-switch-text">
                   Remember your credentials?{' '}
                   <button
@@ -635,6 +825,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               )}
             </div>
 
+            {/* ── Evaluator Demo Roles Stack ──────────────────────────────── */}
             {mode === 'login' && (
               <div className="demo-accounts-container" aria-label="Quick Demo Accounts Selection for Evaluators">
                 <div className="demo-divider-row">

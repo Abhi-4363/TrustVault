@@ -1,6 +1,6 @@
 /**
  * TrustVault Backend - Authentication Routes
- * Exposes registration, login, and user profile endpoints.
+ * Exposes registration, email verification, login, profile, and dual-option recovery endpoints.
  */
 
 import { Router } from 'express';
@@ -10,10 +10,14 @@ import {
   getMe, 
   changePassword, 
   resetPassword,
-  requestPasswordReset 
+  requestPasswordReset,
+  requestEmailPasswordReset,
+  verifyEmail,
+  resendVerification,
 } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { 
+  authRateLimiter,
   passwordResetRateLimiter, 
   changePasswordRateLimiter 
 } from '../middleware/security.middleware.js';
@@ -21,14 +25,28 @@ import {
 const router = Router();
 
 // Public Authentication Endpoints
-router.post('/register', register);
-router.post('/login', login);
+router.post('/register', authRateLimiter, register);
+router.post('/login', authRateLimiter, login);
+
+// Email Verification Endpoints
+router.get('/verify-email', verifyEmail);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', passwordResetRateLimiter, resendVerification);
+
+// Option A: Admin-Assisted Password Reset Request
 router.post('/forgot-password', passwordResetRateLimiter, requestPasswordReset);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password/admin', passwordResetRateLimiter, requestPasswordReset);
+
+// Option B: Self-Service Password Reset via Email Link
+router.post('/forgot-password-email', passwordResetRateLimiter, requestEmailPasswordReset);
+router.post('/request-email-reset', passwordResetRateLimiter, requestEmailPasswordReset);
+
+// Complete Token Password Reset (used for both email reset link and token entry)
+router.post('/reset-password', passwordResetRateLimiter, resetPassword);
+router.post('/reset-password-email', passwordResetRateLimiter, resetPassword);
 
 // Protected Identity & Security Endpoints
 router.get('/me', requireAuth, getMe);
 router.post('/change-password', requireAuth, changePasswordRateLimiter, changePassword);
 
 export default router;
-
