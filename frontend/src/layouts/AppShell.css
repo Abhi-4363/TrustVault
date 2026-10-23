@@ -37,12 +37,24 @@
   box-sizing: border-box;
 }
 
+.app-shell.unauthenticated .app-content-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .app-footer {
   background-color: #ffffff;
   border-top: 1px solid var(--border-light);
   padding: var(--space-4) var(--space-8);
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+.app-shell.unauthenticated .app-footer {
+  padding: 6px var(--space-8);
+  font-size: 11px;
 }
 
 .footer-content {
