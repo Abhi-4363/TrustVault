@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
+import { buildApiUrl } from '../../config/api';
 import './UploadModal.css';
 
 const MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -42,7 +43,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     if (!isOpen || !token) return;
     const fetchDirectory = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/documents/users/directory', {
+        const res = await fetch(buildApiUrl('/documents/users/directory'), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -178,7 +179,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
         formData.append('recipients', JSON.stringify(recipients));
       }
 
-      const response = await fetch('http://localhost:5000/api/documents', {
+      const response = await fetch(buildApiUrl('/documents'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

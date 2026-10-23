@@ -31,7 +31,10 @@ import {
   KeyRound
 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { buildApiUrl } from '../../config/api';
 import './AdminDashboard.css';
+
+const API_BASE = buildApiUrl('');
 
 export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountChange }) {
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'audit' | 'users' | 'notifications'
@@ -98,7 +101,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token || !isAdmin) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/admin/analytics', {
+      const res = await fetch(`${API_BASE}/admin/analytics`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -129,7 +132,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       if (auditFilters.startDate) query.set('startDate', auditFilters.startDate);
       if (auditFilters.endDate) query.set('endDate', auditFilters.endDate);
 
-      const res = await fetch(`http://localhost:5000/api/admin/audit-logs?${query.toString()}`, {
+      const res = await fetch(`${API_BASE}/admin/audit-logs?${query.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -152,7 +155,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token || !isAdmin) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/admin/users', {
+      const res = await fetch(`${API_BASE}/admin/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -173,7 +176,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
   const fetchPendingRequests = useCallback(async () => {
     if (!token || !isAdmin) return;
     try {
-      const res = await fetch('http://localhost:5000/api/admin/owner-requests', {
+      const res = await fetch(`${API_BASE}/admin/owner-requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -192,7 +195,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     const targetFilter = filterParam !== undefined ? filterParam : notificationsFilter;
     setNotificationsLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/notifications?filter=${targetFilter}`, {
+      const res = await fetch(`${API_BASE}/admin/notifications?filter=${targetFilter}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -233,7 +236,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
   const handleMarkNotificationRead = async (id) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}/read`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/${id}/read`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -256,7 +259,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
   const handleMarkAllNotificationsRead = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/mark-all-read`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/mark-all-read`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -280,7 +283,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     setResetLoading(true);
     try {
       const notifId = notif._id || notif.id;
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reset-password`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/${notifId}/reset-password`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -311,7 +314,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     const notif = confirmRejectModal.notification;
     try {
       const notifId = notif._id || notif.id;
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reject-password-reset`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/${notifId}/reject-password-reset`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -339,7 +342,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token) return;
     try {
       const notifId = notif._id || notif.id;
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/approve-owner`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/${notifId}/approve-owner`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -366,7 +369,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token) return;
     try {
       const notifId = notif._id || notif.id;
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${notifId}/reject-owner`, {
+      const res = await fetch(`${API_BASE}/admin/notifications/${notifId}/reject-owner`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -393,7 +396,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token) return;
     setUpdatingRoleId(targetUserId);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/owner-requests/${targetUserId}/approve`, {
+      const res = await fetch(`${API_BASE}/admin/owner-requests/${targetUserId}/approve`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -422,7 +425,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token) return;
     setUpdatingRoleId(targetUserId);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/owner-requests/${targetUserId}/reject`, {
+      const res = await fetch(`${API_BASE}/admin/owner-requests/${targetUserId}/reject`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -455,7 +458,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     const targetId = targetUser.id || targetUser._id;
     setResetLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/password-reset/approve`, {
+      const res = await fetch(`${API_BASE}/admin/users/${targetId}/password-reset/approve`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -484,7 +487,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token || !targetUser) return;
     const targetId = targetUser.id || targetUser._id;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/password-reset/reject`, {
+      const res = await fetch(`${API_BASE}/admin/users/${targetId}/password-reset/reject`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -536,7 +539,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     const targetId = resetPasswordModalUser.id || resetPasswordModalUser._id;
     setResetLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${targetId}/reset-password`, {
+      const res = await fetch(`${API_BASE}/admin/users/${targetId}/reset-password`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -566,7 +569,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (auditFilters.startDate) query.set('startDate', auditFilters.startDate);
     if (auditFilters.endDate) query.set('endDate', auditFilters.endDate);
 
-    const exportUrl = `http://localhost:5000/api/admin/audit-logs/export?${query.toString()}`;
+    const exportUrl = `${API_BASE}/admin/audit-logs/export?${query.toString()}`;
 
     // Fetch as blob with Authorization token
     fetch(exportUrl, {
@@ -600,8 +603,8 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     const targetId = targetUser.id || targetUser._id;
     const isDeactivating = targetUser.isActive;
     const endpoint = isDeactivating
-      ? `http://localhost:5000/api/admin/users/${targetId}/deactivate`
-      : `http://localhost:5000/api/admin/users/${targetId}/reactivate`;
+      ? `${API_BASE}/admin/users/${targetId}/deactivate`
+      : `${API_BASE}/admin/users/${targetId}/reactivate`;
 
     setDeactivatingUserId(targetId);
     try {
@@ -631,7 +634,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
     if (!token) return;
     setUpdatingRoleId(targetUserId);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${targetUserId}/role`, {
+      const res = await fetch(`${API_BASE}/admin/users/${targetUserId}/role`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,

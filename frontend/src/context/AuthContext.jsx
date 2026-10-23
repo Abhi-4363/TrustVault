@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL, buildApiUrl } from '../config/api';
 
 const AuthContext = createContext(null);
 
 const TOKEN_STORAGE_KEY = 'trustvault_auth_token';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

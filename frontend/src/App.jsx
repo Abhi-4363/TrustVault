@@ -40,6 +40,7 @@ import {
 } from './mock/mockData';
 import './App.css';
 import { useAuth } from './context/AuthContext';
+import { buildApiUrl } from './config/api';
 
 export function App() {
   const [activeNav, setActiveNav] = useState('overview');
@@ -78,7 +79,7 @@ export function App() {
   // Attempt live connection check to Express backend
   const checkBackendHealth = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/health');
+      const response = await fetch(buildApiUrl('/health'));
       if (response.ok) {
         const data = await response.json();
         setBackendHealth(data);
@@ -95,7 +96,7 @@ export function App() {
   const fetchVaultDocuments = async () => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/documents', {
+      const response = await fetch(buildApiUrl('/documents'), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -162,7 +163,7 @@ export function App() {
   const fetchLiveActivities = async () => {
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/documents/audit/activity', {
+      const res = await fetch(buildApiUrl('/documents/audit/activity'), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -252,7 +253,7 @@ export function App() {
   // Fetch pending owner requests count for Admin badge
   useEffect(() => {
     if (user?.role === 'admin' && token) {
-      fetch('http://localhost:5000/api/admin/owner-requests', {
+      fetch(buildApiUrl('/admin/owner-requests'), {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then((r) => (r.ok ? r.json() : null))
@@ -385,7 +386,7 @@ export function App() {
           }
 
           // Fetch document bytes with Bearer auth (token never in URL)
-          const response = await fetch(`http://localhost:5000/api/documents/${doc.id}/download`, {
+          const response = await fetch(buildApiUrl(`/documents/${doc.id}/download`), {
             headers: { Authorization: `Bearer ${token}` },
           });
 
@@ -459,7 +460,7 @@ export function App() {
       if (doc.isReal) {
         if (window.confirm(`Are you sure you want to permanently delete "${doc.name}" from private vault storage?`)) {
           try {
-            const response = await fetch(`http://localhost:5000/api/documents/${doc.id}`, {
+            const response = await fetch(buildApiUrl(`/documents/${doc.id}`), {
               method: 'DELETE',
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -500,7 +501,7 @@ export function App() {
     } else if (action === 'details') {
       if (doc.isReal) {
         // Fetch real immutable audit trail for this document
-        fetch(`http://localhost:5000/api/documents/${doc.id}/audit`, {
+        fetch(buildApiUrl(`/documents/${doc.id}/audit`), {
           headers: { Authorization: `Bearer ${token}` },
         })
           .then((r) => r.json())

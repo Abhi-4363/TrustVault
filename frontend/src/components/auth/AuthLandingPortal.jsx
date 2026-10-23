@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import TermsAndPrivacyModals from '../legal/TermsAndPrivacyModals';
+import { buildApiUrl } from '../../config/api';
 import './AuthLandingPortal.css';
 
 export function AuthLandingPortal({ initialMode = 'login' }) {
@@ -51,6 +52,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [devVerifyUrl, setDevVerifyUrl] = useState('');
   const [devResetUrl, setDevResetUrl] = useState('');
+  const [emailDeliveryFailed, setEmailDeliveryFailed] = useState(false);
 
   const getTodayMaxDate = () => {
     return new Date().toISOString().split('T')[0];
@@ -137,20 +139,23 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
       }
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
+        const response = await fetch(buildApiUrl('/auth/resend-verification'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),
         });
         const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error?.message || data.message || 'Failed to submit resend verification request.');
+        }
         setResendNotice(
           data.message || 'If an unverified account exists with this email address, a new verification link has been sent.'
         );
         if (data.devVerifyUrl) {
           setDevVerifyUrl(data.devVerifyUrl);
         }
-      } catch {
-        setError('Network error submitting resend request. Please verify your connection.');
+      } catch (err) {
+        setError(err.message || 'Network error submitting resend request. Please verify your connection.');
       } finally {
         setLoading(false);
       }
@@ -166,8 +171,8 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
       setLoading(true);
       try {
         const endpoint = recoveryOption === 'email'
-          ? 'http://localhost:5000/api/auth/forgot-password-email'
-          : 'http://localhost:5000/api/auth/forgot-password';
+          ? buildApiUrl('/auth/forgot-password-email')
+          : buildApiUrl('/auth/forgot-password');
 
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -175,6 +180,9 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
           body: JSON.stringify({ email: email.trim() }),
         });
         const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error?.message || data.message || 'Failed to submit recovery request.');
+        }
         setForgotSubmitted(true);
         if (data.devResetUrl) {
           setDevResetUrl(data.devResetUrl);
@@ -185,8 +193,8 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               ? 'If an account exists with this email address, a password reset link has been sent to your inbox.'
               : 'If this email address is registered, your password reset request has been submitted to an Administrator for review.')
         );
-      } catch {
-        setError('Network error submitting recovery request. Please try again.');
+      } catch (err) {
+        setError(err.message || 'Network error submitting recovery request. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -214,7 +222,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
 
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:5000/api/auth/reset-password', {
+        const response = await fetch(buildApiUrl('/auth/reset-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -317,9 +325,13 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
           if (regResult.devVerifyUrl) {
             setDevVerifyUrl(regResult.devVerifyUrl);
           }
+          const deliveryFailed = Boolean(regResult.emailDelivery && regResult.emailDelivery.sent === false);
+          setEmailDeliveryFailed(deliveryFailed);
           setForgotNotice(
             regResult.message ||
-              'Account registered! Please check your inbox to verify your email address before signing in.'
+              (deliveryFailed
+                ? 'Account created, but verification email could not be delivered to your inbox (host blocked outbound SMTP). Please check your email configuration on Render or use Resend Verification.'
+                : 'Account registered! Please check your inbox to verify your email address before signing in.')
           );
           setMode('verify-pending');
         }
@@ -353,6 +365,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
     setResendNotice('');
     setDevVerifyUrl('');
     setDevResetUrl('');
+    setEmailDeliveryFailed(false);
   };
 
   return (
@@ -513,17 +526,33 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
             {mode === 'verify-pending' && (
               <div className="verify-pending-card" role="status">
                 <div className="verify-pending-title">
-                  <Mail size={18} className="text-success" />
-                  <span>Verification Email Dispatched</span>
+                  {emailDeliveryFailed ? (
+                    <AlertCircle size={18} style={{ color: '#d97706' }} />
+                  ) : (
+                    <Mail size={18} className="text-success" />
+                  )}
+                  <span>{emailDeliveryFailed ? 'Account Created — Email Delivery Blocked' : 'Verification Email Dispatched'}</span>
                 </div>
-                <p className="verify-pending-body">
-                  We sent an email verification link to <span className="verify-email-highlight">{unverifiedEmail || email}</span>.
-                </p>
-                <p className="verify-pending-body" style={{ fontSize: '12px', color: '#15803d' }}>
-                  Please check your inbox (and spam or junk folder) and click the link to activate your account.
-                </p>
-
-
+                
+                {emailDeliveryFailed ? (
+                  <div style={{ background: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217, 119, 6, 0.3)', borderRadius: '8px', padding: '12px', margin: '8px 0' }}>
+                    <p className="verify-pending-body" style={{ color: '#b45309', margin: 0, fontWeight: 500 }}>
+                      Your TrustVault account was registered successfully, but outbound mail on port 587/465 is blocked by Render.
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#92400e', marginTop: '6px', lineHeight: 1.4 }}>
+                      To send verification emails on Render, add a <strong>RESEND_API_KEY</strong> or <strong>BREVO_API_KEY</strong> in your Render dashboard (transactional HTTPS over port 443).
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="verify-pending-body">
+                      We sent an email verification link to <span className="verify-email-highlight">{unverifiedEmail || email}</span>.
+                    </p>
+                    <p className="verify-pending-body" style={{ fontSize: '12px', color: '#15803d' }}>
+                      Please check your inbox (and spam or junk folder) and click the link to activate your account.
+                    </p>
+                  </>
+                )}
 
                 <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <button

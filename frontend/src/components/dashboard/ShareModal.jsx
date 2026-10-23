@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
+import { buildApiUrl } from '../../config/api';
 import './ShareModal.css';
 
 export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) {
@@ -48,7 +49,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
       setLoading(true);
       try {
         // Fetch directory users
-        const dirRes = await fetch('http://localhost:5000/api/documents/users/directory', {
+        const dirRes = await fetch(buildApiUrl('/documents/users/directory'), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (dirRes.ok) {
@@ -58,7 +59,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
 
         // If this is a real document, fetch its live ACL and visibility
         if (document.isReal) {
-          const permRes = await fetch(`http://localhost:5000/api/documents/${document.id}/permissions`, {
+          const permRes = await fetch(buildApiUrl(`/documents/${document.id}/permissions`), {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (permRes.ok) {
@@ -128,7 +129,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
 
     try {
       if (document.isReal) {
-        const response = await fetch(`http://localhost:5000/api/documents/${document.id}/visibility`, {
+        const response = await fetch(buildApiUrl(`/documents/${document.id}/visibility`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -184,7 +185,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
 
     try {
       if (document.isReal) {
-        const response = await fetch(`http://localhost:5000/api/documents/${document.id}/permissions`, {
+        const response = await fetch(buildApiUrl(`/documents/${document.id}/permissions`), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -243,7 +244,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
     try {
       if (document.isReal) {
         const response = await fetch(
-          `http://localhost:5000/api/documents/${document.id}/permissions/${targetUserId}`,
+          buildApiUrl(`/documents/${document.id}/permissions/${targetUserId}`),
           {
             method: 'DELETE',
             headers: {

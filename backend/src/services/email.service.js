@@ -17,14 +17,14 @@ export function clearSentEmails() {
 let transporterInstance = null;
 
 /**
- * Initializes or returns the cached Nodemailer transporter
+ * Initializes or returns the cached Nodemailer transporter with strict timeouts
  */
 export function getTransporter() {
   if (transporterInstance) {
     return transporterInstance;
   }
 
-  // If in test mode and no SMTP user is provided, or explicitly set to mock
+  // If in test mode and no live SMTP flag is set
   if (config.isTest && !process.env.FORCE_REAL_SMTP) {
     return null;
   }
@@ -32,14 +32,16 @@ export function getTransporter() {
   const hasCredentials = Boolean(config.smtpUser && config.smtpPass);
 
   if (!hasCredentials) {
-    console.warn('[Email Service]: SMTP credentials not fully configured. Outbound emails will be simulated.');
+    if (!config.resendApiKey && !config.brevoApiKey) {
+      console.warn('[Email Service]: SMTP credentials and transactional APIs not configured. Outbound emails will be simulated.');
+    }
     return null;
   }
 
   transporterInstance = nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
-    secure: config.smtpSecure, // true for 465, false for 587
+    secure: config.smtpSecure || config.smtpPort === 465, // true for 465, false for 587
     auth: {
       user: config.smtpUser,
       pass: config.smtpPass,
@@ -48,15 +50,106 @@ export function getTransporter() {
       // Never disable certificate verification
       rejectUnauthorized: true,
     },
+    // Strict connection timeouts to prevent hanging on cloud hosts (e.g. Render) where SMTP ports are blocked
+    connectionTimeout: 5000, // 5s connection timeout
+    greetingTimeout: 5000,   // 5s greeting timeout
+    socketTimeout: 8000,     // 8s socket inactivity timeout
   });
 
   return transporterInstance;
 }
 
 /**
- * Verify transporter SMTP connectivity
+ * Send email via Resend HTTPS REST API (Port 443 - Recommended for Render)
+ */
+async function sendViaResend({ to, subject, html, text }) {
+  const fromAddress = config.emailFrom && !config.emailFrom.includes('gmail.com')
+    ? config.emailFrom
+    : 'onboarding@resend.dev';
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `TrustVault Security <${fromAddress}>`,
+      to: [to],
+      subject,
+      html,
+      text,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.message || `Resend API returned status ${response.status}`);
+  }
+
+  return {
+    success: true,
+    provider: 'resend',
+    messageId: data.id,
+  };
+}
+
+/**
+ * Send email via Brevo HTTPS REST API (Port 443 - Free 300/day, supports Gmail sender)
+ */
+async function sendViaBrevo({ to, subject, html, text }) {
+  const senderEmail = config.emailFrom || 'konagallaabhiram@gmail.com';
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': config.brevoApiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: 'TrustVault Security', email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.message || `Brevo API returned status ${response.status}`);
+  }
+
+  return {
+    success: true,
+    provider: 'brevo',
+    messageId: data.messageId,
+  };
+}
+
+/**
+ * Verify email delivery service connectivity
  */
 export async function verifyEmailConnection() {
+  if (config.resendApiKey) {
+    return {
+      connected: true,
+      provider: 'resend',
+      message: 'Transactional email configured via Resend HTTPS API (Port 443, Render compatible)',
+    };
+  }
+
+  if (config.brevoApiKey) {
+    return {
+      connected: true,
+      provider: 'brevo',
+      message: 'Transactional email configured via Brevo HTTPS API (Port 443, Render compatible)',
+    };
+  }
+
   const transporter = getTransporter();
   if (!transporter) {
     return {
@@ -69,6 +162,7 @@ export async function verifyEmailConnection() {
     await transporter.verify();
     return {
       connected: true,
+      provider: 'smtp',
       message: `Successfully connected to SMTP server ${config.smtpHost}:${config.smtpPort}`,
     };
   } catch (error) {
@@ -102,10 +196,8 @@ export async function sendEmail({ to, subject, html, text }) {
     timestamp: new Date(),
   });
 
-  const transporter = getTransporter();
-
-  // If running in test mode without live SMTP override, simulate successful delivery
-  if (!transporter) {
+  // If in test mode and not forced to use live delivery, simulate success immediately
+  if (config.isTest && !process.env.FORCE_REAL_SMTP) {
     return {
       success: true,
       simulated: true,
@@ -113,19 +205,59 @@ export async function sendEmail({ to, subject, html, text }) {
     };
   }
 
+  // 1. Try Resend HTTPS API if configured
+  if (config.resendApiKey) {
+    try {
+      const result = await sendViaResend({ to, subject, html, text });
+      console.log(`[Email Service Delivered via Resend] Recipient: ${to}, MessageId: ${result.messageId}`);
+      return result;
+    } catch (error) {
+      console.error(`[Email Service Resend Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
+      // Fall through to other providers if available
+    }
+  }
+
+  // 2. Try Brevo HTTPS API if configured
+  if (config.brevoApiKey) {
+    try {
+      const result = await sendViaBrevo({ to, subject, html, text });
+      console.log(`[Email Service Delivered via Brevo] Recipient: ${to}, MessageId: ${result.messageId}`);
+      return result;
+    } catch (error) {
+      console.error(`[Email Service Brevo Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
+      // Fall through to SMTP
+    }
+  }
+
+  // 3. Fallback to Nodemailer SMTP
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    console.warn(`[Email Service Simulated] No live email provider active. Recipient: ${to}`);
+    return {
+      success: false,
+      simulated: true,
+      error: 'No active email provider configured (set RESEND_API_KEY, BREVO_API_KEY, or SMTP credentials).',
+      messageId: `simulated-${Date.now()}`,
+    };
+  }
+
   try {
     const info = await transporter.sendMail(mailOptions);
+    console.log(`[Email Service Delivered via SMTP] Recipient: ${to}, MessageId: ${info.messageId}`);
     return {
       success: true,
+      provider: 'smtp',
       messageId: info.messageId,
       accepted: info.accepted,
       response: info.response,
     };
   } catch (error) {
-    // Log safe diagnostic without credentials
+    // Log safe diagnostic without credentials or tokens
     console.error(`[Email Service Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
     return {
       success: false,
+      provider: 'smtp',
       error: error.message,
     };
   }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
+import { buildApiUrl } from '../../config/api';
 import './AccountSettings.css';
 
 export function AccountSettings({ 
@@ -201,7 +202,7 @@ export function AccountSettings({
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+      const response = await fetch(buildApiUrl('/auth/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

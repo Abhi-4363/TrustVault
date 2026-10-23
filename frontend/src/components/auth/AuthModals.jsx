@@ -3,6 +3,7 @@ import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, 
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { TermsAndPrivacyModals } from '../legal/TermsAndPrivacyModals';
+import { buildApiUrl } from '../../config/api';
 import './AuthModals.css';
 
 export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
@@ -38,7 +39,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
       }
       setIsLoading(true);
       try {
-        const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
+        const res = await fetch(buildApiUrl('/auth/forgot-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),

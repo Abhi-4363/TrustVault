@@ -12,6 +12,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { buildApiUrl } from '../../config/api';
 import './ForcedPasswordChangeModal.css';
 
 export function ForcedPasswordChangeModal({ user, token, onPasswordChanged, onLogout }) {
@@ -52,7 +53,7 @@ export function ForcedPasswordChangeModal({ user, token, onPasswordChanged, onLo
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/change-password', {
+      const res = await fetch(buildApiUrl('/auth/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

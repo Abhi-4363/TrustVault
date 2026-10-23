@@ -23,12 +23,31 @@ export function createApp() {
   // Defensive HTTP Security Headers
   app.use(securityHeaders);
 
+  // Configured allowed frontend origins (local + production Vercel + dynamic CLIENT_URL)
+  const allowedOrigins = new Set([
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://trust-vault-9185.vercel.app',
+  ]);
+
+  if (config.clientUrl) {
+    allowedOrigins.add(config.clientUrl.replace(/\/+$/, ''));
+  }
+
   // Cross-Origin Resource Sharing (CORS) configured for frontend client origin
   app.use(
     cors({
-      origin: config.clientUrl,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        const norm = origin.replace(/\/+$/, '');
+        if (allowedOrigins.has(norm) || allowedOrigins.has(origin) || config.clientUrl === '*') {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-require-verification', 'x-enforce-terms'],
       exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
       credentials: true,
     })

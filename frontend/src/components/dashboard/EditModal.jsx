@@ -12,6 +12,7 @@ import {
 import { Button } from '../common/Button';
 import { StatusBadge } from '../common/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
+import { buildApiUrl } from '../../config/api';
 import './EditModal.css';
 
 export function EditModal({ isOpen, onClose, document, onUpdateSuccess }) {
@@ -60,7 +61,7 @@ export function EditModal({ isOpen, onClose, document, onUpdateSuccess }) {
 
     try {
       if (document.isReal) {
-        const response = await fetch(`http://localhost:5000/api/documents/${document.id}`, {
+        const response = await fetch(buildApiUrl(`/documents/${document.id}`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
