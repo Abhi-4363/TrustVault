@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, 
   Search, 
@@ -7,7 +7,11 @@ import {
   HelpCircle,
   LogOut,
   Shield,
-  ChevronDown
+  ChevronDown,
+  Sun,
+  Moon,
+  Monitor,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
@@ -16,7 +20,7 @@ import './AppHeader.css';
 /**
  * AppHeader Component
  * Desktop & mobile header with breadcrumbs, search trigger,
- * live backend health status, and active user session profile controls.
+ * live backend health status, theme selection control, and active user session profile controls.
  */
 export function AppHeader({
   pageTitle = 'Overview',
@@ -32,6 +36,61 @@ export function AppHeader({
 }) {
   const { user, isAuthenticated, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+  
+  // Theme state persisted in localStorage
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('trustvault_theme') || 'system';
+  });
+
+  const themeRef = useRef(null);
+  const profileRef = useRef(null);
+
+  // Sync theme attribute to documentElement
+  useEffect(() => {
+    const applyTheme = (t) => {
+      if (t === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    };
+
+    applyTheme(theme);
+    try {
+      localStorage.setItem('trustvault_theme', theme);
+    } catch {
+      // LocalStorage access handling
+    }
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e) => {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [theme]);
+
+  // Click-outside listener for dropdown menus
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (themeRef.current && !themeRef.current.contains(e.target)) {
+        setThemeDropdownOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   // Search bar is only displayed for authenticated vault sessions
   const isSearchVisible = showSearch !== undefined 
@@ -58,11 +117,11 @@ export function AppHeader({
     <header className="app-header" aria-label="Application Header">
       <div className="header-left">
         {!showMenuToggle ? (
-          <div className="header-unauth-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-            <div style={{ backgroundColor: 'var(--color-primary-600)', color: '#ffffff', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="header-unauth-brand">
+            <div className="brand-icon-shield">
               <Shield size={16} />
             </div>
-            <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            <span className="brand-text-logo">
               TrustVault
             </span>
           </div>
@@ -79,7 +138,7 @@ export function AppHeader({
           </button>
         )}
 
-        <nav className="header-breadcrumb" aria-label="Breadcrumb">
+        <nav className={`header-breadcrumb ${!showMenuToggle ? 'hide-on-mobile' : ''}`} aria-label="Breadcrumb">
           <ol className="breadcrumb-list">
             <li className="breadcrumb-item">
               <span className="breadcrumb-root">TrustVault</span>
@@ -135,9 +194,78 @@ export function AppHeader({
           <HelpCircle size={18} />
         </button>
 
+        {/* Theme Selector Control */}
+        <div className="theme-dropdown-container" ref={themeRef}>
+          <button
+            type="button"
+            className="header-icon-btn theme-toggle-btn"
+            onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
+            aria-label={`Theme: ${theme}. Click to change theme`}
+            aria-expanded={themeDropdownOpen}
+            aria-haspopup="true"
+            title={`Appearance Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`}
+            id="header-theme-selector-btn"
+          >
+            {theme === 'dark' ? (
+              <Moon size={17} className="theme-icon-active" />
+            ) : theme === 'light' ? (
+              <Sun size={17} className="theme-icon-active" />
+            ) : (
+              <Monitor size={17} className="theme-icon-active" />
+            )}
+          </button>
+
+          {themeDropdownOpen && (
+            <div className="theme-dropdown-menu" role="menu" aria-label="Theme appearance options">
+              <div className="dropdown-menu-header">
+                <span className="dropdown-menu-title">Appearance Theme</span>
+              </div>
+              <button
+                type="button"
+                className={`dropdown-item theme-option ${theme === 'light' ? 'active' : ''}`}
+                role="menuitem"
+                onClick={() => {
+                  setTheme('light');
+                  setThemeDropdownOpen(false);
+                }}
+              >
+                <Sun size={15} />
+                <span className="theme-label">Light Theme</span>
+                {theme === 'light' && <Check size={14} className="theme-check" />}
+              </button>
+              <button
+                type="button"
+                className={`dropdown-item theme-option ${theme === 'dark' ? 'active' : ''}`}
+                role="menuitem"
+                onClick={() => {
+                  setTheme('dark');
+                  setThemeDropdownOpen(false);
+                }}
+              >
+                <Moon size={15} />
+                <span className="theme-label">Dark Theme</span>
+                {theme === 'dark' && <Check size={14} className="theme-check" />}
+              </button>
+              <button
+                type="button"
+                className={`dropdown-item theme-option ${theme === 'system' ? 'active' : ''}`}
+                role="menuitem"
+                onClick={() => {
+                  setTheme('system');
+                  setThemeDropdownOpen(false);
+                }}
+              >
+                <Monitor size={15} />
+                <span className="theme-label">System Default</span>
+                {theme === 'system' && <Check size={14} className="theme-check" />}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Active Session / Authentication Trigger */}
         {isAuthenticated && user ? (
-          <div className="profile-dropdown-container">
+          <div className="profile-dropdown-container" ref={profileRef}>
             <button
               type="button"
               className="user-profile-trigger"

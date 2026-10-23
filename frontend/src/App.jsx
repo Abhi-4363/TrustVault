@@ -156,6 +156,8 @@ export function App() {
           };
         });
         setVaultDocuments(formatted);
+      } else if (response.status === 401) {
+        logout();
       }
     } catch (err) {
       console.error('[Document Fetch Error]:', err);
@@ -446,10 +448,11 @@ export function App() {
             link.download = downloadFilename;
             document.body.appendChild(link);
             link.click();
+            if (link.parentNode) link.parentNode.removeChild(link);
+            // Retain blob in memory for 60 seconds so mobile download managers can complete
             setTimeout(() => {
-              if (link.parentNode) link.parentNode.removeChild(link);
               URL.revokeObjectURL(downloadUrl);
-            }, 100);
+            }, 60000);
           }
         } catch (err) {
           openModal({

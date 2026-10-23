@@ -19,6 +19,28 @@ import './UploadModal.css';
 
 const MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.bin', '.msi', '.vbs', '.ps1'];
+const ALLOWED_EXTENSIONS = [
+  '.pdf', '.png', '.jpg', '.jpeg', '.gif', 
+  '.docx', '.xlsx', '.pptx', '.zip', 
+  '.txt', '.csv', '.json', '.md', '.log'
+];
+
+const MIME_TO_EXTENSION = {
+  'application/pdf': '.pdf',
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/gif': '.gif',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'application/zip': '.zip',
+  'text/plain': '.txt',
+  'text/csv': '.csv',
+  'application/json': '.json',
+  'text/markdown': '.md',
+  'text/x-log': '.log',
+};
 
 export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
   const { user, token } = useAuth();
@@ -59,9 +81,11 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
 
   if (!isOpen) return null;
 
-  const handleFileSelection = (file) => {
+  const handleFileSelection = (rawFile) => {
     setError(null);
-    if (!file) return;
+    if (!rawFile) return;
+
+    let file = rawFile;
 
     // Check size limit (25MB)
     if (file.size > MAX_SIZE_BYTES) {
@@ -69,17 +93,37 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
       return;
     }
 
+    // Determine extension
+    let ext = file.name.includes('.') ? ('.' + file.name.split('.').pop().toLowerCase()) : '';
+
+    // Mobile camera/picker fallback: deduce extension if filename lacks one
+    if (!ext && file.type && MIME_TO_EXTENSION[file.type]) {
+      ext = MIME_TO_EXTENSION[file.type];
+      try {
+        file = new File([rawFile], `${rawFile.name || 'document'}${ext}`, { type: rawFile.type });
+      } catch {
+        // Fallback for older browsers
+      }
+    }
+
     // Check prohibited extensions
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       setError(`Files with extension ${ext} are restricted for organizational security.`);
+      return;
+    }
+
+    // Check supported backend extensions
+    if (ext && !ALLOWED_EXTENSIONS.includes(ext)) {
+      setError(`Unsupported file format '${ext}'. Supported formats: PDF, Word (.docx), Excel (.xlsx), Images (.png, .jpg), Text, and ZIP.`);
       return;
     }
 
     setSelectedFile(file);
     if (!title) {
       // Pre-fill title without extension
-      const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      const baseName = file.name.includes('.') 
+        ? file.name.substring(0, file.name.lastIndexOf('.'))
+        : file.name;
       setTitle(baseName);
     }
   };
@@ -148,6 +192,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // Prevent duplicate submission on mobile tap
     if (!selectedFile) {
       setError('Please select a document to upload.');
       return;
@@ -275,12 +320,17 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (!selectedFile) fileInputRef.current?.click();
+              }}
             >
               <input 
                 type="file" 
                 ref={fileInputRef} 
-                style={{ display: 'none' }}
+                accept=".pdf,.png,.jpg,.jpeg,.gif,.docx,.xlsx,.pptx,.zip,.txt,.csv,.json,.md,.log,image/*,application/pdf"
+                className="upload-dropzone-input"
+                disabled={loading}
+                aria-label="Select document to upload"
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0]) {
                     handleFileSelection(e.target.files[0]);

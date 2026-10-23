@@ -327,6 +327,124 @@
   background-color: var(--color-danger-bg);
 }
 
+/* ── Theme Selector Dropdown ─────────────────────────────────────────────── */
+.theme-dropdown-container {
+  position: relative;
+}
+
+.theme-toggle-btn {
+  color: var(--text-muted);
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text-main);
+  background-color: var(--bg-hover);
+}
+
+.theme-icon-active {
+  color: var(--color-primary-600);
+}
+
+[data-theme="dark"] .theme-icon-active {
+  color: #60a5fa;
+}
+
+.theme-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 190px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 60;
+  animation: slideUp 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-menu-header {
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 4px;
+}
+
+.dropdown-menu-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.theme-option:hover {
+  background-color: var(--bg-hover);
+}
+
+.theme-option.active {
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .theme-option.active {
+  background-color: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+}
+
+.theme-label {
+  flex: 1;
+  text-align: left;
+  margin-left: 8px;
+}
+
+.theme-check {
+  color: var(--color-primary-600);
+}
+
+/* ── Unauthenticated Brand Logo ─────────────────────────────────────────── */
+.header-unauth-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.brand-icon-shield {
+  background-color: var(--color-primary-600);
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-text-logo {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
 /* ── Responsive Viewports ────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .app-header {
@@ -354,6 +472,12 @@
   .header-left {
     gap: var(--space-2);
   }
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .auth-header-actions {
+    gap: 6px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -371,8 +495,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .profile-dropdown-menu {
+  .profile-dropdown-menu,
+  .theme-dropdown-menu {
     right: 0;
-    width: min(250px, calc(100vw - 16px));
+    width: min(230px, calc(100vw - 16px));
   }
 }
