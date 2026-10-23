@@ -598,47 +598,131 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               </div>
             )}
 
+            {/* ── Mode: Forgot Password Confirmation ──────────────────────── */}
+            {mode === 'forgot' && forgotSubmitted && (
+              <div className="auth-success-box verify-pending-card" role="status">
+                <div className="verify-pending-title">
+                  <CheckCircle2 size={18} className="text-success" />
+                  <span>
+                    {recoveryOption === 'email'
+                      ? 'Password Reset Link Dispatched'
+                      : 'Admin Recovery Request Submitted'}
+                  </span>
+                </div>
+                <p className="verify-pending-body">{forgotNotice}</p>
+
+                {devResetUrl && (
+                  <div className="dev-verify-banner" style={{ marginTop: '8px', marginBottom: '8px' }}>
+                    <div className="dev-verify-badge">Developer Local Testing Reset Link</div>
+                    <a
+                      href={devResetUrl}
+                      className="dev-verify-link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        try {
+                          const urlObj = new URL(devResetUrl);
+                          const tok = urlObj.searchParams.get('resetToken') || urlObj.searchParams.get('token');
+                          if (tok) {
+                            setResetToken(tok);
+                            setMode('reset');
+                            setForgotSubmitted(false);
+                          }
+                        } catch {
+                          // fallback
+                        }
+                      }}
+                    >
+                      {devResetUrl}
+                    </a>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => switchMode('login')}
+                  style={{ width: '100%', marginTop: '6px' }}
+                >
+                  Back to Sign In
+                </Button>
+              </div>
+            )}
+
             {/* ── Form Render ─────────────────────────────────────────────── */}
             {!verifyingEmail && mode !== 'verify-pending' && !(mode === 'resend' && resendNotice) && !(mode === 'forgot' && forgotSubmitted) && (
               <form onSubmit={handleSubmit} className="auth-form" noValidate>
-                {/* Dual-Option Tabs on Forgot Password Screen */}
+                {/* Dual-Option Recovery Method Selector on Forgot Password Screen */}
                 {mode === 'forgot' && (
-                  <>
-                    <div className="recovery-options-tabs" role="tablist" aria-label="Password Recovery Options">
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={recoveryOption === 'email'}
-                        className={`recovery-tab-btn ${recoveryOption === 'email' ? 'active' : ''}`}
+                  <div className="recovery-selection-section" aria-label="Available Account Recovery Options">
+                    <span className="recovery-section-label">Select Recovery Method</span>
+                    
+                    <div className="recovery-cards-grid" role="radiogroup" aria-label="Password Recovery Options">
+                      <div
+                        role="radio"
+                        tabIndex={0}
+                        aria-checked={recoveryOption === 'email'}
+                        className={`recovery-choice-card ${recoveryOption === 'email' ? 'selected' : ''}`}
                         onClick={() => setRecoveryOption('email')}
+                        onKeyDown={(e) => {
+                          if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault();
+                            setRecoveryOption('email');
+                          }
+                        }}
                       >
-                        <Mail size={14} />
-                        <span>Email Reset Link</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={recoveryOption === 'admin'}
-                        className={`recovery-tab-btn ${recoveryOption === 'admin' ? 'active' : ''}`}
-                        onClick={() => setRecoveryOption('admin')}
-                      >
-                        <UserCog size={14} />
-                        <span>Admin Assisted</span>
-                      </button>
-                    </div>
+                        <div className="recovery-card-radio">
+                          <span className={`radio-dot ${recoveryOption === 'email' ? 'active' : ''}`} />
+                        </div>
+                        <div className="recovery-card-body">
+                          <div className="recovery-card-header">
+                            <div className="recovery-card-icon-box icon-email">
+                              <Mail size={15} />
+                            </div>
+                            <div className="recovery-card-title-group">
+                              <span className="recovery-card-title">Email Reset Link</span>
+                              <span className="recovery-card-badge badge-instant">Instant • 15 Mins</span>
+                            </div>
+                          </div>
+                          <p className="recovery-card-desc">
+                            Direct self-service recovery. A single-use link is dispatched to your registered email to immediately set a new password.
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="recovery-info-callout">
-                      {recoveryOption === 'email' ? (
-                        <>
-                          <strong>Option B — Self-Service Email Link:</strong> We will send a single-use password reset link to your email. You can choose a new password directly (link valid for 15 minutes).
-                        </>
-                      ) : (
-                        <>
-                          <strong>Option A — Administrator Reset:</strong> An Administrator will review your account and assign a temporary password (<code>Password@123</code>). You will be required to change it on next login.
-                        </>
-                      )}
+                      <div
+                        role="radio"
+                        tabIndex={0}
+                        aria-checked={recoveryOption === 'admin'}
+                        className={`recovery-choice-card ${recoveryOption === 'admin' ? 'selected' : ''}`}
+                        onClick={() => setRecoveryOption('admin')}
+                        onKeyDown={(e) => {
+                          if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault();
+                            setRecoveryOption('admin');
+                          }
+                        }}
+                      >
+                        <div className="recovery-card-radio">
+                          <span className={`radio-dot ${recoveryOption === 'admin' ? 'active' : ''}`} />
+                        </div>
+                        <div className="recovery-card-body">
+                          <div className="recovery-card-header">
+                            <div className="recovery-card-icon-box icon-admin">
+                              <UserCog size={15} />
+                            </div>
+                            <div className="recovery-card-title-group">
+                              <span className="recovery-card-title">Admin Assisted</span>
+                              <span className="recovery-card-badge badge-admin">Managed Reset</span>
+                            </div>
+                          </div>
+                          <p className="recovery-card-desc">
+                            Governance reset. An Administrator reviews your account identity and provisions a temporary password requiring change on first login.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {mode === 'reset' ? (

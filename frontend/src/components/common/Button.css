@@ -1,14 +1,32 @@
+/* ==============================================================================
+   TrustVault — Button Design System Component
+   Clean enterprise buttons with distinct hierarchy, micro-interactions, and focus rings.
+   ============================================================================== */
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  font-family: var(--font-family-base);
   font-weight: var(--font-medium);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
   white-space: nowrap;
   user-select: none;
   border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--border-focus-ring);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn:disabled {
@@ -17,96 +35,116 @@
   pointer-events: none;
 }
 
-/* Sizes */
+/* ── Sizes ───────────────────────────────────────────────────────────────── */
 .btn-sm {
-  padding: var(--space-1) var(--space-2-5, 10px);
+  padding: 5px 10px;
   font-size: var(--text-xs);
   height: 32px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-md {
-  padding: var(--space-2) var(--space-3-5, 14px);
+  padding: 8px 16px;
   font-size: var(--text-sm);
   height: 38px;
+  border-radius: var(--radius-md);
 }
 
 .btn-lg {
-  padding: var(--space-2-5, 10px) var(--space-5);
+  padding: 11px 20px;
   font-size: var(--text-base);
   height: 44px;
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-semibold);
 }
 
-/* Primary */
+/* ── Primary Variant ──────────────────────────────────────────────────────── */
 .btn-primary {
-  background-color: var(--color-primary-600);
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
   color: var(--text-inverse);
-  box-shadow: var(--shadow-sm);
-}
-.btn-primary:hover {
-  background-color: var(--color-primary-700);
-  box-shadow: var(--shadow-md);
-}
-.btn-primary:active {
-  background-color: var(--color-primary-800);
+  border-color: #1d4ed8;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-/* Secondary */
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+  border-color: #1e40af;
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: #1e40af;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Secondary Variant ────────────────────────────────────────────────────── */
 .btn-secondary {
   background-color: var(--bg-card);
   color: var(--text-main);
-  border-color: var(--border-light);
+  border-color: var(--border-medium);
   box-shadow: var(--shadow-xs);
 }
-.btn-secondary:hover {
+
+.btn-secondary:hover:not(:disabled) {
   background-color: var(--bg-hover);
-  border-color: var(--border-medium);
+  border-color: var(--color-slate-400);
+  color: var(--color-slate-900);
+  box-shadow: var(--shadow-sm);
 }
-.btn-secondary:active {
+
+.btn-secondary:active:not(:disabled) {
   background-color: var(--bg-active);
 }
 
-/* Outline */
+/* ── Outline Variant ──────────────────────────────────────────────────────── */
 .btn-outline {
   background-color: transparent;
   color: var(--color-primary-600);
   border-color: var(--color-primary-200);
 }
-.btn-outline:hover {
+
+.btn-outline:hover:not(:disabled) {
   background-color: var(--color-primary-50);
   border-color: var(--color-primary-500);
+  color: var(--color-primary-700);
 }
 
-/* Ghost */
+/* ── Ghost Variant ────────────────────────────────────────────────────────── */
 .btn-ghost {
   background-color: transparent;
   color: var(--text-secondary);
 }
-.btn-ghost:hover {
+
+.btn-ghost:hover:not(:disabled) {
   background-color: var(--bg-hover);
   color: var(--text-main);
 }
 
-/* Danger */
+/* ── Danger Variant ───────────────────────────────────────────────────────── */
 .btn-danger {
-  background-color: var(--color-danger-bg);
-  color: var(--color-danger-text);
-  border-color: var(--color-danger-border);
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  color: var(--text-inverse);
+  border-color: #dc2626;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
-.btn-danger:hover {
-  background-color: #ffe4e6;
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+  border-color: #b91c1c;
 }
 
 .btn-icon {
   flex-shrink: 0;
 }
 
+/* ── Mobile Responsive Adjustments ────────────────────────────────────────── */
 @media (max-width: 640px) {
   .btn {
-    min-height: 38px;
+    min-height: 40px;
   }
   .btn-sm {
     min-height: 34px;
-    padding: var(--space-1-5) var(--space-3);
+    padding: 6px 12px;
   }
   .btn-md {
     min-height: 42px;
@@ -115,4 +153,3 @@
     min-height: 46px;
   }
 }
-

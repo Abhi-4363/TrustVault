@@ -1,3 +1,8 @@
+/* ==============================================================================
+   TrustVault — EmptyState Design System Component
+   Balanced, non-empty placeholder states with clear call-to-actions.
+   ============================================================================== */
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -5,35 +10,39 @@
   justify-content: center;
   text-align: center;
   padding: var(--space-10) var(--space-6);
-  border: 1px dashed var(--border-medium);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-slate-50);
+  border: 1.5px dashed var(--border-medium);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  transition: all var(--transition-fast);
 }
 
 .empty-state-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-radius: var(--radius-full);
-  background-color: var(--color-slate-100);
-  color: var(--text-muted);
+  background-color: #ffffff;
+  color: var(--color-primary-600);
   margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
 }
 
 .empty-state-title {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-size: 1.05rem;
+  font-weight: var(--font-bold);
   color: var(--text-main);
+  letter-spacing: -0.015em;
   margin-bottom: var(--space-2);
 }
 
 .empty-state-description {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  max-width: 380px;
-  line-height: 1.5;
+  max-width: 420px;
+  line-height: 1.55;
   margin-bottom: var(--space-5);
 }
 

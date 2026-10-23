@@ -1,7 +1,15 @@
+/* ==============================================================================
+   TrustVault — AppShell Design System Layout
+   Main viewport coordinator with fluid layout, content boundaries, and enterprise footer.
+   ============================================================================== */
+
 .app-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg-app);
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .app-main-layout {
@@ -11,7 +19,9 @@
   margin-left: var(--sidebar-width);
   min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   transition: margin-left var(--transition-normal);
+  background-color: var(--bg-app);
 }
 
 .app-main-layout.no-sidebar {
@@ -21,13 +31,14 @@
 .app-content-container {
   flex: 1;
   padding: var(--space-8);
-  max-width: 1400px;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .app-footer {
-  background-color: var(--bg-card);
+  background-color: #ffffff;
   border-top: 1px solid var(--border-light);
   padding: var(--space-4) var(--space-8);
   font-size: var(--text-xs);
@@ -40,6 +51,8 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
 .footer-left {
@@ -49,8 +62,9 @@
 }
 
 .footer-brand {
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--text-main);
+  letter-spacing: -0.01em;
 }
 
 .footer-divider {
@@ -66,11 +80,14 @@
 .footer-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1-5);
+  gap: 6px;
   background-color: var(--color-slate-100);
-  padding: 3px 8px;
+  border: 1px solid var(--border-light);
+  padding: 3px 9px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 @media (max-width: 900px) {
@@ -95,7 +112,7 @@
   .footer-content {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-2-5, 10px);
+    gap: 8px;
   }
   .footer-left {
     flex-wrap: wrap;
@@ -115,4 +132,3 @@
     padding: var(--space-3) var(--space-2);
   }
 }
-

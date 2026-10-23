@@ -1,10 +1,17 @@
+/* ==============================================================================
+   TrustVault — DocumentTable Design System Component
+   Accessible enterprise data table with real-time filtering, responsive mobile
+   card view, and fine-grained action buttons.
+   ============================================================================== */
+
 .document-table-container {
-  background-color: var(--bg-card);
+  background-color: #ffffff;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   margin-bottom: var(--space-6);
+  transition: box-shadow var(--transition-fast);
 }
 
 .table-header-toolbar {
@@ -14,6 +21,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   flex-wrap: wrap;
 }
 
@@ -24,16 +32,19 @@
 }
 
 .table-heading {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-main);
+  letter-spacing: -0.015em;
+  margin: 0;
 }
 
 .table-count-badge {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-size: 11px;
+  font-weight: 700;
   background-color: var(--color-slate-100);
   color: var(--text-secondary);
+  border: 1px solid var(--border-light);
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }
@@ -59,21 +70,23 @@
 }
 
 .table-search-input {
-  padding: 6px 12px 6px 32px;
+  padding: 7px 12px 7px 32px;
   font-size: var(--text-xs);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   background-color: var(--bg-app);
-  width: 200px;
+  color: var(--text-main);
+  width: 220px;
   transition: all var(--transition-fast);
+  font-family: inherit;
 }
 
 .table-search-input:focus {
   outline: none;
-  border-color: var(--color-primary-500);
-  background-color: var(--bg-card);
-  box-shadow: 0 0 0 2px var(--color-primary-100);
-  width: 240px;
+  border-color: var(--color-primary-600);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px var(--border-focus-ring);
+  width: 250px;
 }
 
 .table-filter-group {
@@ -90,35 +103,44 @@
 }
 
 .table-filter-select {
-  padding: 6px 12px 6px 30px;
+  padding: 7px 14px 7px 32px;
   font-size: var(--text-xs);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   background-color: var(--bg-app);
   color: var(--text-secondary);
   cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.table-filter-select:hover {
+  background-color: #ffffff;
+  border-color: var(--border-medium);
 }
 
 .table-filter-select:focus {
   outline: none;
-  border-color: var(--color-primary-500);
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px var(--border-focus-ring);
 }
 
 .table-refresh-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1-5, 6px);
+  gap: 6px;
   padding: 6px 12px;
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: 600;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  background-color: var(--bg-app);
+  background-color: #ffffff;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
-  height: 32px;
-  min-height: 32px;
+  height: 34px;
+  min-height: 34px;
+  box-shadow: var(--shadow-xs);
 }
 
 .table-refresh-btn:hover {
@@ -128,10 +150,10 @@
 }
 
 .table-refresh-btn:active {
-  transform: scale(0.98);
+  transform: translateY(1px);
 }
 
-/* Table */
+/* ── Table Layout ────────────────────────────────────────────────────────── */
 .table-responsive-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -140,22 +162,23 @@
 .enterprise-table {
   width: 100%;
   text-align: left;
+  border-collapse: collapse;
 }
 
 .enterprise-table th {
-  padding: var(--space-3) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background-color: var(--color-slate-50);
+  letter-spacing: 0.05em;
+  background-color: #f8fafc;
   border-bottom: 1px solid var(--border-light);
   white-space: nowrap;
 }
 
 .enterprise-table td {
-  padding: var(--space-3) var(--space-3);
+  padding: 13px 16px;
   border-bottom: 1px solid var(--border-light);
   vertical-align: middle;
 }
@@ -165,14 +188,14 @@
 }
 
 .table-row:hover {
-  background-color: var(--bg-hover);
+  background-color: #f8fafc;
 }
 
 .table-row:last-child td {
   border-bottom: none;
 }
 
-/* Document Cell */
+/* ── Document Name Cell ──────────────────────────────────────────────────── */
 .document-cell {
   display: flex;
   align-items: center;
@@ -184,11 +207,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
   background-color: var(--color-slate-100);
   flex-shrink: 0;
+  border: 1px solid var(--border-light);
 }
 
 .file-icon-pdf { color: #dc2626; }
@@ -198,46 +222,68 @@
 .doc-meta {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+
+.doc-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .doc-title {
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  max-width: 260px;
+  letter-spacing: -0.01em;
+}
+
+.doc-vault-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .doc-subtext {
-  font-size: var(--text-xs);
+  font-size: 11.5px;
   color: var(--text-muted);
 }
 
-/* Owner Cell */
+/* ── Owner Cell ──────────────────────────────────────────────────────────── */
 .owner-cell {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
   white-space: nowrap;
 }
 
 .avatar-chip {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-full);
-  background-color: var(--color-slate-800);
-  color: var(--text-inverse);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #ffffff;
   font-size: 10px;
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .owner-name {
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
@@ -251,22 +297,24 @@
   text-align: right;
 }
 
-/* Actions Group */
+/* ── Action Buttons Group ─────────────────────────────────────────────────── */
 .action-buttons-group {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 4px;
 }
 
 .row-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   color: var(--text-muted);
   border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -276,6 +324,11 @@
   border-color: var(--border-light);
 }
 
+.row-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--border-focus-ring);
+}
+
 .row-action-edit:hover {
   color: #2563eb;
   background-color: #eff6ff;
@@ -283,30 +336,12 @@
 }
 
 .row-action-delete:hover {
-  color: var(--color-danger-icon);
-  background-color: var(--color-danger-bg);
-  border-color: var(--color-danger-border);
+  color: #dc2626;
+  background-color: #fef2f2;
+  border-color: #fecaca;
 }
 
-.doc-title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.doc-vault-pill {
-  font-size: 10px;
-  font-weight: var(--font-semibold);
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-success-bg);
-  color: var(--color-success-text);
-  border: 1px solid var(--color-success-border);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-/* Responsive Document Table & Mobile Card View */
+/* ── Responsive Mobile Card View ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   .table-header-toolbar {
     flex-direction: column;
@@ -358,13 +393,13 @@
   .enterprise-table tr.table-row {
     display: flex;
     flex-direction: column;
-    background-color: var(--bg-card);
+    background-color: #ffffff;
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     margin-bottom: var(--space-3);
-    gap: var(--space-2-5, 10px);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    gap: 8px;
+    box-shadow: var(--shadow-xs);
   }
 
   .enterprise-table td {
@@ -390,7 +425,7 @@
     white-space: normal;
     word-break: break-word;
     font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
+    font-weight: 600;
   }
 
   .doc-title-row {
@@ -401,7 +436,7 @@
   .td-owner::before {
     content: "Owner: ";
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-muted);
     margin-right: 6px;
     flex-shrink: 0;
@@ -410,7 +445,7 @@
   .td-date::before {
     content: "Updated: ";
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-muted);
     margin-right: 6px;
     flex-shrink: 0;
@@ -419,7 +454,7 @@
   .td-access::before {
     content: "Access: ";
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-muted);
     margin-right: 6px;
     flex-shrink: 0;
@@ -477,4 +512,3 @@
     min-height: 36px;
   }
 }
-

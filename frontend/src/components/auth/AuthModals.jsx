@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
+import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, EyeOff, UserCog, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { TermsAndPrivacyModals } from '../legal/TermsAndPrivacyModals';
@@ -7,7 +7,8 @@ import { buildApiUrl } from '../../config/api';
 import './AuthModals.css';
 
 export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
-  const [mode, setMode] = useState(initialMode); // 'login' | 'register'
+  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'forgot'
+  const [recoveryOption, setRecoveryOption] = useState('email'); // 'email' | 'admin'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +40,11 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
       }
       setIsLoading(true);
       try {
-        const res = await fetch(buildApiUrl('/auth/forgot-password'), {
+        const endpoint = recoveryOption === 'email'
+          ? buildApiUrl('/auth/forgot-password-email')
+          : buildApiUrl('/auth/forgot-password');
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),
@@ -48,7 +53,9 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
         setForgotSubmitted(true);
         setForgotNotice(
           data.message ||
-            'If this email address is registered, your password reset request has been submitted to an Administrator for review.'
+            (recoveryOption === 'email'
+              ? 'If an account exists with this email address, a password reset link has been dispatched to your inbox.'
+              : 'If this email address is registered, your password reset request has been submitted to an Administrator for review.')
         );
       } catch {
         setError('Network error submitting password reset request');
@@ -180,6 +187,58 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="auth-form">
+              {mode === 'forgot' && (
+                <div className="recovery-selection-section" style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setRecoveryOption('email')}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '4px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: recoveryOption === 'email' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                        backgroundColor: recoveryOption === 'email' ? '#eff6ff' : 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '12px', color: 'var(--text-main)' }}>
+                        <Mail size={14} className="text-primary" />
+                        <span>Email Reset Link</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Instant 15-min link</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRecoveryOption('admin')}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '4px',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: recoveryOption === 'admin' ? '1.5px solid var(--color-primary-600, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                        backgroundColor: recoveryOption === 'admin' ? '#eff6ff' : 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '12px', color: 'var(--text-main)' }}>
+                        <UserCog size={14} style={{ color: '#7c3aed' }} />
+                        <span>Admin Assisted</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Manager approval</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {mode === 'register' && (
                 <div className="form-group">
                   <label htmlFor="reg-name" className="form-label">
@@ -462,7 +521,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
                   </>
                 ) : (
                   mode === 'forgot'
-                    ? 'Send Request to Admin'
+                    ? (recoveryOption === 'email' ? 'Send Password Reset Link' : 'Request Reset from Admin')
                     : mode === 'login'
                       ? 'Sign in'
                       : 'Create account'

@@ -1,8 +1,14 @@
+/* ==============================================================================
+   TrustVault — AuthModals Design System Component
+   Modal-based authentication & password recovery dialogs.
+   ============================================================================== */
+
 .auth-overlay {
   position: fixed;
   inset: 0;
   background-color: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,9 +23,11 @@
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--border-light);
   width: 100%;
-  max-width: 440px;
-  overflow: hidden;
+  max-width: 460px;
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
   animation: slideUp 200ms ease-out;
+  position: relative;
 }
 
 .auth-header {
@@ -34,11 +42,12 @@
   align-items: center;
   gap: var(--space-1-5);
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: 600;
   color: var(--color-primary-700);
   background-color: var(--color-primary-50);
   padding: 3px 10px;
   border-radius: var(--radius-full);
+  border: 1px solid var(--color-primary-200);
 }
 
 .auth-close-btn {
@@ -49,10 +58,16 @@
   height: 32px;
   border-radius: var(--radius-md);
   color: var(--text-muted);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  background: transparent;
 }
+
 .auth-close-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-main);
+  border-color: var(--border-light);
 }
 
 .auth-body {
@@ -60,8 +75,8 @@
 }
 
 .auth-title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
+  font-size: 1.35rem;
+  font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.02em;
   margin-bottom: var(--space-1);
@@ -81,10 +96,11 @@
   background-color: var(--color-danger-bg);
   border: 1px solid var(--color-danger-border);
   color: var(--color-danger-text);
-  padding: var(--space-2-5, 10px) var(--space-3);
+  padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
   margin-bottom: var(--space-4);
+  line-height: 1.4;
 }
 
 .auth-form {
@@ -96,12 +112,12 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1-5);
+  gap: 5px;
 }
 
 .form-label {
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: 600;
   color: var(--text-main);
   display: flex;
   align-items: center;
@@ -133,7 +149,8 @@
 
 .auth-modal .form-input {
   width: 100%;
-  padding: 10px 12px 10px 40px !important;
+  height: 42px;
+  padding: 0 12px 0 40px !important;
   font-size: var(--text-sm);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
@@ -152,8 +169,8 @@
 
 .auth-modal .form-input:focus {
   outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px var(--color-primary-100);
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px var(--border-focus-ring);
 }
 
 .auth-submit-btn {
@@ -169,22 +186,33 @@
 }
 
 .switch-link {
-  font-weight: var(--font-semibold);
+  font-weight: 600;
   color: var(--color-primary-600);
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
-}
-.switch-link:hover {
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.spinner {
-  animation: spin 1s linear infinite;
+.switch-link:hover {
+  color: var(--color-primary-700);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@media (max-width: 480px) {
+  .auth-overlay {
+    padding: var(--space-2);
+  }
+  .auth-modal {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: var(--radius-lg);
+  }
+  .auth-header {
+    padding: var(--space-4) var(--space-4) 0;
+  }
+  .auth-body {
+    padding: var(--space-4);
+  }
 }
