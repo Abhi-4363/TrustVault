@@ -38,6 +38,7 @@ export const config = {
   smtpPass: cleanStr(process.env.SMTP_PASS, '').replace(/\s+/g, ''),
   appBaseUrl: cleanStr(process.env.APP_BASE_URL || process.env.CLIENT_URL, 'http://localhost:5173'),
   // Transactional Email HTTPS APIs (Compatible with Render where direct SMTP ports are restricted)
+  emailProvider: cleanStr(process.env.EMAIL_PROVIDER, '').toLowerCase(),
   resendApiKey: cleanStr(process.env.RESEND_API_KEY, ''),
   brevoApiKey: cleanStr(process.env.BREVO_API_KEY, ''),
 };

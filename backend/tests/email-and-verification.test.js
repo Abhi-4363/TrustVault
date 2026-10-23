@@ -12,7 +12,7 @@
  * 7. Security invariants: token hashes never exposed, audit logging records safe metadata
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import crypto from 'crypto';
 import { createApp } from '../src/app.js';
@@ -198,6 +198,46 @@ describe('Email Verification & Dual-Option Password Recovery Suite', () => {
       const auditLogs = await AuditLog.find({ action: 'EMAIL_VERIFIED' });
       expect(auditLogs.length).toBe(1);
       expect(JSON.stringify(auditLogs[0])).not.toContain(rawToken);
+    });
+
+    it('1.12 Live registration dispatches verification via Brevo HTTPS API when configured', async () => {
+      const originalEnv = { ...process.env };
+      process.env.EMAIL_PROVIDER = 'brevo';
+      process.env.BREVO_API_KEY = 'xkeysib-e2e-test-key';
+      process.env.FORCE_LIVE_EMAIL = 'true';
+
+      let calledUrl = null;
+      let sentHeaders = null;
+
+      vi.spyOn(global, 'fetch').mockImplementation(async (url, options) => {
+        calledUrl = url;
+        sentHeaders = options.headers;
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ messageId: '<brevo-e2e-reg-001@smtp-relay.brevo.com>' }),
+        };
+      });
+
+      try {
+        const res = await request(app)
+          .post('/api/auth/register')
+          .send({
+            name: 'Brevo User',
+            email: 'brevo.user@trustvault.internal',
+            password: 'SecurePassword123!',
+            requireVerification: true,
+          });
+
+        expect(res.status).toBe(201);
+        expect(res.body.data.emailDelivery.attempted).toBe(true);
+        expect(res.body.data.emailDelivery.sent).toBe(true);
+        expect(calledUrl).toBe('https://api.brevo.com/v3/smtp/email');
+        expect(sentHeaders['api-key']).toBe('xkeysib-e2e-test-key');
+      } finally {
+        process.env = originalEnv;
+        vi.restoreAllMocks();
+      }
     });
   });
 

@@ -3,7 +3,7 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-246%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-265%20passed-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-28%2F28%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
@@ -102,7 +102,55 @@ graph TD
 
 ---
 
-## 5. Demonstration Credentials
+## 5. Transactional Email Service & Provider Configuration
+
+TrustVault features a robust, unified multi-provider transactional email subsystem designed for high reliability across local development and cloud production platforms (such as Render and Vercel):
+
+### Supported Email Providers (`EMAIL_PROVIDER`)
+You can select the active provider explicitly via the `EMAIL_PROVIDER` environment variable, or allow TrustVault to automatically detect available credentials using sensible fallback precedence (`brevo` -> `resend` -> `smtp` -> `simulated`).
+
+1. **Brevo HTTPS REST API (Recommended for Cloud / Render)**:
+   - **Provider Value**: `EMAIL_PROVIDER=brevo`
+   - **Transport**: HTTPS POST to `https://api.brevo.com/v3/smtp/email` over Port 443.
+   - **Authentication**: `api-key` request header with `BREVO_API_KEY`.
+   - **Render Compatibility**: Guaranteed compatibility on cloud platforms like Render where outbound raw SMTP ports (25, 465, 587) are restricted or firewalled.
+   - **⚠️ Mandatory Sender Verification**: The configured sender address (`EMAIL_FROM`) **must be verified in Brevo**. In the Brevo dashboard, navigate to **Senders & IP** -> **Senders** and verify your sender address or domain before dispatching emails. Brevo will reject unverified senders with HTTP 400.
+
+2. **Resend HTTPS REST API**:
+   - **Provider Value**: `EMAIL_PROVIDER=resend`
+   - **Transport**: HTTPS POST to `https://api.resend.com/emails` with Bearer token authentication over Port 443.
+   - **Credentials**: `RESEND_API_KEY`.
+
+3. **Nodemailer SMTP (Gmail / Custom)**:
+   - **Provider Value**: `EMAIL_PROVIDER=smtp`
+   - **Transport**: Direct TCP connection to `smtp.gmail.com` (Port 587 / 465).
+   - **Credentials**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
+
+### Duplicate Transmission Prevention (Single-Provider Dispatch)
+To prevent duplicate emails, TrustVault determines the single active provider prior to dispatch. Each email is routed exclusively through the chosen provider. If an upstream provider fails, the service records the rejection and logs safe diagnostics without falling through to secondary providers.
+
+### Transactional Email Security Invariants
+- **Acceptance Confirmation**: The email service only reports delivery success when the active provider confirms acceptance (e.g., returning a valid `messageId` from Brevo or `id` from Resend).
+- **Zero Leakage Logging**: System logs and audit trails record delivery status and recipient metadata, but never log API keys, SMTP passwords, raw verification tokens, or reset tokens.
+- **Link & Token Expiration**: Account verification links remain valid for 24 hours; password recovery links strictly expire after 15 minutes. Both use single-use cryptographic SHA-256 tokens.
+
+### Email Service Environment Variables Reference
+
+| Variable | Required | Default | Description |
+| :--- | :---: | :--- | :--- |
+| `EMAIL_PROVIDER` | Optional | `brevo` | Explicit provider choice: `brevo`, `resend`, or `smtp`. |
+| `BREVO_API_KEY` | For Brevo | `""` | Brevo v3 API key (`xkeysib-...`) from Brevo Settings -> API Keys. |
+| `EMAIL_FROM` | Yes | `konagallaabhiram@gmail.com` | Sender email address. **Must be verified in your email provider dashboard.** |
+| `RESEND_API_KEY` | For Resend | `""` | Resend API key (`re_...`) from Resend dashboard. |
+| `SMTP_HOST` | For SMTP | `smtp.gmail.com` | SMTP relay server hostname. |
+| `SMTP_PORT` | For SMTP | `587` | SMTP port (`587` for STARTTLS, `465` for SSL). |
+| `SMTP_USER` | For SMTP | `""` | SMTP username / Gmail account address. |
+| `SMTP_PASS` | For SMTP | `""` | Google App Password (16 characters, spaces stripped). |
+| `APP_BASE_URL` | Yes | `http://localhost:5173` | Base frontend URL used to generate verification and reset links. |
+
+---
+
+## 6. Demonstration Credentials
 
 The login portal includes a **Quick Demo Accounts** selection with verified credentials ready for evaluation:
 
@@ -146,7 +194,7 @@ All 16 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematicall
 
 ## 7. Automated Test Suite
 
-TrustVault maintains a 100% test pass rate across 11 comprehensive test suites with **151 automated integration tests**:
+TrustVault maintains a 100% test pass rate across 17 comprehensive test suites with **265 automated integration tests**:
 
 ```bash
 cd backend
@@ -155,8 +203,10 @@ npm test
 
 | Suite | File | Tests | Key Invariants Covered |
 | :--- | :--- | :---: | :--- |
-| **Admin Notifications & Reset** | `tests/admin-notifications-and-password-reset.test.js` | 22 | Role-wide password change, forgot-password request anti-enumeration, Admin Notification Center, temporary Password@123 reset, mandatory password change policy |
-| **Visibility & Password Mgmt** | `tests/visibility-and-password-management.test.js` | 12 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption |
+| **Brevo & Multi-Provider Delivery** | `tests/brevo-and-providers.test.js` | 18 | Brevo HTTPS REST API (`api-key` header, Port 443), explicit `EMAIL_PROVIDER` selection (`brevo`, `resend`, `smtp`), single-provider dispatch (duplicate prevention), messageId acceptance verification, unverified sender error handling |
+| **Email Verification & Password Reset** | `tests/email-and-verification.test.js` | 20 | Unverified user blocking (403), 24h verification link token lifecycle, anti-reuse, live Brevo registration dispatch, dual-option password recovery, 15m reset link |
+| **Admin Notifications & Reset** | `tests/admin-notifications-and-password-reset.test.js` | 28 | Role-wide password change, forgot-password request anti-enumeration, Admin Notification Center, temporary Password@123 reset, mandatory password change policy |
+| **Visibility & Password Mgmt** | `tests/visibility-and-password-management.test.js` | 14 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption |
 | **Admin Governance & Audit** | `tests/admin-governance.test.js` | 32 | System analytics, un-truncated CSV/JSON export, user account deactivation, role updates |
 | **Security Threat Integration**| `tests/security-integration.test.js` | 18 | Automated verification of all 19 entries in `THREATS.md` |
 | **Upload Signature & Search** | `tests/search-validation.test.js` | 18 | Magic-number binary header inspection, scoped search isolation |
@@ -164,6 +214,9 @@ npm test
 | **Document Access & Streaming**| `tests/document.test.js` | 16 | Private disk storage, UUID obfuscation, download authorization |
 | **Owner Approval Workflow** | `tests/owner-approval-workflow.test.js` | 13 | Viewer-default registration, pending owner queue, approval/rejection lifecycle, downgrade with zero data loss, self-promotion blocking |
 | **Authentication & RBAC** | `tests/auth.test.js` | 13 | bcrypt (12 rounds), HMAC SHA-256 JWT, deactivated account blocking |
+| **Registration & Profile** | `tests/registration-and-profile.test.js` | 19 | Complete registration input validation, profile retrieval, password requirements |
+| **Visibility Sharing Transitions** | `tests/visibility-sharing-transitions.test.js` | 19 | Dynamic switching between Private, Specific Users, and All Users, ACL preservation and cleanup |
+| **Viewer Owner Request** | `tests/viewer-owner-request.test.js` | 12 | Viewer self-service role escalation request lifecycle and Admin moderation queue |
 | **Tamper-Resistant Audit** | `tests/audit.test.js` | 7 | Append-only ledger, mutation rejection, chronological ordering |
 | **Service Health Check** | `tests/health.test.js` | 3 | Server uptime, environment state, storage accessibility |
 | **Immediate Access Revocation**| `tests/revocation.test.js` | 2 | Zero token caching lag, direct-to-database check |
@@ -462,6 +515,6 @@ All required hiring challenge deliverables are documented in full detail:
 - **Author**: Snovasys Fresher Challenge 2026 Candidate
 - **Architecture**: Zero-Trust Document Security & Governance
 - **Repository**: [https://github.com/Abhi-4363/TrustVault](https://github.com/Abhi-4363/TrustVault)
-- **Automated Test Results**: 16 test files passed, 246/246 tests passing (100% pass rate)
+- **Automated Test Results**: 17 test files passed, 265/265 tests passing (100% pass rate)
 - **Production Build**: 0 errors, Vite 6 production bundle verified
 

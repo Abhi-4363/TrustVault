@@ -7,6 +7,7 @@ import { createApp } from './src/app.js';
 import { config } from './src/config/env.js';
 import { connectDatabase } from './src/config/database.js';
 import { runSeed } from './scripts/seed.js';
+import { verifyEmailConnection } from './src/services/email.service.js';
 
 async function startServer() {
   try {
@@ -26,6 +27,13 @@ async function startServer() {
       console.log(` Health:      http://localhost:${config.port}/api/health`);
       console.log(` Client URL:  ${config.clientUrl}`);
       console.log(`=========================================`);
+
+      // Asynchronously log email provider diagnostic status
+      verifyEmailConnection()
+        .then((diag) => {
+          console.log(`[Email Service]: Provider: ${diag.provider} | Status: ${diag.connected ? 'Ready' : 'Not Connected'} | ${diag.message || diag.error}`);
+        })
+        .catch(() => {});
     });
 
     // Graceful process termination handlers

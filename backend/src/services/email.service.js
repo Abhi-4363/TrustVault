@@ -60,17 +60,46 @@ export function getTransporter() {
 }
 
 /**
+ * Resolves active email provider based on EMAIL_PROVIDER or available credentials.
+ * Ensures only a single provider is selected to prevent duplicate email transmissions.
+ */
+export function getActiveProvider() {
+  const explicit = (process.env.EMAIL_PROVIDER !== undefined ? process.env.EMAIL_PROVIDER : (config.emailProvider || '')).toLowerCase().trim();
+  if (['brevo', 'resend', 'smtp'].includes(explicit)) {
+    return explicit;
+  }
+  // Automatic fallback precedence: Brevo -> Resend -> SMTP
+  const brevoKey = process.env.BREVO_API_KEY !== undefined ? process.env.BREVO_API_KEY : config.brevoApiKey;
+  if (brevoKey) return 'brevo';
+
+  const resendKey = process.env.RESEND_API_KEY !== undefined ? process.env.RESEND_API_KEY : config.resendApiKey;
+  if (resendKey) return 'resend';
+
+  const smtpUser = process.env.SMTP_USER !== undefined ? process.env.SMTP_USER : config.smtpUser;
+  const smtpPass = process.env.SMTP_PASS !== undefined ? process.env.SMTP_PASS : config.smtpPass;
+  if (smtpUser && smtpPass) return 'smtp';
+
+  return 'simulated';
+}
+
+/**
  * Send email via Resend HTTPS REST API (Port 443 - Recommended for Render)
  */
-async function sendViaResend({ to, subject, html, text }) {
-  const fromAddress = config.emailFrom && !config.emailFrom.includes('gmail.com')
-    ? config.emailFrom
+export async function sendViaResend({ to, subject, html, text }) {
+  const apiKey = process.env.RESEND_API_KEY || config.resendApiKey;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured in environment variables.');
+  }
+
+  const senderEmail = process.env.EMAIL_FROM || config.emailFrom;
+  const fromAddress = senderEmail && !senderEmail.includes('gmail.com')
+    ? senderEmail
     : 'onboarding@resend.dev';
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.resendApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -84,8 +113,9 @@ async function sendViaResend({ to, subject, html, text }) {
 
   const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.message || `Resend API returned status ${response.status}`);
+  if (!response.ok || !data.id) {
+    const errMsg = data.message || `Resend API returned status ${response.status}`;
+    throw new Error(errMsg);
   }
 
   return {
@@ -96,31 +126,40 @@ async function sendViaResend({ to, subject, html, text }) {
 }
 
 /**
- * Send email via Brevo HTTPS REST API (Port 443 - Free 300/day, supports Gmail sender)
+ * Send email via Brevo HTTPS REST API (Port 443 - POST https://api.brevo.com/v3/smtp/email)
  */
-async function sendViaBrevo({ to, subject, html, text }) {
-  const senderEmail = config.emailFrom || 'konagallaabhiram@gmail.com';
+export async function sendViaBrevo({ to, name, subject, html, text }) {
+  const apiKey = process.env.BREVO_API_KEY || config.brevoApiKey;
+  if (!apiKey) {
+    throw new Error('BREVO_API_KEY is not configured in environment variables.');
+  }
+
+  const senderEmail = process.env.EMAIL_FROM || config.emailFrom || 'konagallaabhiram@gmail.com';
+  const recipientName = name || (typeof to === 'string' ? to.split('@')[0] : 'User');
+
+  const payload = {
+    sender: { name: 'TrustVault Security', email: senderEmail },
+    to: [{ email: to, name: recipientName }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
 
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'api-key': config.brevoApiKey,
+      'api-key': apiKey,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({
-      sender: { name: 'TrustVault Security', email: senderEmail },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-      textContent: text,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.message || `Brevo API returned status ${response.status}`);
+  if (!response.ok || !data.messageId) {
+    const errMsg = data.message || `Brevo API returned status ${response.status}`;
+    throw new Error(errMsg);
   }
 
   return {
@@ -134,7 +173,34 @@ async function sendViaBrevo({ to, subject, html, text }) {
  * Verify email delivery service connectivity
  */
 export async function verifyEmailConnection() {
-  if (config.resendApiKey) {
+  const provider = getActiveProvider();
+
+  if (provider === 'brevo') {
+    const apiKey = process.env.BREVO_API_KEY || config.brevoApiKey;
+    if (!apiKey) {
+      return {
+        connected: false,
+        provider: 'brevo',
+        error: 'BREVO_API_KEY is not configured in environment variables.',
+      };
+    }
+    return {
+      connected: true,
+      provider: 'brevo',
+      message: 'Transactional email configured via Brevo HTTPS API (Port 443, Render compatible)',
+      sender: process.env.EMAIL_FROM || config.emailFrom || 'konagallaabhiram@gmail.com',
+    };
+  }
+
+  if (provider === 'resend') {
+    const apiKey = process.env.RESEND_API_KEY || config.resendApiKey;
+    if (!apiKey) {
+      return {
+        connected: false,
+        provider: 'resend',
+        error: 'RESEND_API_KEY is not configured in environment variables.',
+      };
+    }
     return {
       connected: true,
       provider: 'resend',
@@ -142,43 +208,44 @@ export async function verifyEmailConnection() {
     };
   }
 
-  if (config.brevoApiKey) {
-    return {
-      connected: true,
-      provider: 'brevo',
-      message: 'Transactional email configured via Brevo HTTPS API (Port 443, Render compatible)',
-    };
+  if (provider === 'smtp') {
+    const transporter = getTransporter();
+    if (!transporter) {
+      return {
+        connected: false,
+        provider: 'smtp',
+        message: 'SMTP transporter not configured.',
+      };
+    }
+    try {
+      await transporter.verify();
+      return {
+        connected: true,
+        provider: 'smtp',
+        message: `Successfully connected to SMTP server ${config.smtpHost}:${config.smtpPort}`,
+      };
+    } catch (error) {
+      console.error('[Email Service Verification Failed]:', error.message);
+      return {
+        connected: false,
+        provider: 'smtp',
+        error: error.message,
+      };
+    }
   }
 
-  const transporter = getTransporter();
-  if (!transporter) {
-    return {
-      connected: false,
-      message: 'SMTP transporter not configured or running in test mode.',
-    };
-  }
-
-  try {
-    await transporter.verify();
-    return {
-      connected: true,
-      provider: 'smtp',
-      message: `Successfully connected to SMTP server ${config.smtpHost}:${config.smtpPort}`,
-    };
-  } catch (error) {
-    console.error('[Email Service Verification Failed]:', error.message);
-    return {
-      connected: false,
-      error: error.message,
-    };
-  }
+  return {
+    connected: false,
+    provider: 'none',
+    message: 'No live email provider configured (simulation mode active).',
+  };
 }
 
 /**
- * Send an email message with safe fallback and test recording
+ * Send an email message using the active provider without duplicate transmissions
  */
-export async function sendEmail({ to, subject, html, text }) {
-  const fromAddress = config.emailFrom || 'konagallaabhiram@gmail.com';
+export async function sendEmail({ to, name, subject, html, text }) {
+  const fromAddress = process.env.EMAIL_FROM || config.emailFrom || 'konagallaabhiram@gmail.com';
   const mailOptions = {
     from: `"TrustVault Security" <${fromAddress}>`,
     to,
@@ -190,77 +257,97 @@ export async function sendEmail({ to, subject, html, text }) {
   // Record into test harness
   sentEmails.push({
     to,
+    name,
     subject,
     text,
     html,
     timestamp: new Date(),
   });
 
-  // If in test mode and not forced to use live delivery, simulate success immediately
-  if (config.isTest && !process.env.FORCE_REAL_SMTP) {
+  // If in automated test mode and not forced to use live delivery, simulate success immediately
+  if (config.isTest && !process.env.FORCE_REAL_SMTP && !process.env.FORCE_LIVE_EMAIL) {
     return {
       success: true,
       simulated: true,
+      provider: getActiveProvider(),
       messageId: `test-simulated-${Date.now()}`,
     };
   }
 
-  // 1. Try Resend HTTPS API if configured
-  if (config.resendApiKey) {
+  const provider = getActiveProvider();
+
+  // 1. Brevo HTTPS API
+  if (provider === 'brevo') {
+    try {
+      const result = await sendViaBrevo({ to, name, subject, html, text });
+      console.log(`[Email Service Delivered via Brevo] Recipient: ${to}, MessageId: ${result.messageId}`);
+      return result;
+    } catch (error) {
+      console.error(`[Email Service Brevo Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
+      return {
+        success: false,
+        provider: 'brevo',
+        error: error.message,
+      };
+    }
+  }
+
+  // 2. Resend HTTPS API
+  if (provider === 'resend') {
     try {
       const result = await sendViaResend({ to, subject, html, text });
       console.log(`[Email Service Delivered via Resend] Recipient: ${to}, MessageId: ${result.messageId}`);
       return result;
     } catch (error) {
       console.error(`[Email Service Resend Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
-      // Fall through to other providers if available
+      return {
+        success: false,
+        provider: 'resend',
+        error: error.message,
+      };
     }
   }
 
-  // 2. Try Brevo HTTPS API if configured
-  if (config.brevoApiKey) {
+  // 3. Nodemailer SMTP
+  if (provider === 'smtp') {
+    const transporter = getTransporter();
+    if (!transporter) {
+      console.warn(`[Email Service SMTP Error] SMTP credentials missing. Recipient: ${to}`);
+      return {
+        success: false,
+        provider: 'smtp',
+        error: 'SMTP credentials not configured.',
+      };
+    }
     try {
-      const result = await sendViaBrevo({ to, subject, html, text });
-      console.log(`[Email Service Delivered via Brevo] Recipient: ${to}, MessageId: ${result.messageId}`);
-      return result;
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[Email Service Delivered via SMTP] Recipient: ${to}, MessageId: ${info.messageId}`);
+      return {
+        success: true,
+        provider: 'smtp',
+        messageId: info.messageId,
+        accepted: info.accepted,
+        response: info.response,
+      };
     } catch (error) {
-      console.error(`[Email Service Brevo Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
-      // Fall through to SMTP
+      console.error(`[Email Service Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
+      return {
+        success: false,
+        provider: 'smtp',
+        error: error.message,
+      };
     }
   }
 
-  // 3. Fallback to Nodemailer SMTP
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    console.warn(`[Email Service Simulated] No live email provider active. Recipient: ${to}`);
-    return {
-      success: false,
-      simulated: true,
-      error: 'No active email provider configured (set RESEND_API_KEY, BREVO_API_KEY, or SMTP credentials).',
-      messageId: `simulated-${Date.now()}`,
-    };
-  }
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email Service Delivered via SMTP] Recipient: ${to}, MessageId: ${info.messageId}`);
-    return {
-      success: true,
-      provider: 'smtp',
-      messageId: info.messageId,
-      accepted: info.accepted,
-      response: info.response,
-    };
-  } catch (error) {
-    // Log safe diagnostic without credentials or tokens
-    console.error(`[Email Service Delivery Failed] Recipient: ${to}, Reason: ${error.message}`);
-    return {
-      success: false,
-      provider: 'smtp',
-      error: error.message,
-    };
-  }
+  // Fallback if no provider configured
+  console.warn(`[Email Service Simulated] No active email provider configured. Recipient: ${to}`);
+  return {
+    success: false,
+    simulated: true,
+    provider: 'simulated',
+    error: 'No active email provider configured (set EMAIL_PROVIDER to brevo, resend, or smtp with corresponding credentials).',
+    messageId: `simulated-${Date.now()}`,
+  };
 }
 
 /**
@@ -319,7 +406,7 @@ This verification link will expire in 24 hours. If you did not create an account
 </html>
 `;
 
-  return sendEmail({ to, subject, html, text });
+  return sendEmail({ to, name, subject, html, text });
 }
 
 /**
@@ -379,7 +466,7 @@ If you did not request a password reset, please ignore this email. Your current 
 </html>
 `;
 
-  return sendEmail({ to, subject, html, text });
+  return sendEmail({ to, name, subject, html, text });
 }
 
 /**
