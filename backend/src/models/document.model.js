@@ -28,12 +28,17 @@ const aclEntrySchema = new mongoose.Schema(
     permissionLevel: {
       type: String,
       enum: {
-        values: ['read', 'view', 'edit'],
+        values: ['read', 'view', 'edit', 'viewer', 'reader'],
         message: 'Permission level must be read, view, or edit',
       },
       required: true,
       default: 'read',
-      set: (val) => (String(val).toLowerCase().trim() === 'view' ? 'read' : String(val).toLowerCase().trim()),
+      set: (val) => {
+        const str = String(val || '').toLowerCase().trim();
+        if (str === 'view' || str === 'viewer' || str === 'reader' || str === 'can read' || str === 'can_read') return 'read';
+        if (str === 'editor' || str === 'can edit' || str === 'can_edit') return 'edit';
+        return str || 'read';
+      },
     },
     grantedBy: {
       type: mongoose.Schema.Types.Mixed,
@@ -107,11 +112,16 @@ const documentSchema = new mongoose.Schema(
     visibility: {
       type: String,
       enum: {
-        values: ['private', 'selected_users', 'all_authenticated_users'],
+        values: ['private', 'selected_users', 'all_authenticated_users', 'specific_users', 'everyone', 'all'],
         message: 'Visibility must be private, selected_users, or all_authenticated_users',
       },
       default: 'private',
-      set: (v) => (String(v || '').toLowerCase().trim() === 'specific_users' ? 'selected_users' : String(v || '').toLowerCase().trim()),
+      set: (v) => {
+        const str = String(v || '').toLowerCase().trim();
+        if (str === 'specific_users' || str === 'specific_viewers' || str === 'selected') return 'selected_users';
+        if (str === 'everyone' || str === 'all') return 'all_authenticated_users';
+        return str || 'private';
+      },
     },
     acl: {
       type: [aclEntrySchema],
@@ -181,8 +191,24 @@ class InMemoryDocumentRepository {
 
   async find(query = {}) {
     let results = Array.from(this.documents.values());
-    if (query.ownerId) {
-      results = results.filter((d) => String(d.ownerId) === String(query.ownerId));
+    if (query && Object.keys(query).length > 0) {
+      results = results.filter((doc) => {
+        for (const [key, val] of Object.entries(query)) {
+          if (key === 'ownerId') {
+            if (String(doc.ownerId) !== String(val)) return false;
+          } else if (key === '$or' && Array.isArray(val)) {
+            const matchesAny = val.some((subQuery) => {
+              return Object.entries(subQuery).every(([subKey, subVal]) => {
+                return String(doc[subKey]) === String(subVal);
+              });
+            });
+            if (!matchesAny) return false;
+          } else {
+            if (doc[key] !== val && String(doc[key]) !== String(val)) return false;
+          }
+        }
+        return true;
+      });
     }
     return results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }

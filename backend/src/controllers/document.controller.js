@@ -14,8 +14,40 @@ import { logAuditEvent } from '../services/audit.service.js';
 import {
   registerImmediateRevocation,
   isAccessImmediatelyRevoked,
+  clearImmediateRevocation,
 } from '../services/revocation.service.js';
 import { STORAGE_DIR } from '../middleware/upload.middleware.js';
+
+/**
+ * Normalizes permission level strings to canonical 'read' or 'edit'
+ */
+export function normalizePermissionLevel(level) {
+  const norm = String(level || 'read').toLowerCase().trim();
+  if (norm === 'view' || norm === 'viewer' || norm === 'reader' || norm === 'can read' || norm === 'can_read') {
+    return 'read';
+  }
+  if (norm === 'edit' || norm === 'editor' || norm === 'can edit' || norm === 'can_edit') {
+    return 'edit';
+  }
+  return norm;
+}
+
+/**
+ * Normalizes visibility strings to canonical modes
+ */
+export function normalizeVisibility(visibility) {
+  const norm = String(visibility || 'private').toLowerCase().trim();
+  if (norm === 'specific_users' || norm === 'specific_viewers' || norm === 'selected') {
+    return 'selected_users';
+  }
+  if (norm === 'everyone' || norm === 'all' || norm === 'all_authenticated_users') {
+    return 'all_authenticated_users';
+  }
+  if (norm === 'private') {
+    return 'private';
+  }
+  return norm;
+}
 
 /**
  * Sanitises document object for client responses, stripping internal server storage paths
@@ -43,21 +75,25 @@ export function canReadDocument(doc, user) {
   // Platform administrator has governance access
   if (user.role === 'admin') return true;
 
-  // Platform-wide visibility: All authenticated, active users have Read access
-  if (doc.visibility === 'all_authenticated_users') return true;
+  // Mode A: Strict Private - Only owner and administrator may access
+  const visibility = normalizeVisibility(doc.visibility);
+  if (visibility === 'private') {
+    return false;
+  }
 
-  // Check granular ACL entry (by userId or userEmail)
+  // Mode C: Platform-wide visibility: All authenticated, active users have Read access
+  if (visibility === 'all_authenticated_users') return true;
+
+  // Mode B: Granular ACL entry (by userId or userEmail)
   if (Array.isArray(doc.acl)) {
-    const hasAclAccess = doc.acl.some(
-      (entry) => {
-        const level = String(entry.permissionLevel || '').toLowerCase().trim();
-        return (
-          (String(entry.userId) === userId ||
-            (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
-          (level === 'read' || level === 'view' || level === 'edit')
-        );
-      }
-    );
+    const hasAclAccess = doc.acl.some((entry) => {
+      const entryUid = String(entry.userId || '');
+      const entryEmail = (entry.email || '').toLowerCase().trim();
+      const matches = (entryUid && entryUid === userId) || (entryEmail && entryEmail === userEmail);
+      if (!matches) return false;
+      const norm = normalizePermissionLevel(entry.permissionLevel);
+      return norm === 'read' || norm === 'edit';
+    });
     if (hasAclAccess) return true;
   }
 
@@ -91,17 +127,20 @@ export function canEditDocument(doc, user) {
   }
   if (user.role === 'admin') return true;
 
+  // Mode A: Private documents can only be edited by owner or administrator
+  const visibility = normalizeVisibility(doc.visibility);
+  if (visibility === 'private') {
+    return false;
+  }
+
   if (Array.isArray(doc.acl)) {
-    const hasEditAcl = doc.acl.some(
-      (entry) => {
-        const level = String(entry.permissionLevel || '').toLowerCase().trim();
-        return (
-          (String(entry.userId) === userId ||
-            (entry.email && entry.email.toLowerCase().trim() === userEmail)) &&
-          level === 'edit'
-        );
-      }
-    );
+    const hasEditAcl = doc.acl.some((entry) => {
+      const entryUid = String(entry.userId || '');
+      const entryEmail = (entry.email || '').toLowerCase().trim();
+      const matches = (entryUid && entryUid === userId) || (entryEmail && entryEmail === userEmail);
+      if (!matches) return false;
+      return normalizePermissionLevel(entry.permissionLevel) === 'edit';
+    });
     if (hasEditAcl) return true;
   }
 
@@ -176,9 +215,10 @@ export async function uploadDocument(req, res) {
     const userId = req.user.id || req.user._id;
 
     let visibility = 'private';
-    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users'];
-    if (req.body.visibility && VALID_VISIBILITY.includes(String(req.body.visibility).toLowerCase().trim())) {
-      visibility = String(req.body.visibility).toLowerCase().trim();
+    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users', 'specific_users', 'everyone', 'all'];
+    let reqVis = String(req.body.visibility || '').toLowerCase().trim();
+    if (VALID_VISIBILITY.includes(reqVis)) {
+      visibility = normalizeVisibility(reqVis);
     }
 
     const acl = [];
@@ -190,17 +230,27 @@ export async function uploadDocument(req, res) {
       if (Array.isArray(rawRecipients)) {
         for (const r of rawRecipients) {
           const recEmail = String(r.email || '').toLowerCase().trim();
-          if (!recEmail) continue;
-          let level = String(r.permissionLevel || 'read').toLowerCase().trim();
-          if (level === 'view') level = 'read';
+          const recUserId = r.userId || r.id;
+          let level = normalizePermissionLevel(r.permissionLevel || 'read');
           if (!['read', 'edit'].includes(level)) level = 'read';
 
-          const targetU = await User.findOne({ email: recEmail });
-          if (targetU) {
+          let targetU = null;
+          if (recEmail) {
+            targetU = await User.findOne({ email: recEmail });
+          }
+          if (!targetU && recUserId) {
+            targetU = await User.findById(recUserId);
+          }
+
+          const resolvedUserId = targetU ? String(targetU._id || targetU.id) : (recUserId ? String(recUserId) : recEmail);
+          const resolvedEmail = targetU ? targetU.email.toLowerCase().trim() : recEmail;
+          const resolvedName = targetU ? targetU.name : (r.name || (resolvedEmail ? resolvedEmail.split('@')[0] : 'Collaborator'));
+
+          if (resolvedUserId || resolvedEmail) {
             acl.push({
-              userId: String(targetU._id || targetU.id),
-              email: targetU.email.toLowerCase().trim(),
-              name: targetU.name || '',
+              userId: resolvedUserId,
+              email: resolvedEmail,
+              name: resolvedName,
               permissionLevel: level,
               grantedBy: userId,
               grantedAt: new Date(),
@@ -790,14 +840,13 @@ export async function grantDocumentPermission(req, res) {
   try {
     const { id } = req.params;
     let { email, userId, permissionLevel = 'read' } = req.body;
-    let normLevel = String(permissionLevel || '').toLowerCase().trim();
-    if (normLevel === 'view') normLevel = 'read';
+    let normLevel = normalizePermissionLevel(permissionLevel);
 
     if (!['read', 'edit'].includes(normLevel)) {
       return res.status(400).json({
         error: {
           code: 'INVALID_PERMISSION_LEVEL',
-          message: "Permission level must be either 'read' (or 'view') or 'edit'.",
+          message: "Permission level must be either 'read' (or 'view' / 'viewer') or 'edit'.",
         },
       });
     }
@@ -902,8 +951,16 @@ export async function grantDocumentPermission(req, res) {
       currentReaders.push(targetEmail);
     }
 
+    // Zero-lag unblock: clear immediate revocation for the recipient
+    if (targetUserId) {
+      clearImmediateRevocation(id, targetUserId);
+    }
+    if (targetEmail) {
+      clearImmediateRevocation(id, targetEmail);
+    }
+
     const docUpdates = { acl: currentAcl, readers: currentReaders };
-    if (!doc.visibility || doc.visibility === 'private') {
+    if (!doc.visibility || normalizeVisibility(doc.visibility) === 'private') {
       docUpdates.visibility = 'selected_users';
     }
 
@@ -1056,11 +1113,8 @@ export async function updateDocumentVisibility(req, res) {
     const { id } = req.params;
     const { visibility, recipients } = req.body;
 
-    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users', 'specific_users'];
-    let normVisibility = String(visibility || '').toLowerCase().trim();
-    if (normVisibility === 'specific_users') {
-      normVisibility = 'selected_users';
-    }
+    const VALID_VISIBILITY = ['private', 'selected_users', 'all_authenticated_users', 'specific_users', 'everyone', 'all'];
+    let normVisibility = normalizeVisibility(visibility);
 
     if (!['private', 'selected_users', 'all_authenticated_users'].includes(normVisibility)) {
       return res.status(400).json({
@@ -1121,7 +1175,10 @@ export async function updateDocumentVisibility(req, res) {
       }
       updates.acl = [];
       updates.readers = [];
-    } else if (normVisibility === 'selected_users' && recipients) {
+    } else if (normVisibility === 'all_authenticated_users') {
+      // Clear revocation cache for all users on this document so authenticated users can access
+      clearImmediateRevocation(id);
+    } else if (normVisibility === 'selected_users') {
       let rawRecipients = recipients;
       if (typeof rawRecipients === 'string') {
         try { rawRecipients = JSON.parse(rawRecipients); } catch {}
@@ -1130,21 +1187,34 @@ export async function updateDocumentVisibility(req, res) {
         const newAcl = [];
         for (const r of rawRecipients) {
           const recEmail = String(r.email || '').toLowerCase().trim();
-          if (!recEmail) continue;
-          let level = String(r.permissionLevel || 'read').toLowerCase().trim();
-          if (level === 'view') level = 'read';
+          const recUserId = r.userId || r.id;
+          let level = normalizePermissionLevel(r.permissionLevel || 'read');
           if (!['read', 'edit'].includes(level)) level = 'read';
 
-          const targetU = await User.findOne({ email: recEmail });
-          if (targetU) {
+          let targetU = null;
+          if (recEmail) {
+            targetU = await User.findOne({ email: recEmail });
+          }
+          if (!targetU && recUserId) {
+            targetU = await User.findById(recUserId);
+          }
+
+          const resolvedUserId = targetU ? String(targetU._id || targetU.id) : (recUserId ? String(recUserId) : recEmail);
+          const resolvedEmail = targetU ? targetU.email.toLowerCase().trim() : recEmail;
+          const resolvedName = targetU ? targetU.name : (r.name || (resolvedEmail ? resolvedEmail.split('@')[0] : 'Collaborator'));
+
+          if (resolvedUserId || resolvedEmail) {
             newAcl.push({
-              userId: String(targetU._id || targetU.id),
-              email: targetU.email.toLowerCase().trim(),
-              name: targetU.name || '',
+              userId: resolvedUserId,
+              email: resolvedEmail,
+              name: resolvedName,
               permissionLevel: level,
               grantedBy: req.user.id || req.user._id,
               grantedAt: new Date(),
             });
+            // Clear any prior revocation markers for this user
+            if (resolvedUserId) clearImmediateRevocation(id, resolvedUserId);
+            if (resolvedEmail) clearImmediateRevocation(id, resolvedEmail);
           }
         }
         // Register immediate revocation for removed users
@@ -1161,6 +1231,14 @@ export async function updateDocumentVisibility(req, res) {
         }
         updates.acl = newAcl;
         updates.readers = newAcl.map((e) => e.userId);
+      } else {
+        // If switching to selected_users without replacing recipients, unblock existing ACL entries
+        if (Array.isArray(doc.acl)) {
+          doc.acl.forEach((entry) => {
+            if (entry.userId) clearImmediateRevocation(id, String(entry.userId));
+            if (entry.email) clearImmediateRevocation(id, String(entry.email).toLowerCase().trim());
+          });
+        }
       }
     }
 

@@ -11,7 +11,8 @@ import {
   Search,
   Filter,
   Trash2,
-  Edit3
+  Edit3,
+  RefreshCw
 } from 'lucide-react';
 import { StatusBadge } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
@@ -39,7 +40,7 @@ function getFileIcon(type) {
  * DocumentTable Component
  * Accessible enterprise table with real-time local search and explicit action modal triggers.
  */
-export function DocumentTable({ documents = [], onActionSelect, userRole }) {
+export function DocumentTable({ documents = [], onActionSelect, userRole, onRefresh }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL');
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -103,6 +104,19 @@ export function DocumentTable({ documents = [], onActionSelect, userRole }) {
               <option value="XLSX">Spreadsheets (.xlsx)</option>
             </select>
           </div>
+
+          {onRefresh && (
+            <button
+              type="button"
+              className="table-refresh-btn"
+              onClick={onRefresh}
+              title="Refresh document list"
+              aria-label="Refresh document list"
+            >
+              <RefreshCw size={14} />
+              <span className="refresh-btn-label">Refresh</span>
+            </button>
+          )}
         </div>
       </div>
 

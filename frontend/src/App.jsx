@@ -135,10 +135,13 @@ export function App() {
                 : `${(doc.fileSize / 1024).toFixed(1)} KB`,
             rawSize: doc.fileSize,
             owner: {
+              id: doc.owner?.id || doc.ownerId,
               name: ownerName,
               email: ownerEmail,
               initials: initials || 'TV',
             },
+            ownerId: doc.owner?.id || doc.ownerId,
+            visibility: doc.visibility || 'private',
             accessLevel: mappedAccess,
             acl: doc.acl || [],
             lastUpdated: doc.updatedAt || doc.createdAt,
@@ -233,6 +236,31 @@ export function App() {
       setVaultDocuments([]);
       setLiveActivities([]);
     }
+  }, [token]);
+
+  // Live refresh documents when switching views
+  useEffect(() => {
+    if (token && (activeNav === 'overview' || activeNav === 'my-documents' || activeNav === 'shared-with-me')) {
+      fetchVaultDocuments();
+      fetchLiveActivities();
+    }
+  }, [activeNav, token]);
+
+  // Live refresh documents on tab focus
+  useEffect(() => {
+    if (!token) return;
+    const handleWindowFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchVaultDocuments();
+        fetchLiveActivities();
+      }
+    };
+    document.addEventListener('visibilitychange', handleWindowFocus);
+    window.addEventListener('focus', handleWindowFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleWindowFocus);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, [token]);
 
   // Role-based dashboard routing upon authentication
@@ -988,6 +1016,10 @@ export function App() {
                   documents={getNavFilteredDocuments()}
                   onActionSelect={handleDocumentAction}
                   userRole={user?.role}
+                  onRefresh={() => {
+                    fetchVaultDocuments();
+                    fetchLiveActivities();
+                  }}
                 />
               )}
             </div>

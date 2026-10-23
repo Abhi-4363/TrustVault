@@ -40,10 +40,16 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
     setError(null);
     setSuccessMsg(null);
 
-    const docVis = document.visibility || 'private';
-    const normalizedVis = docVis === 'specific_users' ? 'selected_users' : docVis;
-    setCurrentVisibility(normalizedVis);
-    setSelectedVisibility(normalizedVis);
+    const normalizeVisMode = (v) => {
+      const s = String(v || 'private').toLowerCase().trim();
+      if (s === 'specific_users' || s === 'specific_viewers' || s === 'selected_users') return 'selected_users';
+      if (s === 'all_authenticated_users' || s === 'everyone' || s === 'all') return 'all_authenticated_users';
+      return 'private';
+    };
+
+    const docVis = normalizeVisMode(document.visibility);
+    setCurrentVisibility(docVis);
+    setSelectedVisibility(docVis);
 
     const loadData = async () => {
       setLoading(true);
@@ -66,7 +72,7 @@ export function ShareModal({ isOpen, onClose, document, onPermissionsUpdated }) 
             const permData = await permRes.json();
             setPermissions(permData.acl || []);
             if (permData.visibility) {
-              const liveVis = permData.visibility === 'specific_users' ? 'selected_users' : permData.visibility;
+              const liveVis = normalizeVisMode(permData.visibility);
               setCurrentVisibility(liveVis);
               setSelectedVisibility(liveVis);
             }

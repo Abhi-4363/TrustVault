@@ -36,6 +36,24 @@ export function isAccessImmediatelyRevoked(documentId, userId) {
 }
 
 /**
+ * Clears immediate revocation marker for a specific user on a document,
+ * or clears all revocation markers for a document if userId is omitted.
+ */
+export function clearImmediateRevocation(documentId, userId) {
+  if (!documentId) return;
+  if (userId) {
+    revokedAccessSet.delete(getRevocationKey(documentId, userId));
+  } else {
+    const prefix = `${String(documentId)}:`;
+    for (const key of revokedAccessSet) {
+      if (key.startsWith(prefix)) {
+        revokedAccessSet.delete(key);
+      }
+    }
+  }
+}
+
+/**
  * Clears in-memory revocation markers (used in tests)
  */
 export function clearRevocationCache() {

@@ -67,6 +67,7 @@
   color: var(--text-main);
   margin: 0;
   line-height: 1.3;
+  word-break: break-word;
 }
 
 .upload-modal-subtitle {
@@ -542,7 +543,7 @@
   color: var(--color-danger);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .upload-modal-header {
     padding: var(--space-4) var(--space-4);
   }
@@ -567,12 +568,20 @@
     gap: var(--space-2);
   }
 
+  .recipient-user-dropdown {
+    width: 100%;
+    min-height: 42px;
+  }
+
   .recipient-perm-dropdown {
     width: 100%;
+    min-height: 42px;
   }
 
   .recipient-selector-row button {
     width: 100%;
+    min-height: 42px;
+    justify-content: center;
   }
 }
 
