@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, EyeOff, UserCog, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
@@ -6,8 +6,8 @@ import { TermsAndPrivacyModals } from '../legal/TermsAndPrivacyModals';
 import { buildApiUrl } from '../../config/api';
 import './AuthModals.css';
 
-export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
-  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'forgot'
+export function AuthModals({ isOpen, onClose, initialMode = 'login', onModeChange }) {
+  const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'forgot' | 'register-success'
   const [recoveryOption, setRecoveryOption] = useState('email'); // 'email' | 'admin'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,6 +26,20 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
   const [legalModalType, setLegalModalType] = useState('terms');
 
   const { login, register } = useAuth();
+
+  // Reset and synchronize modal state whenever the modal opens or initialMode changes
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode || 'login');
+      setError('');
+      setPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      setForgotSubmitted(false);
+      setForgotNotice('');
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
@@ -88,7 +102,16 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
         if (password !== confirmPassword) throw new Error('Passwords do not match');
         if (!termsAccepted) throw new Error('You must accept the Terms & Conditions and acknowledge the Privacy Policy');
 
-        await register(name, email, password, requestedRole, dateOfBirth, termsAccepted, confirmPassword);
+        const regRes = await register(name, email, password, requestedRole, dateOfBirth, termsAccepted, confirmPassword);
+        if (regRes && regRes.isEmailVerified === false) {
+          setForgotSubmitted(true);
+          setForgotNotice(
+            regRes.message ||
+            'Account registered successfully! Please check your inbox to verify your email address before signing in.'
+          );
+          setMode('register-success');
+          return;
+        }
       } else {
         await login(email, password);
       }
@@ -103,8 +126,15 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setForgotSubmitted(false);
     setForgotNotice('');
+    if (onModeChange && (newMode === 'login' || newMode === 'register')) {
+      onModeChange(newMode);
+    }
   };
 
   return (
@@ -135,16 +165,20 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
           <h2 id="auth-modal-title" className="auth-title">
             {mode === 'forgot'
               ? 'Forgot Password?'
-              : mode === 'login'
-                ? 'Sign in to TrustVault'
-                : 'Create your account'}
+              : mode === 'register-success'
+                ? 'Verify Your Email'
+                : mode === 'login'
+                  ? 'Sign in to TrustVault'
+                  : 'Create your account'}
           </h2>
           <p className="auth-subtitle">
             {mode === 'forgot'
               ? 'Submit a request to an Administrator to reset your vault credentials.'
-              : mode === 'login'
-                ? 'Access confidential documents and organizational audit records.'
-                : 'Join your organization vault with secure bcrypt encryption.'}
+              : mode === 'register-success'
+                ? 'Your registration is complete. Activate your work email to begin.'
+                : mode === 'login'
+                  ? 'Access confidential documents and organizational audit records.'
+                  : 'Join your organization vault with secure bcrypt encryption.'}
           </p>
 
           {error && (
@@ -154,7 +188,38 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login' }) {
             </div>
           )}
 
-          {mode === 'forgot' && forgotSubmitted ? (
+          {mode === 'register-success' ? (
+            <div 
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                color: '#166534',
+                fontSize: '13px',
+              }}
+              role="status"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                <CheckCircle2 size={18} className="text-success" />
+                <span>Verification Email Dispatched</span>
+              </div>
+              <p style={{ margin: 0, lineHeight: 1.5 }}>{forgotNotice}</p>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={() => switchMode('login')}
+                style={{ width: '100%', marginTop: '4px' }}
+              >
+                Proceed to Sign in
+              </Button>
+            </div>
+          ) : mode === 'forgot' && forgotSubmitted ? (
             <div 
               style={{
                 display: 'flex',

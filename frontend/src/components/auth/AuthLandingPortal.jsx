@@ -25,7 +25,7 @@ import TermsAndPrivacyModals from '../legal/TermsAndPrivacyModals';
 import { buildApiUrl } from '../../config/api';
 import './AuthLandingPortal.css';
 
-export function AuthLandingPortal({ initialMode = 'login' }) {
+export function AuthLandingPortal({ initialMode = 'login', onModeChange }) {
   const { login, register, verifyEmailToken } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'register' | 'forgot' | 'reset' | 'resend' | 'verify-pending'
   const [recoveryOption, setRecoveryOption] = useState('email'); // 'email' (Option B) | 'admin' (Option A)
@@ -53,6 +53,19 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
   const [devVerifyUrl, setDevVerifyUrl] = useState('');
   const [devResetUrl, setDevResetUrl] = useState('');
   const [emailDeliveryFailed, setEmailDeliveryFailed] = useState(false);
+
+  // Synchronize internal mode whenever initialMode prop updates
+  useEffect(() => {
+    if (initialMode && (initialMode === 'login' || initialMode === 'register')) {
+      setMode(initialMode);
+      setError('');
+      setErrorAction(null);
+      setPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+    }
+  }, [initialMode]);
 
   const getTodayMaxDate = () => {
     return new Date().toISOString().split('T')[0];
@@ -87,12 +100,13 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
     setLegalModalOpen(true);
   };
 
-  // Check URL parameters on mount for ?verifyToken=... or ?resetToken=...
+  // Check URL parameters on mount for ?verifyToken=..., ?resetToken=..., or ?mode=...
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const verifyTokenParam = params.get('verifyToken') || (params.get('mode') === 'verify' ? params.get('token') : null);
       const resetTokenParam = params.get('resetToken') || params.get('token');
+      const modeParam = params.get('mode');
 
       if (verifyTokenParam) {
         setVerifyingEmail(true);
@@ -103,6 +117,7 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
               setEmail(res.user.email);
             }
             setMode('login');
+            onModeChange?.('login');
           })
           .catch((err) => {
             setError(err.message || 'Verification link is invalid or has expired.');
@@ -117,10 +132,39 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
         setResetToken(resetTokenParam);
         setMode('reset');
         window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (modeParam === 'register' || window.location.hash === '#register') {
+        setMode('register');
+        onModeChange?.('register');
+      } else if (modeParam === 'login' || window.location.hash === '#login') {
+        setMode('login');
+        onModeChange?.('login');
       }
     } catch {
       // Ignore URL parsing errors
     }
+
+    const handleUrlChange = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const modeParam = params.get('mode');
+        if (modeParam === 'register' || window.location.hash === '#register') {
+          setMode('register');
+          onModeChange?.('register');
+        } else if (modeParam === 'login' || window.location.hash === '#login') {
+          setMode('login');
+          onModeChange?.('login');
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
   }, []);
 
   const handleSubmit = async (e) => {
@@ -366,6 +410,26 @@ export function AuthLandingPortal({ initialMode = 'login' }) {
     setDevVerifyUrl('');
     setDevResetUrl('');
     setEmailDeliveryFailed(false);
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+
+    if (onModeChange && (newMode === 'login' || newMode === 'register')) {
+      onModeChange(newMode);
+    }
+
+    try {
+      const url = new URL(window.location.href);
+      if (newMode === 'register') {
+        url.searchParams.set('mode', 'register');
+      } else if (newMode === 'login') {
+        url.searchParams.delete('mode');
+      }
+      window.history.replaceState({}, document.title, url.toString());
+    } catch {
+      // ignore
+    }
   };
 
   return (

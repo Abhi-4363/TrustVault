@@ -57,7 +57,18 @@ export function App() {
 
   // Auth, Upload, Share & Edit Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState('login');
+  const [authModalMode, setAuthModalMode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('mode');
+      if (m === 'register' || window.location.hash === '#register') {
+        return 'register';
+      }
+    } catch {
+      // fallback
+    }
+    return 'login';
+  });
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [shareModalConfig, setShareModalConfig] = useState({ isOpen: false, document: null });
   const [editModalConfig, setEditModalConfig] = useState({ isOpen: false, document: null });
@@ -763,7 +774,10 @@ export function App() {
       pendingRequestsCount={pendingRequestsCount}
     >
       {!user ? (
-        <AuthLandingPortal initialMode={authModalMode} />
+        <AuthLandingPortal
+          initialMode={authModalMode}
+          onModeChange={(newMode) => setAuthModalMode(newMode)}
+        />
       ) : user.mustChangePassword ? (
         <ForcedPasswordChangeModal
           user={user}
@@ -1059,9 +1073,11 @@ export function App() {
 
       {/* Authentication Dialog (Login & Registration) */}
       <AuthModals
+        key={`${authModalMode}-${authModalOpen}`}
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         initialMode={authModalMode}
+        onModeChange={(newMode) => setAuthModalMode(newMode)}
       />
 
       {/* Document Upload Dialog */}
