@@ -24,6 +24,7 @@ import {
   grantDocumentPermission,
   revokeDocumentPermission,
   getDirectoryUsers,
+  lookupCollaboratorByEmail,
   getDocumentAuditTrail,
   getRecentAuditActivity,
   updateDocumentVisibility,
@@ -49,6 +50,9 @@ router.get('/search', requireAuth, validateAndSanitizeSearchInput, searchDocumen
 
 // User directory lookup for collaborator selection (placed before /:id)
 router.get('/users/directory', requireAuth, getDirectoryUsers);
+
+// Collaborator email lookup for selective sharing (placed before /:id)
+router.get('/users/lookup', requireAuth, lookupCollaboratorByEmail);
 
 // Recent activity audit logs across documents (placed before /:id)
 router.get('/audit/activity', requireAuth, getRecentAuditActivity);

@@ -242,19 +242,36 @@ export async function uploadDocument(req, res) {
             targetU = await User.findById(recUserId);
           }
 
-          const resolvedUserId = targetU ? String(targetU._id || targetU.id) : (recUserId ? String(recUserId) : recEmail);
-          const resolvedEmail = targetU ? targetU.email.toLowerCase().trim() : recEmail;
-          const resolvedName = targetU ? targetU.name : (r.name || (resolvedEmail ? resolvedEmail.split('@')[0] : 'Collaborator'));
+          // Prevent document owner from adding themselves as a collaborator
+          const callerEmail = (req.user.email || '').toLowerCase().trim();
+          const callerId = String(req.user.id || req.user._id);
+          if (
+            (targetU && (String(targetU._id || targetU.id) === callerId || targetU.email.toLowerCase().trim() === callerEmail)) ||
+            recEmail === callerEmail ||
+            String(recUserId) === callerId
+          ) {
+            continue;
+          }
 
-          if (resolvedUserId || resolvedEmail) {
-            acl.push({
-              userId: resolvedUserId,
-              email: resolvedEmail,
-              name: resolvedName,
-              permissionLevel: level,
-              grantedBy: userId,
-              grantedAt: new Date(),
-            });
+          // Authoritative DB verification: only add registered users and use trusted metadata
+          if (targetU) {
+            const targetId = String(targetU._id || targetU.id);
+            const targetEmail = targetU.email.toLowerCase().trim();
+            const existingIdx = acl.findIndex(
+              (entry) => entry.userId === targetId || entry.email === targetEmail
+            );
+            if (existingIdx >= 0) {
+              acl[existingIdx].permissionLevel = level;
+            } else {
+              acl.push({
+                userId: targetId,
+                email: targetEmail,
+                name: targetU.name,
+                permissionLevel: level,
+                grantedBy: userId,
+                grantedAt: new Date(),
+              });
+            }
           }
         }
       }
@@ -1379,6 +1396,87 @@ export async function getDirectoryUsers(req, res) {
       error: {
         code: 'DIRECTORY_ERROR',
         message: 'Failed to retrieve user directory.',
+      },
+    });
+  }
+}
+
+/**
+ * GET /api/documents/users/lookup?email=...
+ * Authenticated lookup to verify if an email belongs to a registered active user.
+ * Strictly restricted to document owners and administrators to prevent enumeration.
+ * Returns only the minimum necessary user metadata (id, name, email).
+ */
+export async function lookupCollaboratorByEmail(req, res) {
+  try {
+    // 1. Role-based check: Only Document Owners and Administrators can assign collaborators
+    if (!req.user || req.user.role === 'viewer') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied. Only document owners and administrators can look up collaborators.',
+        },
+      });
+    }
+
+    // 2. Validate input email query parameter
+    const rawEmail = req.query.email;
+    if (!rawEmail || typeof rawEmail !== 'string') {
+      return res.status(400).json({
+        error: {
+          code: 'EMAIL_REQUIRED',
+          message: 'Please enter a valid email address.',
+        },
+      });
+    }
+
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail) || normalizedEmail.includes('..') || normalizedEmail.endsWith('.')) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_EMAIL_FORMAT',
+          message: 'Please enter a valid email address.',
+        },
+      });
+    }
+
+    // 3. Prevent self-collaboration
+    const callerEmail = (req.user.email || '').trim().toLowerCase();
+    if (normalizedEmail === callerEmail) {
+      return res.status(400).json({
+        error: {
+          code: 'SELF_COLLABORATOR_FORBIDDEN',
+          message: 'You cannot add yourself as a collaborator.',
+        },
+      });
+    }
+
+    // 4. Query database for registered active user
+    const targetUser = await User.findOne({ email: normalizedEmail });
+    if (!targetUser || targetUser.isActive === false) {
+      return res.status(404).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'This email address is not registered with TrustVault.',
+        },
+      });
+    }
+
+    // 5. Return minimum necessary info (never expose password, tokens, internal roles, or DOB)
+    return res.status(200).json({
+      user: {
+        id: targetUser._id || targetUser.id,
+        name: targetUser.name,
+        email: targetUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('[Collaborator Lookup Error]:', error);
+    return res.status(500).json({
+      error: {
+        code: 'LOOKUP_ERROR',
+        message: 'Internal error verifying collaborator email.',
       },
     });
   }

@@ -53,32 +53,15 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
   const [tags, setTags] = useState('');
   const [visibility, setVisibility] = useState('private'); // 'private' | 'selected_users' | 'all_authenticated_users'
   const [recipients, setRecipients] = useState([]);
-  const [directoryUsers, setDirectoryUsers] = useState([]);
-  const [selectedUserEmail, setSelectedUserEmail] = useState('');
+  const [collaboratorEmail, setCollaboratorEmail] = useState('');
   const [permissionLevel, setPermissionLevel] = useState('read');
+  const [validatingCollaborator, setValidatingCollaborator] = useState(false);
+  const [collaboratorError, setCollaboratorError] = useState(null);
+  const [collaboratorSuccess, setCollaboratorSuccess] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-
-  // Fetch directory users for recipient selection
-  useEffect(() => {
-    if (!isOpen || !token) return;
-    const fetchDirectory = async () => {
-      try {
-        const res = await fetch(buildApiUrl('/documents/users/directory'), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setDirectoryUsers(data.users || []);
-        }
-      } catch (err) {
-        console.error('[UploadModal] Failed to fetch users directory:', err);
-      }
-    };
-    fetchDirectory();
-  }, [isOpen, token]);
 
   if (!isOpen) return null;
 
@@ -169,31 +152,89 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     }
   };
 
-  const handleAddRecipient = () => {
-    if (!selectedUserEmail) return;
-    const existing = recipients.find(
-      (r) => r.email.toLowerCase() === selectedUserEmail.toLowerCase()
-    );
-    if (existing) {
-      setError('This user is already added to the recipient list.');
+  const handleAddRecipient = async () => {
+    setCollaboratorError(null);
+    setCollaboratorSuccess(null);
+
+    const email = (collaboratorEmail || '').trim();
+
+    // 1. Email format check
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+    if (!email || !emailRegex.test(email) || email.includes('..') || email.endsWith('.')) {
+      setCollaboratorError('Please enter a valid email address.');
       return;
     }
-    const dirUser = directoryUsers.find(
-      (u) => u.email.toLowerCase() === selectedUserEmail.toLowerCase()
+
+    // 2. Prevent adding own email
+    if (user?.email && email.toLowerCase() === user.email.toLowerCase().trim()) {
+      setCollaboratorError('You cannot add yourself as a collaborator.');
+      return;
+    }
+
+    // 3. Prevent duplicate collaborator
+    const alreadyAdded = recipients.some(
+      (r) => r.email.toLowerCase() === email.toLowerCase()
     );
-    const newRecipient = {
-      email: selectedUserEmail,
-      name: dirUser ? dirUser.name : selectedUserEmail.split('@')[0],
-      permissionLevel: permissionLevel,
-    };
-    setRecipients([...recipients, newRecipient]);
-    setSelectedUserEmail('');
-    setPermissionLevel('read');
-    setError(null);
+    if (alreadyAdded) {
+      setCollaboratorError('This collaborator has already been added.');
+      return;
+    }
+
+    // 4. Backend validation against registered users in database
+    setValidatingCollaborator(true);
+    try {
+      const response = await fetch(
+        buildApiUrl(`/documents/users/lookup?email=${encodeURIComponent(email)}`),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setCollaboratorError(data.error?.message || 'This email address is not registered with TrustVault.');
+        } else if (response.status === 400) {
+          setCollaboratorError(data.error?.message || 'Please enter a valid email address.');
+        } else if (response.status === 403) {
+          setCollaboratorError(data.error?.message || 'You are not authorized to assign collaborators.');
+        } else {
+          setCollaboratorError(data.error?.message || 'Unable to verify collaborator email.');
+        }
+        return;
+      }
+
+      if (!data.user) {
+        setCollaboratorError('This email address is not registered with TrustVault.');
+        return;
+      }
+
+      const newRecipient = {
+        userId: data.user.id || data.user._id,
+        name: data.user.name || email.split('@')[0],
+        email: data.user.email.toLowerCase().trim(),
+        permissionLevel: permissionLevel,
+      };
+
+      setRecipients((prev) => [...prev, newRecipient]);
+      setCollaboratorEmail('');
+      setCollaboratorError(null);
+      setCollaboratorSuccess(`Added ${data.user.name} (${data.user.email}) as ${permissionLevel === 'edit' ? 'Read & Edit' : 'Read Only'}.`);
+      setTimeout(() => setCollaboratorSuccess(null), 3500);
+    } catch (err) {
+      console.error('[UploadModal] Collaborator lookup network error:', err);
+      setCollaboratorError('Network error connecting to TrustVault API. Please try again.');
+    } finally {
+      setValidatingCollaborator(false);
+    }
   };
 
   const handleRemoveRecipient = (emailToRemove) => {
-    setRecipients(recipients.filter((r) => r.email.toLowerCase() !== emailToRemove.toLowerCase()));
+    setRecipients((prev) => prev.filter((r) => r.email.toLowerCase() !== emailToRemove.toLowerCase()));
+    if (collaboratorSuccess) setCollaboratorSuccess(null);
   };
 
   const handleReset = () => {
@@ -205,8 +246,11 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     setTags('');
     setVisibility('private');
     setRecipients([]);
-    setSelectedUserEmail('');
+    setCollaboratorEmail('');
     setPermissionLevel('read');
+    setValidatingCollaborator(false);
+    setCollaboratorError(null);
+    setCollaboratorSuccess(null);
     setError(null);
     setSuccess(false);
   };
@@ -582,56 +626,89 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
                       <span className="recipient-count-badge">{recipients.length} added</span>
                     </div>
                     <div className="recipient-selector-row">
-                      <select 
-                        id="recipient-user-select"
-                        className="form-select recipient-user-dropdown"
-                        value={selectedUserEmail}
-                        onChange={(e) => setSelectedUserEmail(e.target.value)}
-                        disabled={loading}
-                      >
-                        <option value="">Select registered user...</option>
-                        {directoryUsers
-                          .filter((u) => !recipients.some((r) => r.email.toLowerCase() === u.email.toLowerCase()))
-                          .map((u) => (
-                            <option key={u.id || u.email} value={u.email}>
-                              {u.name} ({u.email}) — {u.role}
-                            </option>
-                          ))}
-                      </select>
+                      <input
+                        type="email"
+                        id="collaborator-email-input"
+                        className="form-input recipient-email-input"
+                        placeholder="Enter collaborator's email address"
+                        value={collaboratorEmail}
+                        onChange={(e) => {
+                          setCollaboratorEmail(e.target.value);
+                          if (collaboratorError) setCollaboratorError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddRecipient();
+                          }
+                        }}
+                        disabled={loading || validatingCollaborator}
+                        autoComplete="off"
+                        aria-label="Collaborator's email address"
+                      />
 
                       <select 
+                        id="collaborator-perm-select"
                         className="form-select recipient-perm-dropdown"
                         value={permissionLevel}
                         onChange={(e) => setPermissionLevel(e.target.value)}
-                        disabled={loading}
+                        disabled={loading || validatingCollaborator}
+                        aria-label="Collaborator permission level"
                       >
                         <option value="read">Read Only</option>
-                        <option value="edit">Can Edit</option>
+                        <option value="edit">Read & Edit</option>
                       </select>
 
                       <Button 
                         type="button" 
                         variant="secondary" 
                         onClick={handleAddRecipient}
-                        disabled={!selectedUserEmail || loading}
+                        disabled={!collaboratorEmail.trim() || loading || validatingCollaborator}
+                        className="btn-add-collaborator"
                       >
-                        <Plus size={14} /> Add
+                        {validatingCollaborator ? (
+                          'Checking...'
+                        ) : (
+                          <>
+                            <Plus size={14} /> Add
+                          </>
+                        )}
                       </Button>
                     </div>
+
+                    {/* Inline Error and Success Feedback */}
+                    {collaboratorError && (
+                      <div className="collaborator-inline-feedback error" role="alert">
+                        <AlertCircle size={14} />
+                        <span>{collaboratorError}</span>
+                      </div>
+                    )}
+
+                    {collaboratorSuccess && (
+                      <div className="collaborator-inline-feedback success" role="status">
+                        <CheckCircle2 size={14} />
+                        <span>{collaboratorSuccess}</span>
+                      </div>
+                    )}
 
                     {recipients.length > 0 && (
                       <div className="recipients-list-chips">
                         {recipients.map((rec) => (
                           <div key={rec.email} className="recipient-chip">
-                            <span className="recipient-chip-name">{rec.name || rec.email}</span>
+                            <div className="recipient-chip-info">
+                              <span className="recipient-chip-name">{rec.name || rec.email.split('@')[0]}</span>
+                              <span className="recipient-chip-email">({rec.email})</span>
+                            </div>
                             <span className={`recipient-chip-badge badge-${rec.permissionLevel}`}>
-                              {rec.permissionLevel === 'edit' ? 'Can Edit' : 'Read'}
+                              {rec.permissionLevel === 'edit' ? 'Read & Edit' : 'Read Only'}
                             </span>
                             <button 
                               type="button" 
                               className="recipient-chip-remove"
                               onClick={() => handleRemoveRecipient(rec.email)}
                               title={`Remove ${rec.email}`}
+                              aria-label={`Remove ${rec.email}`}
+                              disabled={loading}
                             >
                               <X size={13} />
                             </button>
