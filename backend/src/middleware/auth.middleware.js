@@ -68,7 +68,10 @@ export async function requireAuth(req, res, next) {
       name: user.name,
       role: user.role,
       requestedRole: user.requestedRole || null,
-      ownerApprovalStatus: user.ownerApprovalStatus || 'not_required',
+      ownerApprovalStatus:
+        (user.role === 'owner' || user.role === 'admin') && user.ownerApprovalStatus === 'pending'
+          ? 'approved'
+          : (user.ownerApprovalStatus || 'not_required'),
       ownerApprovalRequestedAt: user.ownerApprovalRequestedAt || null,
       ownerApprovalReviewedAt: user.ownerApprovalReviewedAt || null,
       ownerApprovalReviewedByName: user.ownerApprovalReviewedByName || null,

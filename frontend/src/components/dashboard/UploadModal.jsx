@@ -45,6 +45,7 @@ const MIME_TO_EXTENSION = {
 export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
   const { user, token } = useAuth();
   const fileInputRef = useRef(null);
+  const allFilesInputRef = useRef(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -86,24 +87,47 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     if (!rawFile) return;
 
     let file = rawFile;
+    let fileName = rawFile.name || 'document';
+
+    // Decode URI component if Android provided a content URI or url-encoded name
+    try {
+      if (fileName.includes('%')) {
+        fileName = decodeURIComponent(fileName);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Strip out path prefixes if present (e.g. content:// or /storage/emulated/0/...)
+    if (fileName.includes('/') || fileName.includes('\\')) {
+      fileName = fileName.split(/[/\\]/).pop() || fileName;
+    }
+
+    // Determine extension
+    let ext = fileName.includes('.') ? ('.' + fileName.split('.').pop().toLowerCase()) : '';
+
+    // Mobile camera/picker fallback: deduce extension if filename lacks one
+    if (!ext && file.type && MIME_TO_EXTENSION[file.type]) {
+      ext = MIME_TO_EXTENSION[file.type];
+      const baseName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_') || 'document';
+      fileName = `${baseName}${ext}`;
+      try {
+        file = new File([rawFile], fileName, { type: rawFile.type, lastModified: rawFile.lastModified || Date.now() });
+      } catch {
+        file = rawFile;
+      }
+    } else if (fileName !== rawFile.name) {
+      try {
+        file = new File([rawFile], fileName, { type: rawFile.type, lastModified: rawFile.lastModified || Date.now() });
+      } catch {
+        file = rawFile;
+      }
+    }
 
     // Check size limit (25MB)
     if (file.size > MAX_SIZE_BYTES) {
       setError(`File size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the 25 MB private storage limit.`);
       return;
-    }
-
-    // Determine extension
-    let ext = file.name.includes('.') ? ('.' + file.name.split('.').pop().toLowerCase()) : '';
-
-    // Mobile camera/picker fallback: deduce extension if filename lacks one
-    if (!ext && file.type && MIME_TO_EXTENSION[file.type]) {
-      ext = MIME_TO_EXTENSION[file.type];
-      try {
-        file = new File([rawFile], `${rawFile.name || 'document'}${ext}`, { type: rawFile.type });
-      } catch {
-        // Fallback for older browsers
-      }
     }
 
     // Check prohibited extensions
@@ -121,9 +145,9 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
     setSelectedFile(file);
     if (!title) {
       // Pre-fill title without extension
-      const baseName = file.name.includes('.') 
-        ? file.name.substring(0, file.name.lastIndexOf('.'))
-        : file.name;
+      const baseName = fileName.includes('.')
+        ? fileName.substring(0, fileName.lastIndexOf('.'))
+        : fileName;
       setTitle(baseName);
     }
   };
@@ -174,6 +198,8 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
 
   const handleReset = () => {
     setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (allFilesInputRef.current) allFilesInputRef.current.value = '';
     setTitle('');
     setDescription('');
     setTags('');
@@ -327,10 +353,25 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
               <input 
                 type="file" 
                 ref={fileInputRef} 
-                accept=".pdf,.png,.jpg,.jpeg,.gif,.docx,.xlsx,.pptx,.zip,.txt,.csv,.json,.md,.log,image/*,application/pdf"
+                accept=".pdf,.docx,.xlsx,.pptx,.zip,.txt,.csv,.json,.md,.log,.png,.jpg,.jpeg,.gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/zip,text/plain,text/csv,application/json,text/markdown,image/png,image/jpeg,image/gif"
                 className="upload-dropzone-input"
                 disabled={loading}
                 aria-label="Select document to upload"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelection(e.target.files[0]);
+                  }
+                }}
+              />
+
+              {/* Secondary fallback input for unrestricted system file browser */}
+              <input
+                type="file"
+                ref={allFilesInputRef}
+                accept="*/*"
+                style={{ display: 'none' }}
+                disabled={loading}
+                aria-label="Browse device storage"
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0]) {
                     handleFileSelection(e.target.files[0]);
@@ -356,6 +397,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
                       e.stopPropagation();
                       setSelectedFile(null);
                       if (fileInputRef.current) fileInputRef.current.value = '';
+                      if (allFilesInputRef.current) allFilesInputRef.current.value = '';
                     }}
                     title="Remove selected file"
                   >
@@ -364,13 +406,25 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
                 </div>
               ) : (
                 <div className="dropzone-empty-prompt">
-                  <UploadCloud size={40} className="upload-icon" />
+                  <UploadCloud size={42} className="upload-icon" />
                   <p className="prompt-primary">
                     Drag and drop file here, or <span>browse local files</span>
                   </p>
                   <p className="prompt-secondary">
                     Supports PDF, DOCX, XLSX, Images, and Text up to 25 MB
                   </p>
+                  <div className="dropzone-actions">
+                    <button
+                      type="button"
+                      className="btn-browse-docs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        allFilesInputRef.current?.click();
+                      }}
+                    >
+                      Browse Device Storage
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

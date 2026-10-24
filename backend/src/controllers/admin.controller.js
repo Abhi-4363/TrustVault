@@ -701,6 +701,11 @@ export async function updateUserRole(req, res) {
       updates.ownerApprovalReviewedBy = callerId;
       updates.ownerApprovalReviewedByName = req.user.name || req.user.email;
       updates.roleChangeReason = req.body.reason ? String(req.body.reason).trim() : 'Promoted to Document Owner by Administrator';
+    } else if (normalizedRole === 'owner') {
+      updates.ownerApprovalStatus = 'approved';
+      if (req.body.reason) {
+        updates.roleChangeReason = String(req.body.reason).trim();
+      }
     } else if (previousRole === 'owner' && normalizedRole === 'viewer') {
       specificAuditAction = 'USER_DOWNGRADED_TO_VIEWER';
       updates.roleChangeReason = req.body.reason ? String(req.body.reason).trim() : 'Downgraded to Viewer by Administrator';

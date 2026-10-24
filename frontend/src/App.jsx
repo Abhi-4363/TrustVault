@@ -380,6 +380,14 @@ export function App() {
     };
   }, [token, user?.role, user?.ownerApprovalStatus]);
 
+  // Clear any stale owner request feedback banner when user is approved or has owner/admin role
+  useEffect(() => {
+    if (user?.role === 'owner' || user?.role === 'admin' || user?.ownerApprovalStatus === 'approved') {
+      setOwnerRequestNotice({ type: '', message: '' });
+      setApprovalStatusNotice('');
+    }
+  }, [user?.role, user?.ownerApprovalStatus]);
+
   const openModal = (config) => {
     setModalConfig({
       isOpen: true,
@@ -824,7 +832,7 @@ export function App() {
       ) : (
         <>
           {/* Viewer Owner Access Request Feedback Banner */}
-          {ownerRequestNotice.message && (
+          {ownerRequestNotice.message && user.role === 'viewer' && (user.ownerApprovalStatus === 'pending' || ownerRequestNotice.type === 'error') && (
             <div
               className={`viewer-role-banner ${ownerRequestNotice.type === 'success' ? 'viewer-banner-downgraded' : 'viewer-banner-rejected'}`}
               role="alert"

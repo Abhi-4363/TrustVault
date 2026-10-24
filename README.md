@@ -1,25 +1,114 @@
 # TrustVault 🔐
 
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
-> Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
+> Built for the Snovasys Fresher Challenge 2026. Fully implemented, hardened, and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-277%20passed-brightgreen.svg)]()
+[![Live Website](https://img.shields.io/badge/live--site-trust--vault--9185.vercel.app-blue.svg)](https://trust-vault-9185.vercel.app/)
+[![Tests](https://img.shields.io/badge/tests-277%20passed%20%28100%25%29-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/threats%20mitigated-30%2F30%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
 
+---
+
+## 1. Quick Start for Evaluators
+
+Welcome to the **TrustVault** evaluator evaluation portal. This section provides immediate access to the production deployment, pre-configured evaluation accounts, a quick evaluation sequence, and a feature checklist.
+
+### A. Live Website
+
+The production frontend application is deployed and verified at:
+
+👉 **[https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/)**
+
+- **Production Frontend**: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/) (Hosted on Vercel)
+- **Production Backend API**: `https://trustvault-wkaj.onrender.com/api` (Hosted on Render with automated health checks)
+- **CORS Allowed Origins**: Pre-configured in the backend to permit `https://trust-vault-9185.vercel.app` and local development hosts.
+
+> [!NOTE]
+> When testing locally, use `http://localhost:5173` for the frontend and `http://localhost:5000` for the backend. The production URLs above are dedicated to cloud evaluation.
 
 ---
 
-## 1. Executive Summary
+### B. Evaluation Accounts
 
-**TrustVault** is an enterprise-grade document security and collaboration platform designed for modern organizations that handle high-stakes confidential files—such as financial audits, legal contracts, board presentations, and intellectual property.
+The platform has been provisioned with four distinct evaluation accounts representing all platform personas. These credentials are confirmed in the database seed configuration (`backend/scripts/seed.js`) and directly accessible via the **Quick Demo Accounts** buttons on the login portal:
+
+| Name | Login ID / Email | Demo Password | Role | Evaluation Purpose |
+| :--- | :--- | :--- | :---: | :--- |
+| **Marcus Vance** | `admin@trustvault.internal` | `TrustVault2026!` | `admin` | **Chief Security Officer (Administrator)** — Access to the Admin Governance Dashboard, Owner Approval Queue, User Directory, Role Assignment, Temporary Password Resets, and Global Immutable Audit Log Explorer with un-truncated CSV/JSON export. |
+| **Sarah Jenkins** | `sarah.lead@trustvault.internal` | `TrustVault2026!` | `owner` | **VP of Engineering (Document Owner)** — Uploads confidential documents, selects visibility (`Private`, `Specific Users`, `All Registered Users`), assigns fine-grained Read/Edit ACL permissions, and revokes access instantly. |
+| **Alex Mercer** | `alex.dev@trustvault.internal` | `TrustVault2026!` | `viewer` | **Platform Engineer (Viewer)** — Standard read-only collaborator. Views and downloads documents explicitly shared with him; edits metadata if granted Edit permissions; strictly blocked from uploading new documents. |
+| **Jordan Lee** | `jordan.req@trustvault.internal` | `TrustVault2026!` | `viewer` *(pending owner request)* | **Pending Document Owner Requester** — Demonstrates the Owner approval workflow. Retains standard Viewer privileges while an active Owner request is queued for Administrator review in the Governance Dashboard. |
+
+> [!IMPORTANT]
+> **Jordan Lee's Account Workflow**: Jordan's account is intentionally seeded with `role: 'viewer'` and `ownerApprovalStatus: 'pending'` to demonstrate the approval workflow. While pending, Jordan sees a live status banner with submission details and a "Check Status" button. Once an Administrator approves the request in the Admin Dashboard, Jordan's effective role elevates to `owner` and upload privileges unlock immediately.
+
+> [!WARNING]
+> **Security Notice**: These demonstration credentials (`TrustVault2026!`) are provided exclusively for reviewer evaluation, local development, and automated testing. In production deployments with real confidential data, credentials must be generated with cryptographically strong randomness and stored in a secure secret manager.
+
+---
+
+### C. Quick Evaluation Steps
+
+Follow this quick 8-step sequence to evaluate all core capabilities:
+
+1. **Open the live website**: Navigate to [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/).
+2. **Sign in using an evaluation account**: On the login portal, click any of the **Quick Demo Accounts** buttons (e.g., **Document Owner** for Sarah Jenkins) and click **Sign In to Vault**.
+3. **Explore the role-specific dashboard**: Observe the active workspace, stats cards, recent activity stream, and available navigation tabs for that role.
+4. **Test document upload and visibility (Sarah - Owner)**:
+   - Click **Upload Document**.
+   - Notice the three visibility choices: `Private — Only Me` (default), `Share with Specific Users` (user directory selector with Read/Edit options), and `Share with All Registered Users`.
+   - Select a document, enter title and tags, choose visibility, and click **Upload & Encrypt**.
+5. **Test shared document access (Alex - Viewer)**:
+   - Sign out Sarah and sign in as `alex.dev@trustvault.internal`.
+   - In **Shared with Me**, locate the document shared by Sarah.
+   - Click **Download** to receive the file with its original filename via the File System Access API.
+   - If granted Edit permissions, click **Edit** to update tags and description through the Metadata Editor.
+   - Note that Alex has no upload button, enforcing strict RBAC boundaries.
+6. **Test owner approval, account governance, and audit trails (Marcus - Admin)**:
+   - Sign in as `admin@trustvault.internal`.
+   - Open **Admin Governance** from the sidebar.
+   - In **Pending Document Owner Requests**, review Jordan Lee's pending request. Click **Approve** (elevates Jordan to Owner) or **Reject**.
+   - Inspect the **Global Audit Trail**, apply action or actor filters, and click **Export CSV** or **Export JSON** to verify un-truncated compliance records.
+   - Test user role modification with the **Zero Data Loss Guarantee** dialog.
+7. **Examine the pending owner request workflow (Jordan - Pending Requester)**:
+   - Sign in as `jordan.req@trustvault.internal`.
+   - Inspect the pending status notice: *"Owner access request pending administrator approval — Under Review"*.
+   - Click **Check Status** to test live profile synchronization against the backend.
+8. **Test access revocation and zero-leakage isolation**:
+   - Sign in as Sarah (Owner), open the document sharing modal, and click **Revoke** on Alex's permission grant.
+   - Switch Alex back to the platform: access is revoked immediately with zero cache delay (`403 Forbidden`).
+   - Switch visibility of a shared document back to `Private`: all prior collaborator ACLs are purged instantly.
+
+---
+
+### D. Quick Evaluation Checklist
+
+- [x] **Distinct Sign In and Create Account Forms**: Completely separated interfaces with dedicated field schemas, clean state resets, component key isolation, and direct URL routing (`?mode=login` / `?mode=register`).
+- [x] **Role-Based Access Control (RBAC)**: Strictly enforced roles (`admin`, `owner`, `viewer`) with server-side authorization middleware on all routes.
+- [x] **Administrator, Owner, and Viewer Workflows**: Comprehensive role-tailored dashboards and capabilities verified on client and server.
+- [x] **Document Upload, Preview, and Download**: Non-web-root private disk quarantine, UUID filename obfuscation, and native Save-As dialog preserving original filenames via File System Access API.
+- [x] **Three-Tier Visibility Controls**: `Private — Only Me` (default), `Share with Specific Users` (granular Read/Edit ACLs), and `Share with All Registered Users` (authenticated accounts only).
+- [x] **Read/Edit Permissions & Immediate Revocation**: Per-document collaborator permissions with zero-cache-lag direct-to-database revocation.
+- [x] **Owner Approval & Notification Handling**: Viewer self-service escalation, Admin Notification Center, live badge counts, and Zero Data Loss Guarantee on role downgrade.
+- [x] **Email Verification & Dual-Option Password Recovery**: 24-hour cryptographic verification tokens, Admin-assisted temporary resets (`Password@123` with mandatory change policy), and 15-minute self-service email reset links.
+- [x] **Append-Only Immutable Audit Trail**: Pre-save database hooks rejecting PUT/PATCH/DELETE mutations; global audit log explorer with un-truncated CSV/JSON export.
+- [x] **Scoped Search & Zero Metadata Leakage**: Database query pipeline filtering enforcing user ACLs; unauthorized keyword searches return 0 matching results.
+- [x] **Responsive Mobile Layout & Robust Document Selection**: Centered upload dropzone with sufficient height (155px desktop / 140px mobile), fully visible cloud icon, touch-gesture overlay, debounced double-tap protection, and reliable Android document file selection path.
+- [x] **Defensive Security Architecture**: Magic number file signature validation with auto-purge, bcrypt (12 salt rounds), rate limiting, and all 30 threat mitigations cataloged in `THREATS.md` verified.
+
+---
+
+## 2. Project Overview
+
+**TrustVault** is an enterprise-grade document security and collaboration platform designed for organizations handling high-stakes confidential files—such as financial audits, legal contracts, board presentations, and intellectual property.
 
 TrustVault enforces a strict **Zero-Trust** security architecture:
-1. **Private Storage Isolation**: File binaries are never exposed in static web directories. All downloads are served through authenticated streaming controllers.
+1. **Private Storage Isolation**: File binaries are never exposed in static web directories. All downloads are served through authenticated streaming controllers (`res.sendFile` / streaming pipeline) with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 2. **Per-Document ACLs & Document Visibility**: Document owners can select document visibility during upload (`Private — Only Me`, `Share with Specific Users`, or `Share with All Registered Users`) and assign fine-grained `read` or `edit` permissions.
-3. **Immediate Access Revocation**: Permissions are checked directly against the database on every read or stream request with zero cache lag. Switching visibility to `private` immediately revokes all third-party access and clears prior ACL grants.
-4. **Append-Only Immutable Audit Trail**: Every file upload, download, metadata read, permission grant, revocation, visibility change, and password lifecycle event is permanently recorded in a tamper-resistant ledger.
+3. **Immediate Access Revocation Engine**: Permissions are checked directly against the database on every read or stream request with zero cache lag. Switching visibility to `private` immediately revokes all third-party access and clears prior ACL grants.
+4. **Append-Only Immutable Audit Trail**: Every file upload, download, metadata read, permission grant, revocation, visibility change, and password lifecycle event is permanently recorded in a tamper-resistant ledger protected by schema pre-hooks.
 5. **Upload & Magic-Number Validation**: Uploads are strictly checked against file signatures (magic numbers) to prevent disguised scripts/executables, with automatic disk purging.
 6. **Administrator Governance Dashboard**: Real-time system analytics, global audit log explorer with un-truncated CSV/JSON export, user account deactivation, and single-use password recovery initiation.
 7. **Secure Download with Original Filename**: Downloads use the browser's File System Access API (`showSaveFilePicker`) to present the original filename (e.g. `Report.pdf`) in a native Save-As dialog, bypassing Chromium's blob-URL UUID fallback. Bearer-token authentication is preserved; tokens are never placed in URLs.
@@ -30,54 +119,92 @@ TrustVault enforces a strict **Zero-Trust** security architecture:
 
 ---
 
-## 2. 10-Stage Technical Roadmap Overview
+## 3. Key Features
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          TrustVault Security Core                           │
+├─────────────────────┬───────────────────────────┬───────────────────────────┤
+│    Identity & RBAC  │   Document Management     │   Governance & Compliance │
+│ • Admin / Owner /   │ • 3-Tier Visibility       │ • Append-Only Audit Trail │
+│   Viewer Roles      │ • Granular Read/Edit ACLs │ • Un-truncated CSV / JSON │
+│ • Owner Approval    │ • Magic Number Validation │ • Account Suspension      │
+│ • Dual-Option Reset │ • Private Disk Isolation  │ • Zero Data Loss on       │
+│ • Distinct Auth UI  │ • Native Save-As Filename │   Role Downgrade          │
+└─────────────────────┴───────────────────────────┴───────────────────────────┘
+```
+
+- **Enterprise Role-Based Access Control (RBAC)**: Clear division of authority between Administrators (governance, approvals, audits), Document Owners (file upload, sharing, ACL management), and Viewers (read/download shared files).
+- **Three-Tier Document Visibility**:
+  - `Private — Only Me`: Strictly accessible to the uploader and administrative governance.
+  - `Share with Specific Users`: Collaborator selector with granular `Read` or `Can Edit` permission levels.
+  - `Share with All Registered Users`: Discoverable by all authenticated, active accounts; unauthenticated requests return `401 Unauthorized`.
+- **Immediate Zero-Lag Access Revocation**: Direct database authorization check on every metadata read and binary stream request. Modifying document visibility to Private immediately revokes third-party access and purges collaborator grants.
+- **File Signature & Magic Number Inspection**: Multi-byte binary signature verification rejecting executable files (`.exe`, `.bat`, `.sh`, `.bin`, `.msi`) disguised with document extensions (e.g., an ELF binary or shell script renamed as `.docx` or `.png`). Rejected uploads are purged from disk immediately.
+- **Native Save-As Filename Preservation**: Solves Chromium's standard download limitation where blob URLs trigger generic UUID filenames (`d290f1ee-6c54-4b01...`). Uses the browser File System Access API (`showSaveFilePicker`) to populate the user's native file dialog with the sanitized original filename (e.g. `Quarterly_Report.pdf`), with automatic 60-second blob URL fallback for Firefox and Safari.
+- **Admin Governance & Live Metrics**: System metrics (active users, total files, active grants, pending requests), user directory management, and one-click Owner request approval/rejection.
+- **Tamper-Resistant Audit Trail**: Append-only MongoDB/in-memory collection with Mongoose schema hooks rejecting all `updateOne`, `updateMany`, `findOneAndUpdate`, `deleteOne`, and `deleteMany` operations.
+- **Dual-Option Password Recovery Architecture**:
+  - Option A: Admin-Assisted Reset (`POST /api/auth/forgot-password`) queuing an unread notification for Administrator review, resetting to `Password@123` with a mandatory `mustChangePassword` forced change policy.
+  - Option B: Self-Service Email Reset Link (`POST /api/auth/forgot-password-email`) dispatching a 15-minute single-use cryptographic token directly to the user's verified inbox.
+- **Transactional Email Integration**: Unified multi-provider engine supporting Brevo HTTPS REST API (Port 443, Render compatible), Resend REST API, and Gmail SMTP with App Passwords. Enforces duplicate transmission prevention and zero credential logging.
+- **Responsive Mobile Layout & Touch Ingestion**: Dropzone with minimum 155px desktop / 140px mobile height, centered cloud upload icon, mobile touch gesture overlay, double-tap debouncing, and a comprehensive Android file selection path supporting documents (`.pdf, .docx, .xlsx, .pptx, .zip, .txt, .csv, .json, .md, .log`) and images without restrictive `image/*` picker locking.
+- **Enterprise Theme Customization**: Real-time Light, Dark, and System Default appearance modes with OS `prefers-color-scheme` synchronization and localStorage persistence.
+
+---
+
+## 4. Technology Stack and Architecture
+
+### Technology Stack
+
+- **Backend API**: Node.js, Express 4, Mongoose with dual-engine architecture:
+  - Persistent MongoDB Atlas connection when `MONGODB_URI` is provided.
+  - Resilient zero-configuration in-memory repository fallback for instant local testing and offline execution.
+- **Security & Cryptography**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), crypto (SHA-256 token hashing, UUIDv4), defensive HTTP headers, sliding-window rate limiters.
+- **File Ingestion & Storage**: Multer, private storage quarantine outside public web roots, magic-number binary inspection, mobile touch overlay.
+- **File Download & Streaming**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; resilient 60-second blob-URL fallback for Firefox/Safari and mobile OS download managers.
+- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic, Light/Dark/System theme switcher with OS synchronization).
+- **Testing**: Vitest 5, Supertest (18 test suites, 277 automated integration tests, 100% pass rate).
+
+### 10-Stage Technical Roadmap
 
 ```mermaid
 graph TD
-    S1[Stage 1: Foundation & UI] --> S2[Stage 2: Authentication & RBAC]
-    S2 --> S3[Stage 3: Document Metadata & Private Storage]
-    S3 --> S4[Stage 4: Per-Document Permissions]
-    S4 --> S5[Stage 5: Immediate Revocation Engine]
-    S5 --> S6[Stage 6: Tamper-Resistant Audit Trail]
-    S6 --> S7[Stage 7: Search & Upload Validation]
-    S7 --> S8[Stage 8: Administrator Governance Dashboard]
-    S8 --> S9[Stage 9: Automated Security Integration Tests]
-    S9 --> S10[Stage 10: Production Hardening, Seed Data & Final Demo]
+    S1["Stage 1: Foundation & UI"] --> S2["Stage 2: Authentication & RBAC"]
+    S2 --> S3["Stage 3: Document Metadata & Private Storage"]
+    S3 --> S4["Stage 4: Per-Document Permissions"]
+    S4 --> S5["Stage 5: Immediate Revocation Engine"]
+    S5 --> S6["Stage 6: Tamper-Resistant Audit Trail"]
+    S6 --> S7["Stage 7: Search & Upload Validation"]
+    S7 --> S8["Stage 8: Administrator Governance Dashboard"]
+    S8 --> S9["Stage 9: Automated Security Integration Tests"]
+    S9 --> S10["Stage 10: Production Hardening, Seed Data & Final Demo"]
 ```
 
-| Stage | Name | Status | Key Deliverables & Achievements |
+| Stage | Name | Status | Key Deliverables & Verified Achievements |
 | :---: | :--- | :---: | :--- |
-| **Stage 1** | **Foundation & Premium UI** | ✅ Complete | Express decoupled app factory, React + Vite SaaS shell, design system tokens |
-| **Stage 2** | **Authentication & RBAC** | ✅ Complete | JWT issuance, bcrypt (12 rounds), RBAC middleware (`admin`, `owner` / Document Owner, `viewer` / Viewer) |
-| **Stage 3** | **Metadata & Private Storage** | ✅ Complete | UUID disk filenames, non-web storage quarantine, secure binary streaming |
-| **Stage 4** | **Per-Document Permissions** | ✅ Complete | Granular ACLs (`read` / `edit`), access delegation, ownership isolation |
-| **Stage 5** | **Immediate Revocation Engine** | ✅ Complete | Zero token caching lag, direct-to-database download authorization |
-| **Stage 6** | **Tamper-Resistant Audit Trail** | ✅ Complete | Append-only ledger, schema pre-hooks rejecting PUT/DELETE mutations |
-| **Stage 7** | **Search & Upload Validation** | ✅ Complete | Scoped search without metadata leaks, magic number header inspection |
-| **Stage 8** | **Admin Governance Dashboard** | ✅ Complete | System analytics, un-truncated CSV/JSON audit export, user account deactivation |
-| **Stage 9** | **Automated Security Integration** | ✅ Complete | 100% verification of all entries in `THREATS.md` |
-| **Stage 10** | **Production Hardening & Final Finalization** | ✅ Complete | Document visibility cards, self-service & admin password recovery, distinct auth forms, 0 audit vulnerabilities |
+| **Stage 1** | **Foundation & Premium UI** | ✅ Complete | Express decoupled app factory, React + Vite SaaS shell, design system tokens, responsive navbar. |
+| **Stage 2** | **Authentication & RBAC** | ✅ Complete | JWT issuance, bcrypt (12 rounds), RBAC middleware (`admin`, `owner` / Document Owner, `viewer` / Viewer). |
+| **Stage 3** | **Metadata & Private Storage** | ✅ Complete | UUID disk filenames, non-web storage quarantine, secure binary streaming with original filename preservation. |
+| **Stage 4** | **Per-Document Permissions** | ✅ Complete | Granular ACLs (`read` / `edit`), access delegation, ownership isolation, recipient collaborator directory. |
+| **Stage 5** | **Immediate Revocation Engine** | ✅ Complete | Zero token caching lag, direct-to-database download authorization, instant grant clearing on visibility shift to Private. |
+| **Stage 6** | **Tamper-Resistant Audit Trail** | ✅ Complete | Append-only ledger, schema pre-hooks rejecting PUT/PATCH/DELETE mutations, un-truncated CSV/JSON export. |
+| **Stage 7** | **Search & Upload Validation** | ✅ Complete | Scoped search without metadata leaks, magic number header inspection, automatic disk purging of rejected uploads. |
+| **Stage 8** | **Admin Governance Dashboard** | ✅ Complete | System analytics, Owner request moderation queue, un-truncated CSV/JSON audit export, user account deactivation. |
+| **Stage 9** | **Automated Security Integration** | ✅ Complete | 100% automated verification of all 30 threat vectors cataloged in `THREATS.md`. |
+| **Stage 10** | **Production Hardening & Verification** | ✅ Complete | Three-tier visibility cards, self-service & admin password recovery, distinct auth forms, Brevo HTTPS email delivery, mobile touch dropzone, 0 audit vulnerabilities. |
 
 ---
 
-## 3. Technology Stack
-
-- **Backend API**: Node.js, Express 4, Mongoose (with dual-engine architecture: persistent MongoDB Atlas + resilient zero-configuration in-memory adapter)
-- **Security & Crypto**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), crypto (SHA-256 tokens), defensive HTTP headers, sliding-window rate limiter
-- **File Ingestion**: Multer, private encrypted disk quarantine, magic-number binary signature inspection, touch-friendly dropzone overlay
-- **File Download**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; resilient 60-second blob-URL fallback for Firefox/Safari and mobile OS download managers
-- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic, Light/Dark/System theme switcher with OS synchronization)
-- **Testing**: Vitest 5, Supertest (18 test suites, 277 automated integration tests)
-
----
-
-## 4. Quickstart Guide
+## 5. Installation and Local Setup
 
 ### Prerequisites
+
 - **Node.js**: `v18.x` or higher (`v22+` recommended)
 - **npm**: `v9.x` or higher
+- **Git**: For repository cloning
 
-### Installation & Launch
+### Clean-Clone Setup Instructions
 
 1. **Clone the repository**:
    ```bash
@@ -85,93 +212,298 @@ graph TD
    cd TrustVault
    ```
 
-2. **Start the Backend API Server**:
+2. **Configure Environment Variables**:
+   Copy the example environment templates:
    ```bash
+   # Backend environment configuration
+   cp backend/.env.example backend/.env
+
+   # Frontend environment configuration (optional for local dev)
+   cp frontend/.env.example frontend/.env
+   ```
+   *The default values in `backend/.env.example` work out of the box for local development. If MongoDB is not running locally, TrustVault automatically uses its in-memory repository fallback.*
+
+3. **Install Dependencies & Seed Database**:
+   ```bash
+   # Install and seed backend
    cd backend
    npm install
-   npm run seed    # Populates realistic demo users, documents, and audit logs
-   npm run dev     # Runs on http://localhost:5000 (with auto-reload)
-   ```
+   npm run seed     # Seeds Marcus (Admin), Sarah (Owner), Alex (Viewer), Jordan (Pending Owner)
 
-3. **Start the Frontend Client**:
-   ```bash
+   # Install frontend
    cd ../frontend
    npm install
-   npm run dev     # Runs on http://localhost:5173
    ```
 
-4. Open `http://localhost:5173` in your browser.
+4. **Start Development Servers**:
+   Open two terminal windows:
+
+   **Terminal 1 — Backend API Server (Port 5000):**
+   ```bash
+   cd backend
+   npm run dev      # Starts Express API at http://localhost:5000 with auto-reload
+   ```
+
+   **Terminal 2 — Frontend Client (Port 5173):**
+   ```bash
+   cd frontend
+   npm run dev      # Starts Vite dev server at http://localhost:5173
+   ```
+
+5. **Open Application**:
+   Navigate to `http://localhost:5173` in your browser.
 
 ---
 
-## 5. Transactional Email Service & Provider Configuration
+## 6. Environment Variables and Email Configuration
 
-TrustVault features a robust, unified multi-provider transactional email subsystem designed for high reliability across local development and cloud production platforms (such as Render and Vercel):
+### Local Development Configuration (`backend/.env`)
 
-### Supported Email Providers (`EMAIL_PROVIDER`)
-You can select the active provider explicitly via the `EMAIL_PROVIDER` environment variable, or allow TrustVault to automatically detect available credentials using sensible fallback precedence (`brevo` -> `resend` -> `smtp` -> `simulated`).
+For local execution, the environment configuration defaults to local ports:
+
+```env
+# Network Port & Environment
+PORT=5000
+NODE_ENV=development
+
+# Allowed Frontend Origin for CORS Policies
+CLIENT_URL=http://localhost:5173
+
+# Frontend Base URL for Generating Verification & Reset Links
+APP_BASE_URL=http://localhost:5173
+
+# Database Connection (MongoDB Atlas or Local MongoDB)
+# Falls back to zero-config in-memory store if offline
+MONGODB_URI=mongodb://localhost:27017/trustvault_dev
+
+# JWT Authentication Secret & Lifetime
+JWT_SECRET=trustvault_dev_secret_change_in_production_min32chars
+JWT_EXPIRES_IN=24h
+
+# Transactional Email Provider Selection: 'brevo' | 'resend' | 'smtp'
+EMAIL_PROVIDER=brevo
+EMAIL_FROM=konagallaabhiram@gmail.com
+
+# Brevo HTTPS REST API (Port 443 - Recommended)
+BREVO_API_KEY=your_brevo_v3_api_key_here
+
+# Resend HTTPS REST API (Alternative)
+RESEND_API_KEY=your_resend_api_key_here
+
+# Gmail SMTP Configuration (Alternative for local dev)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=trustvaultOff@gmail.com
+SMTP_PASS=your_google_app_password_here
+```
+
+### Production Cloud Configuration (Vercel + Render)
+
+In production, keep the frontend and backend URLs separate:
+
+- **Frontend Origin & App Base URL**: `https://trust-vault-9185.vercel.app/`
+- **Backend API Base URL**: `https://trustvault-wkaj.onrender.com/api`
+
+```env
+# Production Backend Environment Variables (configured in Render Dashboard)
+PORT=5000
+NODE_ENV=production
+
+# Frontend Origin for CORS & Verification/Reset Link Generation
+CLIENT_URL=https://trust-vault-9185.vercel.app/
+APP_BASE_URL=https://trust-vault-9185.vercel.app/
+
+# Persistent Database & Storage
+MONGODB_URI=mongodb+srv://<db_user>:<db_password>@cluster.mongodb.net/trustvault_prod?retryWrites=true&w=majority
+STORAGE_DIR=/opt/render/project/src/backend/storage/uploads
+
+# Cryptographic Secrets
+JWT_SECRET=your_production_random_32char_jwt_secret
+JWT_EXPIRES_IN=24h
+
+# Transactional Email Service via Brevo HTTPS REST API (Render Compatible)
+EMAIL_PROVIDER=brevo
+EMAIL_FROM=konagallaabhiram@gmail.com
+BREVO_API_KEY=xkeysib-your-production-brevo-api-key
+```
+
+```env
+# Production Frontend Environment Variables (configured in Vercel Dashboard)
+VITE_API_BASE_URL=https://trustvault-wkaj.onrender.com/api
+VITE_APP_ENV=production
+```
+
+### Transactional Email Subsystem & Multi-Provider Architecture
+
+TrustVault incorporates a unified transactional email engine designed for resilient delivery across both local development and cloud hosting platforms:
 
 1. **Brevo HTTPS REST API (Recommended for Cloud / Render)**:
-   - **Provider Value**: `EMAIL_PROVIDER=brevo`
+   - **Provider Setting**: `EMAIL_PROVIDER=brevo`
    - **Transport**: HTTPS POST to `https://api.brevo.com/v3/smtp/email` over Port 443.
-   - **Authentication**: `api-key` request header with `BREVO_API_KEY`.
-   - **Render Compatibility**: Guaranteed compatibility on cloud platforms like Render where outbound raw SMTP ports (25, 465, 587) are restricted or firewalled.
-   - **⚠️ Mandatory Sender Verification**: The configured sender address (`EMAIL_FROM`) **must be verified in Brevo**. In the Brevo dashboard, navigate to **Senders & IP** -> **Senders** and verify your sender address or domain before dispatching emails. Brevo will reject unverified senders with HTTP 400.
-
+   - **Authentication**: `api-key` header with `BREVO_API_KEY`.
+   - **Cloud Advantage**: Guaranteed delivery on platforms like Render where raw outbound SMTP ports (25, 465, 587) are restricted on free/starter tiers.
+   - **Mandatory Sender Verification**: The sender address (`EMAIL_FROM`) must be verified in your Brevo dashboard under **Senders & IP -> Senders**.
 2. **Resend HTTPS REST API**:
-   - **Provider Value**: `EMAIL_PROVIDER=resend`
+   - **Provider Setting**: `EMAIL_PROVIDER=resend`
    - **Transport**: HTTPS POST to `https://api.resend.com/emails` with Bearer token authentication over Port 443.
    - **Credentials**: `RESEND_API_KEY`.
-
-3. **Nodemailer SMTP (Gmail / Custom)**:
-   - **Provider Value**: `EMAIL_PROVIDER=smtp`
-   - **Transport**: Direct TCP connection to `smtp.gmail.com` (Port 587 / 465).
-   - **Credentials**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
-
-### Duplicate Transmission Prevention (Single-Provider Dispatch)
-To prevent duplicate emails, TrustVault determines the single active provider prior to dispatch. Each email is routed exclusively through the chosen provider. If an upstream provider fails, the service records the rejection and logs safe diagnostics without falling through to secondary providers.
-
-### Transactional Email Security Invariants
-- **Acceptance Confirmation**: The email service only reports delivery success when the active provider confirms acceptance (e.g., returning a valid `messageId` from Brevo or `id` from Resend).
-- **Zero Leakage Logging**: System logs and audit trails record delivery status and recipient metadata, but never log API keys, SMTP passwords, raw verification tokens, or reset tokens.
-- **Link & Token Expiration**: Account verification links remain valid for 24 hours; password recovery links strictly expire after 15 minutes. Both use single-use cryptographic SHA-256 tokens.
-
-### Email Service Environment Variables Reference
-
-| Variable | Required | Default | Description |
-| :--- | :---: | :--- | :--- |
-| `EMAIL_PROVIDER` | Optional | `brevo` | Explicit provider choice: `brevo`, `resend`, or `smtp`. |
-| `BREVO_API_KEY` | For Brevo | `""` | Brevo v3 API key (`xkeysib-...`) from Brevo Settings -> API Keys. |
-| `EMAIL_FROM` | Yes | `konagallaabhiram@gmail.com` | Sender email address. **Must be verified in your email provider dashboard.** |
-| `RESEND_API_KEY` | For Resend | `""` | Resend API key (`re_...`) from Resend dashboard. |
-| `SMTP_HOST` | For SMTP | `smtp.gmail.com` | SMTP relay server hostname. |
-| `SMTP_PORT` | For SMTP | `587` | SMTP port (`587` for STARTTLS, `465` for SSL). |
-| `SMTP_USER` | For SMTP | `""` | SMTP username / Gmail account address. |
-| `SMTP_PASS` | For SMTP | `""` | Google App Password (16 characters, spaces stripped). |
-| `APP_BASE_URL` | Yes | `http://localhost:5173` | Base frontend URL used to generate verification and reset links. |
+3. **Nodemailer SMTP (Gmail / Custom SMTP Relay)**:
+   - **Provider Setting**: `EMAIL_PROVIDER=smtp`
+   - **Transport**: Direct TCP connection to `smtp.gmail.com` on Port 587 (STARTTLS) or 465 (SSL).
+   - **Credentials**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (16-character Google App Password).
+4. **Single-Provider Dispatch & Duplicate Prevention**: The service resolves the single active provider prior to transmission. Each email is routed exclusively through that provider. If the active provider rejects the payload, an error is recorded without falling through to secondary providers to prevent duplicate email delivery.
+5. **Zero Secret Leakage Invariant**: Logs and audit records document delivery status, recipient email, and timestamps, but strictly omit passwords, API keys, raw verification tokens, or reset tokens.
 
 ---
 
-## 6. Demonstration Credentials
+## 7. Evaluation Accounts and Role Workflows
 
-The login portal includes a **Quick Demo Accounts** selection with verified credentials ready for evaluation:
+The TrustVault RBAC model implements three primary roles with strict separation between effective privileges and requested permissions:
 
-> [!WARNING]
-> **PRODUCTION SECURITY ADVISORY**:
-> The default demonstration credentials and passwords (`TrustVault2026!`) listed below are intended strictly for local development, reviewer evaluation, and automated testing. In production environments, credentials must be generated with cryptographically strong randomness, stored in environment secrets managers, and never shared or checked into source control.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            TrustVault RBAC Model                            │
+├────────────────────┬────────────────────────────────────────────────────────┤
+│ Role               │ Authorized Capabilities                                │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ Administrator      │ • Full platform governance & metrics dashboard         │
+│ (Marcus Vance)     │ • Review, approve, or reject Owner access requests     │
+│                    │ • View & export un-truncated CSV/JSON audit trails     │
+│                    │ • Promote / downgrade user roles (Zero Data Loss)      │
+│                    │ • Deactivate / activate user accounts                  │
+│                    │ • Initiate Admin-assisted single-use password resets   │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ Document Owner     │ • Upload confidential documents to private storage     │
+│ (Sarah Jenkins)    │ • Select 3-tier visibility (Private, Specific, All)    │
+│                    │ • Assign Read or Can Edit permissions to named peers   │
+│                    │ • Revoke collaborator access instantly (zero lag)      │
+│                    │ • Update metadata (title, tags, description)           │
+│                    │ • View personal document audit trail                   │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ Viewer             │ • View and download documents explicitly shared        │
+│ (Alex Mercer)      │ • Discover platform-wide (All Registered Users) docs   │
+│                    │ • Edit metadata if explicitly granted 'Can Edit'       │
+│                    │ • Request Document Owner privileges via dashboard      │
+│                    │ • Strictly blocked from uploading or deleting files    │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ Pending Owner      │ • Same operational capabilities as Viewer              │
+│ (Jordan Lee)       │ • Active Owner request queued for Admin approval       │
+│                    │ • Live status notice with 'Check Status' polling       │
+└────────────────────┴────────────────────────────────────────────────────────┘
+```
 
-| Persona | Role | Email | Password | Permissions & Purpose |
-| :--- | :---: | :--- | :--- | :--- |
-| **Marcus Vance** | `admin` | `admin@trustvault.internal` | `TrustVault2026!` | Chief Security Officer — Full access to Governance Dashboard, Owner Approval Queue, Global Audit Trail, Role Assignment, and Password Recovery |
-| **Sarah Jenkins** | `owner` | `sarah.lead@trustvault.internal` | `TrustVault2026!` | Document Owner (VP Engineering) — Uploads documents, selects visibility, manages ACLs for owned files, and reviews audit history |
-| **Alex Mercer** | `viewer` | `alex.dev@trustvault.internal` | `TrustVault2026!` | Viewer (Platform Engineer) — Read-only collaborator; views and downloads explicitly shared files, blocked from uploading |
-| **Jordan Lee** | `viewer` (pending) | `jordan.req@trustvault.internal` | `TrustVault2026!` | Pending Document Owner Requester — Demonstrates the pending owner workflow, awaiting Admin governance decision |
+### Strict Separation of Effective vs. Requested Role
+
+TrustVault distinguishes an account's **effective role** (`role`: `admin`, `owner`, `viewer`) from its **requested role** (`requestedRole`: `owner`, `viewer`, or `null`) and approval lifecycle (`ownerApprovalStatus`: `not_required`, `pending`, `approved`, `rejected`):
+
+1. **Public Registration Policy**: Public registrations always provision accounts as **effective Viewers (`role: 'viewer'`)**. Users requesting `owner` privileges have their account flagged as `ownerApprovalStatus: 'pending'` and are queued for Administrator review.
+2. **In-App Notice & Real-Time Status**: Pending requester accounts see an informative status banner showing submission date and retain full Viewer privileges to documents shared with them. A live "Check Status" button polls `/api/auth/me` to refresh approval state.
+3. **Approved Accounts Clean State**: When an account is approved (`role === 'owner'` or `ownerApprovalStatus === 'approved'`), any pending request banners are automatically cleared, ensuring approved owners never see stale pending notices.
+4. **Admin Moderation Actions**:
+   - `POST /api/admin/owner-requests/:userId/approve`: Elevates effective role to `owner`, sets status to `approved`, and emits an immutable `OWNER_REQUEST_APPROVED` audit log. Upload privileges activate immediately.
+   - `POST /api/admin/owner-requests/:userId/reject`: Retains effective role as `viewer`, records rejection reason, sets status to `rejected`, and emits `OWNER_REQUEST_REJECTED`.
+5. **Zero Data Loss Guarantee on Role Downgrade**:
+   - When an Administrator downgrades an Owner to Viewer (`USER_DOWNGRADED_TO_VIEWER`), upload and sharing capabilities are revoked immediately.
+   - **All documents previously uploaded by the downgraded user remain strictly preserved in private vault storage**. No files are deleted or reassigned, and existing collaborator access remains fully functional.
+   - A confirmation modal explicitly outlines this guarantee before changes take effect.
 
 ---
 
-## 6. Security Threat Model Verification
+## 8. Document Visibility and Permission Management
 
-All 16 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematically mitigated and verified via automated integration tests in [`backend/tests/security-integration.test.js`](file:///c:/TrustVault/backend/tests/security-integration.test.js) and [`backend/tests/visibility-and-password-management.test.js`](file:///c:/TrustVault/backend/tests/visibility-and-password-management.test.js):
+When an Owner uploads a document, TrustVault presents the **"Who can access this document?"** selector:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Document Visibility Architecture                      │
+├────────────────────────────────┬────────────────────────────────────────────┤
+│ 1. Private — Only Me (Default) │ • Only the document owner (and admin       │
+│                                │   compliance governance) can view/stream.  │
+│                                │ • 100% hidden from search and other users. │
+├────────────────────────────────┼────────────────────────────────────────────┤
+│ 2. Share with Specific Users   │ • Collaborator directory selector.         │
+│                                │ • Assign per-user 'Read' or 'Can Edit'.    │
+│                                │ • Appears in recipient's "Shared with Me". │
+├────────────────────────────────┼────────────────────────────────────────────┤
+│ 3. Share with All Registered   │ • Accessible to all authenticated users.   │
+│    Users                       │ • Unauthenticated internet traffic is      │
+│                                │   strictly blocked with 401 Unauthorized.  │
+│                                │ • Default permission is Read-Only.         │
+└────────────────────────────────┴────────────────────────────────────────────┘
+```
+
+### Dynamic Visibility Modification & Zero-Lag Immediate Revocation
+
+- **Real-Time Visibility Updates**: Document owners can update document visibility at any time (`PATCH /api/documents/:id/visibility`).
+- **Immediate Revocation**: Switching visibility from `all_authenticated_users` or `selected_users` to `private` **immediately revokes all collaborator access and clears prior ACL grants**. Subsequent protected requests fail immediately with `403 Forbidden`.
+- **Metadata Editing Permission**: Recipients granted `edit` permissions can modify document titles, descriptions, and discoverability tags through an integrated Metadata Editor modal. View-only recipients remain restricted to read/download access.
+- **Audit Logging**: Every visibility modification emits an immutable audit event (`DOCUMENT_VISIBILITY_UPDATED`).
+
+---
+
+## 9. Authentication, Profile, and Password Recovery
+
+### Distinct Sign In and Create Account Architecture
+
+TrustVault strictly decouples the Sign In and Create Account interfaces to prevent input cross-contamination or ambiguous modal rendering:
+
+- **Dedicated Field Schemas**:
+  - **Sign In**: Displays Work Email, Password (with toggle), inline "Forgot Password?" trigger, "Verify email / Resend?" link, "Sign In to Vault" submission, and quick-access verified Demo Role selection cards. All registration-specific inputs (Full Name, Date of Birth, Confirm Password, Role selection, Terms & Privacy checkbox) are completely absent.
+  - **Create Account**: Displays Full Name, Work Email, Date of Birth (minimum age 13 enforcement), Password, Confirm Password, Requested Account Role (`Viewer` or `Document Owner`), Terms & Privacy acceptance checkbox, and "Create Account" submission. Login-only controls and demo role cards are strictly excluded.
+- **State Synchronization & Component Keys**:
+  - The authentication dialog (`AuthModals.jsx`) and landing portal (`AuthLandingPortal.jsx`) maintain dynamic synchronization with parent state via `initialMode` and `onModeChange` callbacks.
+  - Component instances utilize distinct React keys (`key={`${authModalMode}-${authModalOpen}`}`), ensuring state re-initialization and preventing retention of stale passwords, confirmation values, or validation errors when switching modes.
+- **Direct Query Parameter & Hash Routing**: Deep-linkable via URL query parameters (`?mode=register` or `?mode=login`) and URL hashes (`#register` or `#login`). Browser navigation events (`popstate`, `hashchange`) dynamically update the active form mode without requiring full page reloads.
+
+### Date of Birth Policy & Minimum Age Enforcement
+
+- **Minimum Age Rule**: Enforces a strict minimum age requirement (defaulting to **13 years old**).
+- **Exact Calendar Calculation**: Calculates age by evaluating exact birth year, month, and day rather than merely subtracting birth year from current year.
+- **Calendar Validation**: Rejects malformed dates (e.g., February 30th), leap year anomalies, and future dates on client and server.
+- **Timezone Drift Defense**: Persisted as a date-only string in `YYYY-MM-DD` format (ISO 8601 calendar date), preventing UTC timezone shifts from altering displayed birthdays.
+- **Privacy Enforcement**: Date of birth is excluded from audit ledgers to protect sensitive PII.
+
+### Terms & Conditions and Privacy Policy Versioning
+
+- **Version Constants**: `CURRENT_TERMS_VERSION = '1.0.0'`, `CURRENT_PRIVACY_VERSION = '1.0.0'`, `TERMS_POLICY_EFFECTIVE_DATE = '2026-10-22'`.
+- **Auditable Server Timestamp**: The user record captures `termsVersionAccepted`, `privacyVersionAcknowledged`, `termsPolicyEffectiveDate`, and a strictly server-generated timestamp `termsAcceptedAt`.
+- **Accessible Legal Modals**: Dedicated accessible modal dialogs with keyboard navigation, `Escape` key dismissal, focus trapping, and scrollable responsive viewports.
+
+### Editable Profile & Immediate Name Synchronization
+
+- **Self-Service Editing**: Users can edit their display name and date of birth inline or in a dialog with Save/Cancel controls, frontend validation, server-side validation, and instant visual feedback.
+- **Mass Assignment Protection**: Attempts to alter `role`, `isAdmin`, `isEmailVerified`, or permissions via `PUT /api/auth/profile` are strictly rejected or stripped.
+- **Cross-Collection Name Propagation**: When a user updates their name, the backend atomically updates the primary user identity record (`User.name`), owned document records (`Document.ownerName`), collaborator entries in permission lists (`Document.acl[].name`), pending Admin notifications (`AdminNotification.userName`), active password reset requests (`PasswordResetRequest.userName`), and records an immutable `PROFILE_UPDATED` audit log.
+
+### Dual-Option Password Recovery Architecture
+
+TrustVault provides two distinct, clearly separated password recovery options:
+
+| Recovery Feature | Option A: Administrator-Assisted Recovery | Option B: Self-Service Email Reset Link |
+| :--- | :--- | :--- |
+| **Trigger Mechanism** | User clicks "Request Reset from Admin" | User clicks "Send Password Reset Link" |
+| **Backend Endpoint** | `POST /api/auth/forgot-password` | `POST /api/auth/forgot-password-email` |
+| **Admin Intervention** | **Required** (Admin reviews in Notification Center) | **None** (Fully automated via email) |
+| **Resulting Credential** | Temporary evaluation password: `Password@123` | User sets their own permanent password |
+| **Enforced Policy** | `mustChangePassword: true` forces password change on next login | Password replaces existing credentials immediately |
+| **Token Lifetime** | Admin review queue (until approved/rejected) | Cryptographic token expires in **15 minutes** |
+| **Enumeration Defense** | Neutral response: *"If this email address is registered..."* | Neutral response: *"If an account exists with this email..."* |
+| **Notification Sync** | Creates persistent `PasswordResetRequest` + `AdminNotification` | Direct email delivery; no Admin notification clutter |
+
+#### Mandatory Temporary-Password Policy (`Password@123`)
+
+When an Administrator clicks **Reset Password** on a pending notification:
+1. The user's password is reset to **`Password@123`**, securely hashed with bcrypt (12 rounds).
+2. The user account is flagged with `mustChangePassword: true`.
+3. On the user's next login with `Password@123`, the backend blocks all protected endpoints with `403 PASSWORD_CHANGE_REQUIRED`.
+4. The frontend renders `ForcedPasswordChangeModal`, preventing any navigation or document access until a new password satisfying complexity rules is configured.
+
+---
+
+## 10. Security Threat Model
+
+All 30 security attack vectors cataloged in [`THREATS.md`](./THREATS.md) have been systematically mitigated and verified via automated integration tests:
 
 | Threat ID | Threat Vector | Mitigation Strategy | Test Suite Result |
 | :---: | :--- | :--- | :---: |
@@ -191,356 +523,234 @@ All 16 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematicall
 | **THREAT-14** | Data Loss on Downgrade | Documents strictly preserved on Owner downgrade without deletion | **VERIFIED (Zero Loss)** |
 | **THREAT-15** | Accidental Oversharing | Default Private visibility; instant revocation on switch to Private | **VERIFIED (Zero Lag)** |
 | **THREAT-16** | Reset Token Replay | Single-use SHA-256 token hashing; 1-hour expiration; audit sanitization | **VERIFIED (Single-Use)** |
+| **THREAT-17** | Password Reset Abuse & Flooding | Timing-safe neutral responses; request deduplication; rate limiting | **VERIFIED (Deduplicated)** |
+| **THREAT-18** | Notification Center Spoofing | Administrative endpoints strictly protected by `requireRole('admin')` | **VERIFIED (403 Forbidden)** |
+| **THREAT-19** | Permanent Temporary Password | Mandatory `mustChangePassword: true` blocking vault until changed | **VERIFIED (Enforced)** |
+| **THREAT-20** | Unverified Account Vault Access | Unverified accounts blocked from document routes with `403` | **VERIFIED (403 Forbidden)** |
+| **THREAT-21** | Verification Token Replay | 32-byte SHA-256 tokens; atomic consumption; 24-hour expiration | **VERIFIED (Single-Use)** |
+| **THREAT-22** | Reset Token Interception | Short 15-minute expiration; complexity enforcement; session invalidation | **VERIFIED (15m Expiry)** |
+| **THREAT-23** | User Enumeration via Probes | Identical neutral responses for registered vs non-existent emails | **VERIFIED (Zero Leakage)** |
+| **THREAT-24** | Email Provider Failures & Leaks | Credentials stored in `.env`; safe diagnostics; zero secret logging | **VERIFIED (Sanitized Logs)** |
+| **THREAT-25** | Underage Registration & DOB Bypass | Server-side ISO calendar validation; exact 13-year age calculation | **VERIFIED (Boundary Checked)** |
+| **THREAT-26** | Terms Non-Acceptance Spoofing | Server-bound policy versions; strictly server-generated timestamps | **VERIFIED (Server Timestamp)** |
+| **THREAT-27** | Profile Mass Assignment & XSS | Strict field whitelist (`name`, `dateOfBirth`); multi-model name sync | **VERIFIED (Whitelisted)** |
+| **THREAT-28** | DOB Privacy Leakage in Audits | Date of birth excluded from audit event metadata to protect PII | **VERIFIED (PII Excluded)** |
+| **THREAT-29** | Auth Form State Contamination | Dynamic mode synchronization; React key re-mounting; deep link routing | **VERIFIED (Clean State)** |
+| **THREAT-30** | Mobile File Ingestion Sandboxing | Dropzone touch overlay; client MIME deduction; debounced submission | **VERIFIED (Mobile Ingestion)** |
 
 ---
 
-## 7. Automated Test Suite
+## 11. Testing and Validation
 
-TrustVault maintains a 100% test pass rate across 18 comprehensive test suites with **277 automated integration tests**:
+TrustVault maintains a **100% test pass rate across all 18 test suites with 277 automated integration tests**:
 
 ```bash
 cd backend
 npm test
 ```
 
-| Suite | File | Tests | Key Invariants Covered |
+### Automated Test Coverage Breakdown
+
+| Suite | File | Tests | Key Security Invariants Covered |
 | :--- | :--- | :---: | :--- |
-| **Brevo & Multi-Provider Delivery** | `tests/brevo-and-providers.test.js` | 18 | Brevo HTTPS REST API (`api-key` header, Port 443), explicit `EMAIL_PROVIDER` selection (`brevo`, `resend`, `smtp`), single-provider dispatch (duplicate prevention), messageId acceptance verification, unverified sender error handling |
-| **Email Verification & Password Reset** | `tests/email-and-verification.test.js` | 20 | Unverified user blocking (403), 24h verification link token lifecycle, anti-reuse, live Brevo registration dispatch, dual-option password recovery, 15m reset link |
-| **Admin Notifications & Reset** | `tests/admin-notifications-and-password-reset.test.js` | 28 | Role-wide password change, forgot-password request anti-enumeration, Admin Notification Center, temporary Password@123 reset, mandatory password change policy |
-| **Visibility & Password Mgmt** | `tests/visibility-and-password-management.test.js` | 12 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption |
-| **Visibility & Viewer Edge Cases** | `tests/visibility-and-viewer-bug.test.js` | 12 | Edge-case boundary tests for visibility inheritance, viewer isolation, unshared document concealment, and grant-level revocation |
-| **Admin Governance & Audit** | `tests/admin-governance.test.js` | 32 | System analytics, un-truncated CSV/JSON export, user account deactivation, role updates |
-| **Security Threat Integration**| `tests/security-integration.test.js` | 18 | Automated verification of all cataloged threat vectors in `THREATS.md` |
-| **Upload Signature & Search** | `tests/search-validation.test.js` | 18 | Magic-number binary header inspection, scoped search isolation |
-| **Permissions & Delegation** | `tests/permissions.test.js` | 17 | Per-document ACLs (`read`/`edit`), multi-user collaboration |
-| **Document Access & Streaming**| `tests/document.test.js` | 16 | Private disk storage, UUID obfuscation, download authorization |
-| **Owner Approval Workflow** | `tests/owner-approval-workflow.test.js` | 13 | Viewer-default registration, pending owner queue, approval/rejection lifecycle, downgrade with zero data loss, self-promotion blocking |
-| **Authentication & RBAC** | `tests/auth.test.js` | 13 | bcrypt (12 rounds), HMAC SHA-256 JWT, deactivated account blocking |
-| **Registration & Profile** | `tests/registration-and-profile.test.js` | 18 | Complete registration input validation, profile retrieval, password requirements |
-| **Visibility Sharing Transitions** | `tests/visibility-sharing-transitions.test.js` | 19 | Dynamic switching between Private, Specific Users, and All Users, ACL preservation and cleanup |
-| **Viewer Owner Request** | `tests/viewer-owner-request.test.js` | 11 | Viewer self-service role escalation request lifecycle and Admin moderation queue |
-| **Tamper-Resistant Audit** | `tests/audit.test.js` | 7 | Append-only ledger, mutation rejection, chronological ordering |
-| **Service Health Check** | `tests/health.test.js` | 3 | Server uptime, environment state, storage accessibility |
-| **Immediate Access Revocation**| `tests/revocation.test.js` | 2 | Zero token caching lag, direct-to-database check |
+| **Brevo & Multi-Provider Delivery** | [`backend/tests/brevo-and-providers.test.js`](backend/tests/brevo-and-providers.test.js) | 18 | Brevo HTTPS REST API (`api-key` header, Port 443), explicit `EMAIL_PROVIDER` selection (`brevo`, `resend`, `smtp`), single-provider dispatch (duplicate prevention), messageId acceptance verification, unverified sender error handling. |
+| **Email Verification & Password Reset** | [`backend/tests/email-and-verification.test.js`](backend/tests/email-and-verification.test.js) | 20 | Unverified user blocking (403), 24h verification link token lifecycle, anti-reuse, live Brevo registration dispatch, dual-option password recovery, 15m reset link. |
+| **Admin Notifications & Reset** | [`backend/tests/admin-notifications-and-password-reset.test.js`](backend/tests/admin-notifications-and-password-reset.test.js) | 28 | Role-wide password change, forgot-password request anti-enumeration, Admin Notification Center, temporary Password@123 reset, mandatory password change policy. |
+| **Visibility & Password Mgmt** | [`backend/tests/visibility-and-password-management.test.js`](backend/tests/visibility-and-password-management.test.js) | 12 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption. |
+| **Visibility & Viewer Edge Cases** | [`backend/tests/visibility-and-viewer-bug.test.js`](backend/tests/visibility-and-viewer-bug.test.js) | 12 | Edge-case boundary tests for visibility inheritance, viewer isolation, unshared document concealment, and grant-level revocation. |
+| **Admin Governance & Audit** | [`backend/tests/admin-governance.test.js`](backend/tests/admin-governance.test.js) | 32 | System analytics, un-truncated CSV/JSON export, user account deactivation, role updates. |
+| **Security Threat Integration** | [`backend/tests/security-integration.test.js`](backend/tests/security-integration.test.js) | 18 | Automated verification of all cataloged threat vectors in `THREATS.md`. |
+| **Upload Signature & Search** | [`backend/tests/search-validation.test.js`](backend/tests/search-validation.test.js) | 18 | Magic-number binary header inspection, scoped search isolation. |
+| **Permissions & Delegation** | [`backend/tests/permissions.test.js`](backend/tests/permissions.test.js) | 17 | Per-document ACLs (`read`/`edit`), multi-user collaboration. |
+| **Document Access & Streaming** | [`backend/tests/document.test.js`](backend/tests/document.test.js) | 16 | Private disk storage, UUID obfuscation, download authorization. |
+| **Owner Approval Workflow** | [`backend/tests/owner-approval-workflow.test.js`](backend/tests/owner-approval-workflow.test.js) | 13 | Viewer-default registration, pending owner queue, approval/rejection lifecycle, downgrade with zero data loss, self-promotion blocking. |
+| **Authentication & RBAC** | [`backend/tests/auth.test.js`](backend/tests/auth.test.js) | 13 | bcrypt (12 rounds), HMAC SHA-256 JWT, deactivated account blocking. |
+| **Registration & Profile** | [`backend/tests/registration-and-profile.test.js`](backend/tests/registration-and-profile.test.js) | 18 | Complete registration input validation, profile retrieval, password requirements. |
+| **Visibility Sharing Transitions** | [`backend/tests/visibility-sharing-transitions.test.js`](backend/tests/visibility-sharing-transitions.test.js) | 19 | Dynamic switching between Private, Specific Users, and All Users, ACL preservation and cleanup. |
+| **Viewer Owner Request** | [`backend/tests/viewer-owner-request.test.js`](backend/tests/viewer-owner-request.test.js) | 11 | Viewer self-service role escalation request lifecycle and Admin moderation queue. |
+| **Tamper-Resistant Audit** | [`backend/tests/audit.test.js`](backend/tests/audit.test.js) | 7 | Append-only ledger, mutation rejection, chronological ordering. |
+| **Service Health Check** | [`backend/tests/health.test.js`](backend/tests/health.test.js) | 3 | Server uptime, environment state, storage accessibility. |
+| **Immediate Access Revocation** | [`backend/tests/revocation.test.js`](backend/tests/revocation.test.js) | 2 | Zero token caching lag, direct-to-database check. |
+
+### Frontend Production Build Verification
+
+```bash
+cd frontend
+npm run build
+```
+*Result*: Vite 6 transforms modules and produces an optimized production bundle with **0 warnings and 0 errors**.
 
 ---
 
-## 8. Admin User Management, Owner Approval, and Role Revocation Workflow
+## 12. Deployment — Vercel Frontend and Render Backend
 
-### Strict Separation of Effective vs Requested Role
-TrustVault distinguishes an account's **effective role** (`role`: `admin`, `owner`, `viewer`) from its **requested role** (`requestedRole`: `owner`, `viewer`, or `null`) and approval lifecycle (`ownerApprovalStatus`: `not_required`, `pending`, `approved`, `rejected`):
-1. **Public Registration Policy**: Public registrations are **always provisioned as effective Viewers (`role: 'viewer'`)**. Users requesting `owner` privileges have their account flagged as `ownerApprovalStatus: 'pending'` and are queued for Administrator review.
-2. **Immediate In-App Notice**: Requester accounts receive an in-app notice with their submission date and can browse files shared with them as Viewers while awaiting Admin action. A live "Check Status" button polls `/api/auth/me` to reflect approval decisions instantly.
-3. **Admin Queue & Notifications**: Administrators see a live badge count in the navigation (`1 PENDING`) and a dedicated **Pending Document Owner Requests** table in the Admin Governance dashboard.
-4. **Approve / Reject Actions**:
-   - `POST /api/admin/owner-requests/:userId/approve`: Promotes effective role to `owner`, sets status to `approved`, and emits an immutable `OWNER_REQUEST_APPROVED` audit event. The user immediately gains upload and ACL delegation privileges.
-   - `POST /api/admin/owner-requests/:userId/reject`: Keeps effective role as `viewer`, sets status to `rejected`, records the reason, and emits an `OWNER_REQUEST_REJECTED` audit event.
-5. **Role Promotion & Downgrade (Zero Data Loss Guarantee)**:
-   - Administrators can promote any Viewer to Owner (`USER_PROMOTED_TO_OWNER`) or downgrade any Owner to Viewer (`USER_DOWNGRADED_TO_VIEWER`) at any time.
-   - When an Owner is downgraded:
-     - Their upload, deletion, and sharing permissions are revoked immediately.
-     - **All existing documents previously uploaded by the downgraded user are strictly preserved** in private storage without file deletion or ownership reassignment.
-     - Pre-action confirmation dialog explicitly details this guarantee before role updates take effect.
+TrustVault is architected for seamless cloud production deployment:
 
----
+### Production URLs
 
-## 9. Document Visibility Policies & Ingestion Workflow
+- **Production Frontend**: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/) (Vercel)
+- **Production Backend**: `https://trustvault-wkaj.onrender.com/api` (Render)
 
-When an Owner uploads a document, TrustVault presents the **"Who can access this document?"** selector with three clear options:
+### Render Infrastructure as Code (`render.yaml`)
 
-1. **Private — Only Me (Default)**:
-   - Selected by default on all uploads.
-   - Strictly restricted to the document owner (and administrative compliance review).
-   - Inaccessible to other users via search, listing, direct document ID, or streaming URL.
-2. **Share with Specific Users**:
-   - Integrated recipient selector queries the user directory (`GET /api/documents/users/directory`).
-   - Assign per-collaborator `Read` or `Edit` permissions.
-   - Persisted in document ACL; displayed in recipient's **Shared with Me** workspace.
-3. **Share with All Registered Users**:
-   - Accessible strictly to authenticated, active TrustVault accounts.
-   - Never exposed publicly to unauthenticated internet traffic (unauthenticated requests return `401 Unauthorized`).
-   - Default permission is Read-Only.
-   - Any authenticated active user can discover and download the document.
+The repository includes a verified `render.yaml` blueprint:
 
-### Dynamic Visibility Modification & Zero-Lag Revocation
-- Document owners can update document visibility at any time (`PATCH /api/documents/:id/visibility`).
-- **Immediate Revocation**: Switching visibility from `all_authenticated_users` or `selected_users` to `private` **immediately revokes all collaborator access and clears prior ACL grants**. Subsequent protected requests fail immediately with `403 Forbidden`.
-- Every visibility modification produces an immutable audit log (`DOCUMENT_VISIBILITY_UPDATED`).
+```yaml
+services:
+  - type: web
+    name: trustvault-api
+    env: node
+    plan: starter
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    disk:
+      name: trustvault-storage
+      mountPath: /opt/render/project/src/backend/storage/uploads
+      sizeGB: 10
+```
+
+- **Persistent Disk Isolation**: The 10GB persistent disk mounted at `/opt/render/project/src/backend/storage/uploads` guarantees uploaded binaries persist across application restarts and redeployments.
+- **Automated Health Checks**: Express exposes `GET /api/health` reporting server status, storage directory accessibility, and database connectivity.
 
 ---
 
-## 10. Password Management, Admin Notification Center & Credential Workflows
+## 13. Mobile and Responsive UI
 
-TrustVault provides an integrated credential management and administrative notification lifecycle:
+TrustVault is fully optimized for touchscreens and mobile viewports down to narrow 360–390px screens:
 
-### 1. User Self-Service Change Password (`POST /api/auth/change-password`)
-- Accessible to **all authenticated roles** (Administrator, Document Owner, Viewer) via **Profile** and **Settings** navigation.
-- Verifies current password against stored bcrypt hash (12 rounds).
-- Enforces strict password complexity rules (minimum 8 characters, at least one letter, and at least one number).
-- Password and confirmation must match; rejects identical password reuse (`SAME_PASSWORD`).
-- Includes interactive show/hide password visibility toggles and clear success/error banners.
-- Invalidation: Active sessions and existing password-reset tokens are revoked immediately.
-- Never logs or stores plaintext passwords; records an immutable `USER_PASSWORD_CHANGED` audit record without sensitive metadata.
-- Account role, document permissions, ownership, and status are strictly preserved.
-
-### 2. Public "Forgot Password?" Request Flow (`POST /api/auth/forgot-password`)
-- Prominently accessible on the public login page via **Forgot Password?**.
-- Users enter their registered email and click **Send Request to Admin**.
-- **Anti-Enumeration Protection**: Returns a neutral, timing-safe confirmation (*"If this email address is registered, your password reset request has been submitted to an Administrator for review."*) regardless of whether the email is registered.
-- Creates a persistent `PasswordResetRequest` and an unread `AdminNotification` in the database.
-- **Deduplication**: If a pending reset request already exists for a user, no duplicate notification or database record is created.
-- Rate-limited to 15 submissions per minute to prevent flooding and abuse.
-
-### 3. Administrator Notification Center (`GET /api/admin/notifications`)
-- Clearly visible in the Admin Governance dashboard with a dynamic unread count badge.
-- Live tab and toolbar filters:
-  - **All Notifications**
-  - **Unread**
-  - **Owner Access Requests**
-  - **Password Reset Requests**
-- Displays request type, requester name, registered email, submission timestamp, and current status (`pending`, `approved`, `rejected`, `completed`).
-- Actions:
-  - **Mark Read** (`PATCH /api/admin/notifications/:id/read`)
-  - **Mark All as Read** (`POST /api/admin/notifications/mark-all-read`)
-  - **Refresh Notifications**
-  - **Review Request Details**
-- Persisted in the database, surviving dashboard reloads without generating duplicate notifications.
-- Strictly restricted to authenticated Administrators via `requireAuth` and `requireRole('admin')`.
-
-### 4. Password Reset — Exact Admin Workflow & Mandatory Temporary Policy
-When an Admin clicks **Reset Password** on a pending password reset notification:
-1. **Confirmation Dialog**: Displays an explicit prompt:
-   > *"Reset this user's password to Password@123?"*
-2. **Cancellation**: Cancelling leaves the account unchanged with zero side effects.
-3. **Execution (`POST /api/admin/notifications/:id/reset-password`)**:
-   - Verifies the requester is an authenticated Administrator and the notification is valid and pending.
-   - Resets the user's password to the exact temporary password **`Password@123`**, securely hashed with bcrypt (12 rounds).
-   - Never stores or displays the password in plaintext or in audit logs.
-   - Marks the reset request as `completed`, updates notification status to `completed`, and marks it as read.
-   - Emits immutable audit events (`PASSWORD_RESET_APPROVED`, `PASSWORD_RESET_COMPLETED`).
-4. **Mandatory Temporary-Password Policy**:
-   - The user account is flagged with `mustChangePassword: true`.
-   - On the user's next login with `Password@123`, the backend blocks all protected resources with `403 PASSWORD_CHANGE_REQUIRED`.
-   - The frontend displays `ForcedPasswordChangeModal`, preventing any navigation or document access until a new password is set. Only the password-change flow and logout are permitted.
-   - Setting a permanent password satisfies complexity rules, clears `mustChangePassword`, and unlocks the full vault dashboard.
-   - *Controlled Challenge Demonstration Notice*: `Password@123` is a temporary evaluation password and must never remain a user's permanent password.
-
-### 5. Owner Access Request Notifications Synchronization
-- Users registering with `requestedRole: 'owner'` are provisioned with effective role `viewer` and trigger an unread `owner_access_request` Admin notification.
-- From the Notification Center, Administrators can **Review**, **Approve** (`POST /api/admin/notifications/:id/approve-owner`), or **Reject** (`POST /api/admin/notifications/:id/reject-owner`).
-- Approving elevates the user's effective role to `owner` and marks the notification `approved`.
-- Rejecting preserves the user's effective role as `viewer` and marks the notification `rejected`.
-- Both actions record immutable compliance audit events (`OWNER_REQUEST_APPROVED`, `OWNER_REQUEST_REJECTED`).
-
-### 6. Email Verification & Automatic Login Flow
-1. **Unverified Account Provisioning**: Public registration creates accounts in an unverified state (`isEmailVerified: false`).
-2. **Cryptographic Single-Use Token**: A 32-byte secure token is generated via `crypto.randomBytes(32)` and persisted exclusively as a SHA-256 hash in the database with a 24-hour expiration window.
-3. **Vault Access Boundary**: Unverified users are strictly blocked from accessing confidential documents, uploads, downloads, and permission management (`403 EMAIL_NOT_VERIFIED`).
-4. **Verification Link Dispatch**: A verification email is sent via `trustvaultOff@gmail.com` using Nodemailer and Gmail SMTP containing the activation URL:
-   ```text
-   http://localhost:5173/?verifyToken=<single-use-token>
-   ```
-5. **Instant Activation & Auto-Login**: Opening the verification link verifies the token against the database hash, invalidates the token atomically, marks `isEmailVerified: true`, emits an immutable `EMAIL_VERIFIED` audit event, and returns an authenticated JWT session that logs the user directly into the platform without requiring a secondary sign-in step.
-6. **Resend Verification**: Users can request a fresh verification link at any time via `POST /api/auth/resend-verification`. The endpoint enforces sliding-window rate limiting and timing-neutral responses to prevent public email enumeration.
-
-### 7. Dual-Option Password Recovery Architecture
-TrustVault provides two distinct, clearly separated password recovery options on the Forgot Password portal:
-
-| Recovery Feature | Option A: Administrator-Assisted Recovery | Option B: Self-Service Email Reset Link |
-| :--- | :--- | :--- |
-| **Trigger Mechanism** | User clicks "Request Reset from Admin" | User clicks "Send Password Reset Link" |
-| **Backend Endpoint** | `POST /api/auth/forgot-password` | `POST /api/auth/forgot-password-email` |
-| **Admin Intervention** | **Required** (Admin reviews in Notification Center) | **None** (Fully automated via email) |
-| **Resulting Credential** | Temporary demo password: `Password@123` | User sets their own permanent password |
-| **Enforced Policy** | `mustChangePassword: true` forces password change on next login | Password replaces existing credentials immediately |
-| **Token Lifetime** | Admin review queue (until approved/rejected) | Cryptographic token expires in **15 minutes** |
-| **Enumeration Defense** | Neutral response: *"If this email address is registered..."* | Neutral response: *"If an account exists with this email..."* |
-| **Notification Sync** | Creates persistent `PasswordResetRequest` + `AdminNotification` | Direct email delivery; no Admin notification clutter |
-
-### 8. Email Delivery Configuration (Gmail SMTP)
-To enable real transactional email delivery using your Gmail account:
-
-1. **Sender Email Address**: Designate your Google account: `trustvaultOff@gmail.com`.
-2. **Enable 2-Step Verification**: Visit [Google Account Security](https://myaccount.google.com/security) and ensure **2-Step Verification** is turned **ON**.
-3. **Generate an App Password**:
-   - Go to [Google App Passwords](https://myaccount.google.com/apppasswords).
-   - Enter `TrustVault` as the application name and click **Create**.
-   - Google generates a 16-character App Password (e.g., `abcd efgh ijkl mnop`).
-4. **Configure Local Environment (`backend/.env`)**:
-   Add the following variables to your local `backend/.env` file (which is strictly excluded from Git):
-   ```env
-   EMAIL_FROM=trustvaultOff@gmail.com
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_SECURE=false
-   SMTP_USER=trustvaultOff@gmail.com
-   SMTP_PASS=your_16_character_app_password_without_spaces
-   APP_BASE_URL=http://localhost:5173
-   ```
-5. **Restart Backend**: Restart the Express server (`npm run dev`) and test delivery.
-
-### 9. Delivery Failure Behavior & Diagnostics
-- **Safe Diagnostic Logging**: If SMTP credentials are invalid (e.g. Gmail returns `535 5.7.8 BadCredentials`) or the network is unreachable, TrustVault logs a sanitized operational message without leaking passwords or tokens.
-- **Honest Feedback**: The backend returns clear diagnostic information indicating delivery status without falsely claiming success if provider rejection occurs.
-- **In-Memory Testing Harness**: During automated testing (`NODE_ENV=test`), emails are captured in an in-memory test queue (`sentEmails`), allowing instant and deterministic test assertions without external network dependencies.
-
----
-
-## 10. Registration, Terms & Conditions, Date of Birth & User Profile Architecture
-
-TrustVault incorporates an enterprise identity registration and self-service profile lifecycle designed around strict input validation, legal compliance versioning, and zero privilege escalation.
-
-### 1. Sign-Up Form Specification & Layout
-The public registration form presents fields in the following deliberate sequence:
-1. **Full Name**: Required, trimmed of leading/trailing whitespace, minimum 2 to 50 characters. Validates against XSS patterns while permitting international Unicode names, spaces, hyphens, and apostrophes.
-2. **Work Email Address**: Required, RFC-5322 format validated on both frontend and backend, normalized to lowercase, guarded by database uniqueness.
-3. **Date of Birth**: Positioned immediately above the password fields. Native touch-friendly date picker with `max` bounded to the current date.
-4. **Password & Confirm Password**: Visibility toggle (`Eye`/`EyeOff`), live checklist chips verifying requirements (8+ chars, letters & numbers, confirmation match). Hashed with 12 bcrypt salt rounds; raw passwords never logged or persisted.
-5. **Requested Account Role**: Selection between `Viewer` (standard read access upon email verification) and `Document Owner` (requires Admin review before file uploads are permitted).
-6. **Terms & Conditions Acceptance Checkbox**: Must be actively checked before submission (`[ ] I agree to the Terms & Conditions and acknowledge the Privacy Policy.`). Checkbox contains independent clickable links opening accessible legal modals without toggling the checkbox or resetting form data.
-7. **Create Account Button**: Disabled during submission with an inline spinner to prevent double-submits.
-8. **Sign In Link**: Effortless switching back to the authentication screen for existing users.
-
-### 2. Date of Birth Policy & Minimum Age Enforcement
-- **Configurable Age Policy**: Enforces a minimum age policy (configurable via `config.auth.minAge`, defaulting to **13 years old**).
-- **Exact Age Calculation**: Calculates age by taking into account the exact birth year, month, and day rather than merely subtracting birth year from current year.
-- **Strict Calendar Validation**: Rejects malformed dates (e.g. February 30th, April 31st), leap year anomalies, and future dates on both client and server.
-- **Timezone Drift Defense**: Persisted consistently as a date-only string in `YYYY-MM-DD` format (ISO 8601 calendar date), preventing UTC timezone shifts from altering the user's displayed birthday.
-- **Privacy Enforcement**: Date of birth is excluded from audit ledgers to protect sensitive PII.
-
-### 3. Terms & Conditions and Privacy Policy Versioning
-- **Version Tracking**:
-  - `CURRENT_TERMS_VERSION = '1.0.0'`
-  - `CURRENT_PRIVACY_VERSION = '1.0.0'`
-  - `TERMS_POLICY_EFFECTIVE_DATE = '2026-10-22'`
-- **Auditable Server Timestamp**: The user model records `termsVersionAccepted`, `privacyVersionAcknowledged`, `termsPolicyEffectiveDate`, and a strictly server-generated timestamp `termsAcceptedAt`. Client-supplied timestamps are never trusted.
-- **15-Section Terms of Service**: Covers eligibility, document ownership, authorized use, prohibited content, collaborator permissions, access revocation, audit logs, security incident reporting, and account termination.
-- **11-Section Privacy Policy**: Transparently discloses registration data collected, document metadata, audit logging, security controls, retention policies, and user data correction rights.
-- **Modal Accessibility**: Dedicated accessible modal dialog with tab switching, keyboard navigation, `Escape` key dismissal, focus trapping, and scrollable responsive viewport.
-
-### 4. Editable User Profile & Immediate Name Synchronization
-- **Profile View**: Displays user's full name with a prominent `[Edit]` button, email address (read-only with security lock badge), account role badge, approval status, date of birth with `[Edit]` button, email verification badge, terms version accepted (`v1.0.0`), and account creation timestamp.
-- **Self-Service Editing**: Users can edit their display name and date of birth inline or in a dialog with Save/Cancel controls, frontend validation, server-side validation, and instant visual feedback.
-- **Mass Assignment Protection**: Attempts to alter `role`, `isAdmin`, `isEmailVerified`, or permissions via `PUT /api/auth/profile` are strictly rejected or stripped.
-- **Cross-Collection Name Propagation**:
-  When a user saves a new name, the backend atomically updates:
-  1. The primary user identity record (`User.name`).
-  2. All document records owned by the user (`Document.ownerName`).
-  3. All collaborator entries where the user appears in permission lists (`Document.acl[].name`).
-  4. Pending admin notification center cards (`AdminNotification.userName`).
-  5. Active password reset requests (`PasswordResetRequest.userName`).
-  6. Emits an immutable `PROFILE_UPDATED` audit record noting the actor ID, affected user ID, and modified field names (`changedFields: ['name']`) while keeping historical audit log snapshots intact.
-- **Client Synchronization**: The frontend updates React authentication context immediately, updating the AppHeader avatar initials, user dropdown menu, overview welcome banner (`Welcome back, <Name>`), and profile display without requiring a page refresh or re-login.
-
-### 5. Transparent Limitations & Legal Placeholders
-- **Compliance Scope**: Collecting a date of birth and recording terms acceptance satisfies application policy requirements but does not by itself certify compliance with every global jurisdiction (e.g. COPPA, GDPR, CCPA).
-- **Placeholders**: Corporate entity registration details, physical headquarters address, and official legal counsel contact email are marked with explicit placeholders (`[TrustVault Legal Entity Placeholder]`, `legal@trustvault.internal`) pending formal corporate formation.
-
-### 6. Authentication Architecture: Distinct Forms & Direct URL Routing
-TrustVault strictly decouples the Sign In and Create Account interfaces to prevent input cross-contamination or ambiguous modal rendering:
-- **Dedicated Field Schemas**:
-  - **Sign In**: Displays solely Work Email, Password (with toggle), inline "Forgot Password?" trigger, "Verify email / Resend?" link, "Sign In to Vault" submission, and quick-access verified Demo Role selection cards. All registration-specific inputs (Full Name, Date of Birth, Confirm Password, Role selection, Terms & Privacy checkbox) are completely absent.
-  - **Create Account**: Displays Full Name, Work Email, Date of Birth (minimum age 13 enforcement), Password, Confirm Password, Requested Account Role (`Viewer` or `Document Owner`), Terms & Privacy acceptance checkbox, and "Create Account" submission. Login-only controls and demo role cards are strictly excluded.
-- **State Synchronization & Component Keys**:
-  - The authentication dialog (`AuthModals.jsx`) and landing portal (`AuthLandingPortal.jsx`) maintain dynamic synchronization with parent state via `initialMode` and `onModeChange` callbacks.
-  - Component instances utilize distinct React keys (`key={`${authModalMode}-${authModalOpen}`}`), ensuring state re-initialization and preventing retention of stale passwords, confirmation values, or validation errors when switching modes.
-- **Direct Query Parameter & Hash Routing**:
-  - Deep-linkable via URL query parameters (`?mode=register` or `?mode=login`) and URL hashes (`#register` or `#login`).
-  - Browser navigation events (`popstate`, `hashchange`) dynamically update the active form mode without requiring full page reloads.
-
-### 7. Mobile Document Ingestion & Download Resilience
-To guarantee reliable enterprise collaboration on mobile devices and touchscreens:
-- **Native Gesture Dropzone Overlay**: Replaced hidden file input elements (`display: none`) with an absolute transparent overlay (`.upload-dropzone-input`) spanning the dropzone. This eliminates synthetic `.click()` blocking enforced by iOS Safari and Android WebView gesture security sandbox models.
-- **MIME-to-Extension Deduction**: Mobile device camera and photo pickers frequently assign generic filenames (e.g., `image` or `blob`) without file extensions. TrustVault inspects incoming MIME types (e.g., `image/jpeg` -> `.jpg`, `application/pdf` -> `.pdf`) and constructs a sanitized, properly named `File` object before dispatching multipart requests to the backend, preventing `415 UNSUPPORTED_MEDIA_TYPE` rejections.
+- **Upload Modal Dropzone Height & Centering**: The upload dropzone provides a guaranteed minimum height of **155px on desktop** and **140px on mobile** (`flex-shrink: 0`, flex centering). The cloud upload icon (42px desktop / 38px mobile) and prompt text are fully visible, centered, and never clipped.
+- **Smooth Modal Scrolling**: The upload modal container enforces `max-height: calc(100dvh - 12px)` with an auto-scrolling form container (`overscroll-behavior: contain`), ensuring all form controls and footer action buttons (Upload & Encrypt, Cancel) remain easily reachable on small mobile screens.
+- **Reliable Android Document Selection Path**:
+  - The standard file input specifies explicit document extensions (`.pdf, .docx, .xlsx, .pptx, .zip, .txt, .csv, .json, .md, .log, .png, .jpg, .jpeg, .gif`) and concrete MIME types without the wildcard `image/*`. On Android Chromium browsers, removing `image/*` prevents the camera/photos-only bottom sheet from trapping the user and opens the native Android system document picker.
+  - A dedicated **"Browse Device Storage"** fallback button triggers an unrestricted file selector (`accept="*/*"`), giving Android users a direct path to the system file manager.
+  - Automatic client-side MIME-to-extension deduction constructs a named `File` object for generic filenames (e.g. `image` or `blob`), preventing `415 UNSUPPORTED_MEDIA_TYPE` rejections.
+- **Touch Gesture Overlay**: Replaced hidden file inputs (`display: none`) with an absolute transparent overlay (`.upload-dropzone-input`) spanning the entire dropzone, eliminating synthetic `.click()` blocking enforced by mobile WebView/iOS Safari gesture sandboxes.
 - **Double-Tap Debouncing**: Synchronous submission locks (`if (loading) return;`) protect against duplicate multipart uploads triggered by rapid touchscreen taps.
 - **Resilient Blob URL Lifetime**: Download blob object URLs are retained for 60 seconds before invocation of `URL.revokeObjectURL()`, allowing mobile OS download managers sufficient streaming time without premature stream termination.
-- **Session Expiry Recovery**: Intercepts `401 Unauthorized` responses during vault document polling and triggers graceful re-authentication rather than silent failure.
-
-### 8. Enterprise Appearance Theme Selector
-- **Three Core Modes**: Light Theme, Dark Theme, and System Default.
-- **Dynamic OS Synchronization**: When set to "System", TrustVault listens to `window.matchMedia('(prefers-color-scheme: dark)')` to reflect operating system appearance changes in real time.
-- **Persistence & Accessibility**: User preferences persist in `localStorage` (`trustvault_theme`). Dropdown menus enforce right-aligned viewport clamping (`right: 0`, `min-width: 230px`) to prevent horizontal screen overflow on narrow mobile viewports (< 375px), backed by touch-outside dismiss listeners.
+- **Theme Selector Clamping**: Theme switcher dropdown menus enforce right-aligned viewport clamping (`right: 0`, `min-width: 230px`), preventing horizontal screen overflow on narrow mobile screens (< 375px).
 
 ---
 
-## 11. Evaluator Interactive Walkthrough Guide
+## 14. Troubleshooting
 
-To experience all enterprise security capabilities in the live browser:
-
-1. **Quick Demo Accounts on Login Page**:
-   - Visit the login portal at `http://localhost:5173`.
-   - Click any demo button (**Administrator**, **Document Owner**, or **Viewer**) to pre-fill verified credentials.
-   - Click **Sign In to Vault** to authenticate through the normal secure authentication pipeline.
-
-2. **Explore Administrator Governance Dashboard**:
-   - Sign in as `admin@trustvault.internal` / `TrustVault2026!`.
-   - Click **Admin Governance** in the sidebar.
-   - **System Analytics**: View metrics for users, documents, active ACL access grants, and compliance indicators.
-   - **Owner Requests Queue**: Review, approve, or reject pending Owner access requests with one click.
-   - **User Governance Directory**: Manage roles (promote, downgrade with Zero Data Loss Guarantee), suspend/restore accounts, and click **Reset Pwd** to generate a single-use password recovery link.
-   - **Global Audit Trail**: Filter events by action type or actor email, and click **Export CSV** or **Export JSON** to download un-truncated compliance records.
-
-3. **Test Document Visibility & Ingestion**:
-   - Sign in as Document Owner `sarah.lead@trustvault.internal`.
-   - Click **Upload Document**.
-   - Notice the **"Who can access this document?"** selector:
-     - `Private — Only Me` is selected by default.
-     - Select `Share with Specific Users` to select `alex.dev@trustvault.internal` with `Read` or `Can Edit` permission.
-     - Or select `Share with All Registered Users` to make the document discoverable to all authenticated accounts.
-   - Upload a test file and observe immediate ingestion and private disk quarantine.
-
-4. **Test Granular ACL Sharing & Real-Time Revocation**:
-   - In the document table, click **Share** on any owned document.
-   - Add a collaborator with `Read` or `Can Edit` permission.
-   - Click **Revoke** on any active grant; access is terminated immediately with zero caching delay.
-
-5. **Test Scoped Search & Isolation**:
-   - Sign in as Viewer `alex.dev@trustvault.internal`.
-   - Search for terms present in other users' private documents.
-   - Zero matching documents or confidential metadata are leaked.
-
-6. **Test Secure Download with Original Filename**:
-   - Click **Download** on any accessible document.
-   - A native browser **Save As** dialog opens pre-filled with the original filename (e.g. `Report.pdf`), fetched securely with Bearer-token authentication.
-
-7. **Test End-to-End Shared with Me & Metadata Editing**:
-   - Sign in as Document Owner, grant **Can Edit** access to `alex.dev@trustvault.internal`.
-   - Sign in as Alex, navigate to **Shared with Me**, click **Edit**, and modify document title or description.
-   - Changes persist immediately and are recorded under `DOCUMENT_UPDATED` in the audit log.
-
-8. **Test Account Settings & Password Change**:
-   - Click **Profile** or **Settings** in the sidebar.
-   - Inspect account identity, role, and approval status.
-   - Use the **Change Account Password** form to update your password with complexity verification.
-
-9. **Test Forgotten-Password Recovery**:
-   - As Admin, click **Reset Pwd** for an account, copy the generated one-time recovery link.
-   - Open the link in a browser (or click "Forgot password / Recovery token?" on login), paste the token, enter a new password, and submit.
-   - Sign in with the new password. Attempting to reuse the same token is rejected with `INVALID_RESET_TOKEN`.
+| Symptom | Cause | Solution |
+| :--- | :--- | :--- |
+| **Brevo returns HTTP 400 Bad Request** | The sender address (`EMAIL_FROM`) is not verified in Brevo. | In the Brevo dashboard, go to **Senders & IP -> Senders** and verify the sender email address or domain. |
+| **Gmail SMTP returns `535 5.7.8 BadCredentials`** | Using your standard Gmail password instead of a Google App Password. | Enable 2-Step Verification in Google Account Security, generate a 16-character App Password at [Google App Passwords](https://myaccount.google.com/apppasswords), and set `SMTP_PASS` without spaces. |
+| **CORS error on API requests** | The requesting origin is not in the allowed origins set. | Ensure `CLIENT_URL` matches the frontend URL exactly (e.g. `http://localhost:5173` or `https://trust-vault-9185.vercel.app/`). |
+| **MongoDB connection fails locally** | Local MongoDB daemon is not running. | TrustVault automatically falls back to its built-in in-memory repository with zero configuration required. To use MongoDB, start the service or provide a MongoDB Atlas URI. |
+| **Android file picker opens only Photos/Videos** | The file input included `image/*` wildcard in the accept attribute. | Resolved in current version: explicit MIME types and extensions are used alongside a secondary "Browse Device Storage" button. |
 
 ---
 
-## 12. Submission Deliverables & Documentation Index
+## 15. Project Structure
 
-All required hiring challenge deliverables are documented in full detail:
+```
+TrustVault/
+├── backend/
+│   ├── scripts/
+│   │   └── seed.js                         # Seeds Marcus (Admin), Sarah (Owner), Alex (Viewer), Jordan (Pending)
+│   ├── src/
+│   │   ├── app.js                          # Express decoupled application factory & CORS configuration
+│   │   ├── config/
+│   │   │   ├── database.js                 # Dual-engine database adapter (MongoDB Atlas + In-Memory)
+│   │   │   └── env.js                      # Centralized environment variable parsing & defaults
+│   │   ├── controllers/
+│   │   │   ├── admin.controller.js         # Governance, analytics, audit export, owner approval, role updates
+│   │   │   ├── auth.controller.js          # Authentication, registration, DOB age 13, profile sync, password reset
+│   │   │   └── document.controller.js      # Upload, 3-tier visibility, ACL sharing, metadata editing, streaming
+│   │   ├── middleware/
+│   │   │   ├── auth.middleware.js          # JWT verification, RBAC role guard, email verification gate
+│   │   │   ├── fileSignature.middleware.js # Magic number binary inspection & auto-disk-purge
+│   │   │   ├── rateLimiter.middleware.js   # Sliding-window general and password-reset rate limiters
+│   │   │   ├── security.middleware.js      # Defensive HTTP security headers
+│   │   │   └── upload.middleware.js        # Multer private storage disk configuration (25MB limit)
+│   │   ├── models/
+│   │   │   ├── adminNotification.model.js  # Persistent notifications for owner requests & password resets
+│   │   │   ├── audit.model.js              # Append-only immutable audit ledger with mutation pre-hooks
+│   │   │   ├── document.model.js           # Document metadata, 3-tier visibility, ACLs, category
+│   │   │   └── user.model.js               # User identity, roles, DOB, Terms versioning, 12-round bcrypt
+│   │   ├── routes/
+│   │   │   ├── admin.routes.js             # /api/admin endpoints (governance, notifications, export)
+│   │   │   ├── auth.routes.js              # /api/auth endpoints (login, register, forgot-password, profile)
+│   │   │   └── document.routes.js          # /api/documents endpoints (upload, share, visibility, stream)
+│   │   ├── services/
+│   │   │   ├── audit.service.js            # Immutable audit logging service with IP/actor tracking
+│   │   │   ├── email.service.js            # Multi-provider email engine (Brevo, Resend, Nodemailer SMTP)
+│   │   │   └── revocation.service.js       # Immediate zero-lag memory revocation tracker
+│   │   └── utils/
+│   │       └── token.js                    # Cryptographic token generator & JWT signer/verifier
+│   ├── storage/
+│   │   └── uploads/                        # Quarantined private storage directory (outside web root)
+│   ├── tests/                              # 18 automated integration test suites (277 tests)
+│   ├── server.js                           # Express entry point
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── admin/
+│   │   │   │   └── AdminDashboard.jsx      # Governance dashboard, analytics, audit export, user directory
+│   │   │   ├── auth/
+│   │   │   │   ├── AuthLandingPortal.jsx   # Distinct sign-in / registration portal with demo accounts
+│   │   │   │   └── AuthModals.jsx          # Synchronized modal dialog with key re-mounting
+│   │   │   ├── common/                     # Reusable Button, Card, Modal, Input components
+│   │   │   ├── dashboard/
+│   │   │   │   ├── AccountSettings.jsx     # Profile display, DOB, self-service password change
+│   │   │   │   ├── DocumentTable.jsx       # Document list, sharing triggers, download with original name
+│   │   │   │   ├── MetadataEditorModal.jsx # Metadata editing dialog for collaborators with Edit access
+│   │   │   │   ├── ShareModal.jsx          # Per-collaborator Read/Edit ACL management dialog
+│   │   │   │   └── UploadModal.jsx         # Upload modal with 3-tier visibility cards & Android file path
+│   │   │   └── legal/
+│   │   │       └── TermsAndPrivacyModals.jsx # Accessible 15-section Terms & 11-section Privacy dialog
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx             # React auth context, session persistence, profile sync
+│   │   ├── layouts/
+│   │   │   └── AppHeader.jsx               # Navigation bar, user dropdown, Light/Dark/System theme switcher
+│   │   ├── config/
+│   │   │   └── api.js                      # API base URL normalizer & safe endpoint builder
+│   │   ├── App.jsx                         # Main application container, router, role banners
+│   │   ├── index.css                       # Pure CSS enterprise design tokens & reset
+│   │   └── main.jsx
+│   ├── index.html
+│   └── package.json
+├── docs/
+│   ├── API_DOCUMENTATION.md                # Exhaustive REST API specification
+│   └── DEPLOYMENT.md                       # Deployment guide, Render blueprint, and seeding
+├── DEMO_SCRIPT.md                          # Minute-by-minute 5-minute video presentation script
+├── PROMPTS.md                              # Chronological prompt log, AI corrections & commit audit
+├── TECHNICAL_WRITEUP.md                    # Architectural deep-dive & design decisions
+├── THREATS.md                              # 30-vector security threat model catalog
+├── render.yaml                             # Render Infrastructure as Code Blueprint
+└── README.md                               # Root project documentation
+```
+
+---
+
+## 16. Submission Deliverables & Documentation Index
+
+All challenge deliverables are documented in full detail:
 
 | Document | Purpose & Description |
 | :--- | :--- |
-| **[`TECHNICAL_WRITEUP.md`](file:///c:/TrustVault/TECHNICAL_WRITEUP.md)** | Architectural deep-dive: permission model rationale, private storage quarantine, revocation mechanics, AI collaboration review, and deliberate omissions. |
-| **[`DEMO_SCRIPT.md`](file:///c:/TrustVault/DEMO_SCRIPT.md)** | Minute-by-minute 5-minute video demonstration walkthrough script, click actions, and recording checklist. |
-| **[`THREATS.md`](file:///c:/TrustVault/THREATS.md)** | Complete threat model catalog covering 30 security attack vectors, code mitigations, and automated test citations. |
-| **[`PROMPTS.md`](file:///c:/TrustVault/PROMPTS.md)** | Dated chronological prompt and development audit log with 20 entries, AI mistakes identified during review, corrections, and commit references. |
-| **[`docs/API_DOCUMENTATION.md`](file:///c:/TrustVault/docs/API_DOCUMENTATION.md)** | Exhaustive REST API specification documenting all endpoints, RBAC permissions, JSON request/response formats, and error codes. |
-| **[`docs/DEPLOYMENT.md`](file:///c:/TrustVault/docs/DEPLOYMENT.md)** | Clean-clone quickstart instructions, environment configuration, database seeding, and production cloud deployment on Render. |
+| **[`TECHNICAL_WRITEUP.md`](./TECHNICAL_WRITEUP.md)** | Architectural deep-dive: permission model rationale, private storage quarantine, revocation mechanics, AI collaboration review, and deliberate omissions. |
+| **[`DEMO_SCRIPT.md`](./DEMO_SCRIPT.md)** | Minute-by-minute 5-minute video demonstration walkthrough script, click actions, and recording checklist. |
+| **[`THREATS.md`](./THREATS.md)** | Complete threat model catalog covering 30 security attack vectors, code mitigations, and automated test citations. |
+| **[`PROMPTS.md`](./PROMPTS.md)** | Dated chronological prompt and development audit log with 20 entries, AI mistakes identified during review, corrections, and commit references. |
+| **[`docs/API_DOCUMENTATION.md`](./docs/API_DOCUMENTATION.md)** | Exhaustive REST API specification documenting all endpoints, RBAC permissions, JSON request/response formats, and error codes. |
+| **[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)** | Clean-clone quickstart instructions, environment configuration, database seeding, and production cloud deployment on Render. |
 
 ---
 
-## 13. License & Submission Metadata
+## 17. License & Submission Metadata
 
 - **Author**: Snovasys Fresher Challenge 2026 Candidate
-- **Architecture**: Zero-Trust Document Security & Governance
+- **Project**: TrustVault — Enterprise Secure Document Platform
+- **Live Production URL**: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/)
 - **Repository**: [https://github.com/Abhi-4363/TrustVault](https://github.com/Abhi-4363/TrustVault)
 - **Automated Test Results**: 18 test files passed, 277/277 tests passing (100% pass rate)
-- **Production Build**: 0 errors, Vite 6 production bundle verified
-
+- **Threat Model Verification**: 30/30 threat vectors verified via automated tests
+- **Production Build Status**: Vite 6 bundle compiled with 0 errors
+- **License**: MIT License

@@ -141,6 +141,9 @@ userSchema.methods.toJSON = function () {
   delete obj.passwordResetTokenHash;
   delete obj.emailVerificationTokenHash;
   delete obj.__v;
+  if ((obj.role === 'owner' || obj.role === 'admin') && obj.ownerApprovalStatus === 'pending') {
+    obj.ownerApprovalStatus = 'approved';
+  }
   return obj;
 };
 
@@ -241,6 +244,9 @@ class InMemoryUserRepository {
         delete copy.emailVerificationTokenHash;
         delete copy.comparePassword;
         delete copy.toJSON;
+        if ((copy.role === 'owner' || copy.role === 'admin') && copy.ownerApprovalStatus === 'pending') {
+          copy.ownerApprovalStatus = 'approved';
+        }
         return copy;
       },
     };
