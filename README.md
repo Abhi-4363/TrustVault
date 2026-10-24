@@ -1,4 +1,4 @@
-# TrustVault 🔐
+# TrustVault — Secure Document Sharing with Audit Trails
 
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented, hardened, and verified across all 10 planned stages.
@@ -11,115 +11,57 @@
 
 ---
 
-## 1. Quick Start for Evaluators
+## 1. Project Title and Description
 
-Welcome to the **TrustVault** evaluator evaluation portal. This section provides immediate access to the production deployment, pre-configured evaluation accounts, a quick evaluation sequence, and a feature checklist.
+### TrustVault — Secure Document Sharing with Audit Trails
 
-### A. Live Website
+**TrustVault** is an enterprise-grade document security, access governance, and collaboration platform designed for organizations managing high-stakes confidential files—such as financial audits, legal contracts, board presentations, and proprietary intellectual property.
 
-The production frontend application is deployed and verified at:
+Live Website: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/)
 
-👉 **[https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/)**
+#### The Problem TrustVault Solves
+Modern enterprise teams routinely handle sensitive digital assets across decentralized networks. Traditional cloud drives and shared folders suffer from critical security vulnerabilities:
+- **Permission Caching Lag**: Revoked user access often persists for minutes or hours due to cached access tokens or distributed session stores.
+- **Accidental Oversharing**: Permissive default permissions ("Anyone with the link") leak confidential data across internal and external boundaries.
+- **Unverified Identity Escalation**: Self-promoted administrative privileges lead to unauthorized data exfiltration.
+- **Tampered or Non-Existent Audit Trails**: Mutable database logs allow bad actors to cover their tracks after accessing or deleting sensitive documents.
+- **Malicious Disguised Binaries**: Attackers rename executable malware or scripts (`.exe`, `.sh`) with innocent document extensions (`.pdf`, `.docx`) to bypass superficial file filters.
 
-- **Production Frontend**: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/) (Hosted on Vercel)
-- **Production Backend API**: `https://trustvault-wkaj.onrender.com/api` (Hosted on Render with automated health checks)
-- **CORS Allowed Origins**: Pre-configured in the backend to permit `https://trust-vault-9185.vercel.app` and local development hosts.
+#### Secure Document-Sharing Capabilities
+TrustVault eliminates these risks through an uncompromising **Zero-Trust** security architecture:
+- **Private Storage Isolation**: Uploaded binaries are never placed in public web roots. Files are quarantined on a dedicated private storage disk with UUID-obfuscated filenames. All downloads are served through authenticated streaming controllers (`res.sendFile` / streaming pipelines) with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+- **Native Save-As Filename Preservation**: Solves Chromium's standard download limitation where blob URLs trigger generic UUID filenames (`d290f1ee-6c54-4b01...`). Uses the browser's File System Access API (`showSaveFilePicker`) to present the original sanitized filename (e.g., `Financial_Audit_2026.pdf`) in a native Save-As dialog while preserving strict Bearer token authentication.
+- **Three-Tier Visibility Controls**: Document owners select from three explicit visibility policies during upload: `Private — Only Me` (default), `Share with Specific Users` (fine-grained collaborator access lists), and `Share with All Registered Users` (authenticated corporate accounts only; unauthenticated requests receive `401 Unauthorized`).
+- **Granular Read/Edit Permissions**: Owners can grant `read` or `edit` permissions to individual collaborators. Recipients with Edit permissions can update document metadata (title, description, tags) via an integrated Metadata Editor modal, while View recipients remain strictly restricted to read-only access.
+- **Magic-Number Binary Inspection**: Multi-byte file header verification detects and rejects executable binaries disguised as documents, instantly purging unauthorized files from disk.
 
-> [!NOTE]
-> When testing locally, use `http://localhost:5173` for the frontend and `http://localhost:5000` for the backend. The production URLs above are dedicated to cloud evaluation.
+#### Role-Based Permissions & Administrative Governance
+TrustVault enforces strict **Role-Based Access Control (RBAC)** across three primary tiers:
+- **Administrator (Marcus Vance)**: Full platform governance, system health and storage telemetry, user directory moderation, temporary password reset issuance, Zero Data Loss role adjustments, and immutable audit exploration with un-truncated CSV/JSON export.
+- **Document Owner (Sarah Jenkins)**: Confidential document upload, three-tier visibility assignment, granular collaborator ACL management, metadata updates, and instant access revocation.
+- **Viewer (Alex Mercer / Jordan Lee)**: Secure viewing and streaming of explicitly shared documents, discoverability of corporate-wide documents, and metadata editing when explicitly granted Edit permissions. Upload and deletion capabilities are strictly blocked.
+- **Owner Approval Workflow**: Viewers can request Document Owner privileges via their dashboard. Requests are queued in the Administrator Governance Center for moderation, ensuring zero unauthorized privilege escalation.
 
----
+#### Immediate Access Revocation Engine
+Permissions are verified directly against the database on every metadata read and binary stream request with **zero token caching lag**. When a Document Owner switches visibility back to `Private — Only Me`, or revokes an individual user's ACL grant, all third-party access is revoked instantly. Subsequent requests immediately fail with `403 Forbidden`.
 
-### B. Evaluation Accounts
+#### Append-Only Immutable Audit Trail
+Every significant platform lifecycle event—file upload, download, metadata read, permission grant, revocation, visibility update, user deactivation, and password recovery—is permanently recorded in a tamper-resistant audit ledger. Pre-save database hooks reject all `updateOne`, `updateMany`, `findOneAndUpdate`, `deleteOne`, and `deleteMany` operations, ensuring complete regulatory compliance.
 
-The platform has been provisioned with four distinct evaluation accounts representing all platform personas. These credentials are confirmed in the database seed configuration (`backend/scripts/seed.js`) and directly accessible via the **Quick Demo Accounts** buttons on the login portal:
+#### Technology Stack
+TrustVault is built using a modern, decoupled web architecture:
+- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens with dynamic Light, Dark, and System Default theme synchronization.
+- **Backend API**: Node.js, Express 4, Mongoose with a dual-engine database architecture (MongoDB Atlas persistent cloud connection with automatic zero-configuration in-memory repository fallback).
+- **Security & Cryptography**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), Node.js `crypto` (SHA-256 token hashing, UUIDv4), defensive HTTP security headers, sliding-window rate limiters.
+- **File Ingestion & Storage**: Multer, private storage quarantine outside public web roots, binary magic-number validation, touch gesture overlay for mobile browsers.
+- **Transactional Email**: Multi-provider engine supporting Brevo HTTPS REST API (Port 443, Render compatible), Resend REST API, and Gmail SMTP with App Passwords.
+- **Automated Testing**: Vitest 5, Supertest (18 test suites, 277 automated integration tests, 100% pass rate).
+- **Cloud Infrastructure**: Vercel for frontend hosting; Render for containerized Node.js API with persistent 10GB disk storage.
 
-| Name | Login ID / Email | Demo Password | Role | Evaluation Purpose |
-| :--- | :--- | :--- | :---: | :--- |
-| **Marcus Vance** | `admin@trustvault.internal` | `TrustVault2026!` | `admin` | **Chief Security Officer (Administrator)** — Access to the Admin Governance Dashboard, Owner Approval Queue, User Directory, Role Assignment, Temporary Password Resets, and Global Immutable Audit Log Explorer with un-truncated CSV/JSON export. |
-| **Sarah Jenkins** | `sarah.lead@trustvault.internal` | `TrustVault2026!` | `owner` | **VP of Engineering (Document Owner)** — Uploads confidential documents, selects visibility (`Private`, `Specific Users`, `All Registered Users`), assigns fine-grained Read/Edit ACL permissions, and revokes access instantly. |
-| **Alex Mercer** | `alex.dev@trustvault.internal` | `TrustVault2026!` | `viewer` | **Platform Engineer (Viewer)** — Standard read-only collaborator. Views and downloads documents explicitly shared with him; edits metadata if granted Edit permissions; strictly blocked from uploading new documents. |
-| **Jordan Lee** | `jordan.req@trustvault.internal` | `TrustVault2026!` | `viewer` *(pending owner request)* | **Pending Document Owner Requester** — Demonstrates the Owner approval workflow. Retains standard Viewer privileges while an active Owner request is queued for Administrator review in the Governance Dashboard. |
-
-> [!IMPORTANT]
-> **Jordan Lee's Account Workflow**: Jordan's account is intentionally seeded with `role: 'viewer'` and `ownerApprovalStatus: 'pending'` to demonstrate the approval workflow. While pending, Jordan sees a live status banner with submission details and a "Check Status" button. Once an Administrator approves the request in the Admin Dashboard, Jordan's effective role elevates to `owner` and upload privileges unlock immediately.
-
-> [!WARNING]
-> **Security Notice**: These demonstration credentials (`TrustVault2026!`) are provided exclusively for reviewer evaluation, local development, and automated testing. In production deployments with real confidential data, credentials must be generated with cryptographically strong randomness and stored in a secure secret manager.
-
----
-
-### C. Quick Evaluation Steps
-
-Follow this quick 8-step sequence to evaluate all core capabilities:
-
-1. **Open the live website**: Navigate to [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/).
-2. **Sign in using an evaluation account**: On the login portal, click any of the **Quick Demo Accounts** buttons (e.g., **Document Owner** for Sarah Jenkins) and click **Sign In to Vault**.
-3. **Explore the role-specific dashboard**: Observe the active workspace, stats cards, recent activity stream, and available navigation tabs for that role.
-4. **Test document upload and visibility (Sarah - Owner)**:
-   - Click **Upload Document**.
-   - Notice the three visibility choices: `Private — Only Me` (default), `Share with Specific Users` (user directory selector with Read/Edit options), and `Share with All Registered Users`.
-   - Select a document, enter title and tags, choose visibility, and click **Upload & Encrypt**.
-5. **Test shared document access (Alex - Viewer)**:
-   - Sign out Sarah and sign in as `alex.dev@trustvault.internal`.
-   - In **Shared with Me**, locate the document shared by Sarah.
-   - Click **Download** to receive the file with its original filename via the File System Access API.
-   - If granted Edit permissions, click **Edit** to update tags and description through the Metadata Editor.
-   - Note that Alex has no upload button, enforcing strict RBAC boundaries.
-6. **Test owner approval, account governance, and audit trails (Marcus - Admin)**:
-   - Sign in as `admin@trustvault.internal`.
-   - Open **Admin Governance** from the sidebar.
-   - In **Pending Document Owner Requests**, review Jordan Lee's pending request. Click **Approve** (elevates Jordan to Owner) or **Reject**.
-   - Inspect the **Global Audit Trail**, apply action or actor filters, and click **Export CSV** or **Export JSON** to verify un-truncated compliance records.
-   - Test user role modification with the **Zero Data Loss Guarantee** dialog.
-7. **Examine the pending owner request workflow (Jordan - Pending Requester)**:
-   - Sign in as `jordan.req@trustvault.internal`.
-   - Inspect the pending status notice: *"Owner access request pending administrator approval — Under Review"*.
-   - Click **Check Status** to test live profile synchronization against the backend.
-8. **Test access revocation and zero-leakage isolation**:
-   - Sign in as Sarah (Owner), open the document sharing modal, and click **Revoke** on Alex's permission grant.
-   - Switch Alex back to the platform: access is revoked immediately with zero cache delay (`403 Forbidden`).
-   - Switch visibility of a shared document back to `Private`: all prior collaborator ACLs are purged instantly.
 
 ---
 
-### D. Quick Evaluation Checklist
-
-- [x] **Distinct Sign In and Create Account Forms**: Completely separated interfaces with dedicated field schemas, clean state resets, component key isolation, and direct URL routing (`?mode=login` / `?mode=register`).
-- [x] **Role-Based Access Control (RBAC)**: Strictly enforced roles (`admin`, `owner`, `viewer`) with server-side authorization middleware on all routes.
-- [x] **Administrator, Owner, and Viewer Workflows**: Comprehensive role-tailored dashboards and capabilities verified on client and server.
-- [x] **Document Upload, Preview, and Download**: Non-web-root private disk quarantine, UUID filename obfuscation, and native Save-As dialog preserving original filenames via File System Access API.
-- [x] **Three-Tier Visibility Controls**: `Private — Only Me` (default), `Share with Specific Users` (granular Read/Edit ACLs), and `Share with All Registered Users` (authenticated accounts only).
-- [x] **Read/Edit Permissions & Immediate Revocation**: Per-document collaborator permissions with zero-cache-lag direct-to-database revocation.
-- [x] **Owner Approval & Notification Handling**: Viewer self-service escalation, Admin Notification Center, live badge counts, and Zero Data Loss Guarantee on role downgrade.
-- [x] **Email Verification & Dual-Option Password Recovery**: 24-hour cryptographic verification tokens, Admin-assisted temporary resets (`Password@123` with mandatory change policy), and 15-minute self-service email reset links.
-- [x] **Append-Only Immutable Audit Trail**: Pre-save database hooks rejecting PUT/PATCH/DELETE mutations; global audit log explorer with un-truncated CSV/JSON export.
-- [x] **Scoped Search & Zero Metadata Leakage**: Database query pipeline filtering enforcing user ACLs; unauthorized keyword searches return 0 matching results.
-- [x] **Responsive Mobile Layout & Robust Document Selection**: Centered upload dropzone with sufficient height (155px desktop / 140px mobile), fully visible cloud icon, touch-gesture overlay, debounced double-tap protection, and reliable Android document file selection path.
-- [x] **Defensive Security Architecture**: Magic number file signature validation with auto-purge, bcrypt (12 salt rounds), rate limiting, and all 30 threat mitigations cataloged in `THREATS.md` verified.
-
----
-
-## 2. Project Overview
-
-**TrustVault** is an enterprise-grade document security and collaboration platform designed for organizations handling high-stakes confidential files—such as financial audits, legal contracts, board presentations, and intellectual property.
-
-TrustVault enforces a strict **Zero-Trust** security architecture:
-1. **Private Storage Isolation**: File binaries are never exposed in static web directories. All downloads are served through authenticated streaming controllers (`res.sendFile` / streaming pipeline) with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
-2. **Per-Document ACLs & Document Visibility**: Document owners can select document visibility during upload (`Private — Only Me`, `Share with Specific Users`, or `Share with All Registered Users`) and assign fine-grained `read` or `edit` permissions.
-3. **Immediate Access Revocation Engine**: Permissions are checked directly against the database on every read or stream request with zero cache lag. Switching visibility to `private` immediately revokes all third-party access and clears prior ACL grants.
-4. **Append-Only Immutable Audit Trail**: Every file upload, download, metadata read, permission grant, revocation, visibility change, and password lifecycle event is permanently recorded in a tamper-resistant ledger protected by schema pre-hooks.
-5. **Upload & Magic-Number Validation**: Uploads are strictly checked against file signatures (magic numbers) to prevent disguised scripts/executables, with automatic disk purging.
-6. **Administrator Governance Dashboard**: Real-time system analytics, global audit log explorer with un-truncated CSV/JSON export, user account deactivation, and single-use password recovery initiation.
-7. **Secure Download with Original Filename**: Downloads use the browser's File System Access API (`showSaveFilePicker`) to present the original filename (e.g. `Report.pdf`) in a native Save-As dialog, bypassing Chromium's blob-URL UUID fallback. Bearer-token authentication is preserved; tokens are never placed in URLs.
-8. **End-to-End Sharing & Metadata Editing**: Document owners can grant `read` or `edit` permissions. Recipients with Edit permission can modify document titles, descriptions, and discoverability tags through an integrated Metadata Editor modal, with changes reflected in real-time and audited in the immutable log. View recipients remain strictly restricted to read/download access.
-9. **Zero-Trust Password Management**: Self-service change password with current password verification and 12-round bcrypt hashing, plus Admin-initiated single-use token recovery without credential leakage.
-10. **Distinct Authentication Architecture & URL Routing**: Complete decoupling of Sign In and Create Account screens. The modal dialog (`AuthModals`) and full-screen portal (`AuthLandingPortal`) synchronize state dynamically via `initialMode` and `onModeChange` hooks, clearing stale passwords and errors on transition. Supports direct URL routing (`?mode=register` / `?mode=login`) and browser navigation.
-11. **Mobile Ingestion & Resilient Streaming**: Dropzone with transparent touch gesture overlay preventing mobile WebView/iOS Safari synthetic click blocking, automatic client-side MIME-to-extension deduction for camera/photo pickers to avoid 415 rejections, double-tap debounce locks, and a 60-second blob URL retention window supporting mobile OS download managers.
-
----
-
-## 3. Key Features
+## 2. Key Features
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -136,35 +78,41 @@ TrustVault enforces a strict **Zero-Trust** security architecture:
 
 - **Enterprise Role-Based Access Control (RBAC)**: Clear division of authority between Administrators (governance, approvals, audits), Document Owners (file upload, sharing, ACL management), and Viewers (read/download shared files).
 - **Three-Tier Document Visibility**:
-  - `Private — Only Me`: Strictly accessible to the uploader and administrative governance.
-  - `Share with Specific Users`: Collaborator selector with granular `Read` or `Can Edit` permission levels.
-  - `Share with All Registered Users`: Discoverable by all authenticated, active accounts; unauthenticated requests return `401 Unauthorized`.
-- **Immediate Zero-Lag Access Revocation**: Direct database authorization check on every metadata read and binary stream request. Modifying document visibility to Private immediately revokes third-party access and purges collaborator grants.
+  - `Private — Only Me`: Strictly accessible to the uploader and administrative compliance governance. Hidden from all other user searches and lists.
+  - `Share with Specific Users`: Collaborator selector with granular `Read` or `Can Edit` permission levels. Appears in recipient's "Shared with Me" view.
+  - `Share with All Registered Users`: Discoverable by all authenticated, active accounts; unauthenticated requests return `401 Unauthorized`. Default permission is Read-Only.
+- **Immediate Zero-Lag Access Revocation**: Direct database authorization check on every metadata read and binary stream request. Modifying document visibility to Private immediately revokes third-party access and purges collaborator grants with zero cache delay.
 - **File Signature & Magic Number Inspection**: Multi-byte binary signature verification rejecting executable files (`.exe`, `.bat`, `.sh`, `.bin`, `.msi`) disguised with document extensions (e.g., an ELF binary or shell script renamed as `.docx` or `.png`). Rejected uploads are purged from disk immediately.
-- **Native Save-As Filename Preservation**: Solves Chromium's standard download limitation where blob URLs trigger generic UUID filenames (`d290f1ee-6c54-4b01...`). Uses the browser File System Access API (`showSaveFilePicker`) to populate the user's native file dialog with the sanitized original filename (e.g. `Quarterly_Report.pdf`), with automatic 60-second blob URL fallback for Firefox and Safari.
+- **Native Save-As Filename Preservation**: Solves Chromium's standard download limitation where blob URLs trigger generic UUID filenames (`d290f1ee-6c54-4b01...`). Uses the browser File System Access API (`showSaveFilePicker`) to populate the user's native file dialog with the sanitized original filename (e.g., `Quarterly_Report.pdf`), with automatic 60-second blob URL fallback for Firefox and Safari.
 - **Admin Governance & Live Metrics**: System metrics (active users, total files, active grants, pending requests), user directory management, and one-click Owner request approval/rejection.
-- **Tamper-Resistant Audit Trail**: Append-only MongoDB/in-memory collection with Mongoose schema hooks rejecting all `updateOne`, `updateMany`, `findOneAndUpdate`, `deleteOne`, and `deleteMany` operations.
+- **Tamper-Resistant Audit Trail**: Append-only MongoDB/in-memory collection with Mongoose schema hooks rejecting all `updateOne`, `updateMany`, `findOneAndUpdate`, `deleteOne`, and `deleteMany` operations. Includes un-truncated CSV and JSON exports.
 - **Dual-Option Password Recovery Architecture**:
-  - Option A: Admin-Assisted Reset (`POST /api/auth/forgot-password`) queuing an unread notification for Administrator review, resetting to `Password@123` with a mandatory `mustChangePassword` forced change policy.
-  - Option B: Self-Service Email Reset Link (`POST /api/auth/forgot-password-email`) dispatching a 15-minute single-use cryptographic token directly to the user's verified inbox.
+  - *Option A: Admin-Assisted Reset* (`POST /api/auth/forgot-password`) queuing an unread notification for Administrator review, resetting to `Password@123` with a mandatory `mustChangePassword` forced change policy.
+  - *Option B: Self-Service Email Reset Link* (`POST /api/auth/forgot-password-email`) dispatching a 15-minute single-use cryptographic token directly to the user's verified inbox.
 - **Transactional Email Integration**: Unified multi-provider engine supporting Brevo HTTPS REST API (Port 443, Render compatible), Resend REST API, and Gmail SMTP with App Passwords. Enforces duplicate transmission prevention and zero credential logging.
+- **Distinct Authentication Architecture & URL Routing**: Complete decoupling of Sign In and Create Account screens. The modal dialog (`AuthModals`) and full-screen portal (`AuthLandingPortal`) synchronize state dynamically via `initialMode` and `onModeChange` hooks, clearing stale passwords and errors on transition. Supports direct URL routing (`?mode=register` / `?mode=login`) and browser navigation.
+- **Date of Birth Policy & Minimum Age Enforcement**: Enforces a strict minimum age requirement (defaulting to 13 years old) with exact calendar day/month/year calculation, calendar validation rejecting invalid dates, and timezone drift defense via ISO 8601 calendar strings (`YYYY-MM-DD`). PII is excluded from audit ledgers.
+- **Terms & Privacy Policy Versioning**: Server-bound constants (`CURRENT_TERMS_VERSION = '1.0.0'`, `CURRENT_PRIVACY_VERSION = '1.0.0'`) with server-generated acceptance timestamps (`termsAcceptedAt`) and accessible legal modal dialogs.
+- **Editable Profile & Immediate Name Synchronization**: Users can update their display name with instant multi-collection synchronization across `User.name`, `Document.ownerName`, `Document.acl[].name`, `AdminNotification.userName`, and `PasswordResetRequest.userName`.
 - **Responsive Mobile Layout & Touch Ingestion**: Dropzone with minimum 155px desktop / 140px mobile height, centered cloud upload icon, mobile touch gesture overlay, double-tap debouncing, and a comprehensive Android file selection path supporting documents (`.pdf, .docx, .xlsx, .pptx, .zip, .txt, .csv, .json, .md, .log`) and images without restrictive `image/*` picker locking.
 - **Enterprise Theme Customization**: Real-time Light, Dark, and System Default appearance modes with OS `prefers-color-scheme` synchronization and localStorage persistence.
 
 ---
 
-## 4. Technology Stack and Architecture
+## 3. Technology Stack and Architecture
 
 ### Technology Stack
 
+- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic, Light/Dark/System theme switcher with OS synchronization).
 - **Backend API**: Node.js, Express 4, Mongoose with dual-engine architecture:
   - Persistent MongoDB Atlas connection when `MONGODB_URI` is provided.
   - Resilient zero-configuration in-memory repository fallback for instant local testing and offline execution.
 - **Security & Cryptography**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), crypto (SHA-256 token hashing, UUIDv4), defensive HTTP headers, sliding-window rate limiters.
 - **File Ingestion & Storage**: Multer, private storage quarantine outside public web roots, magic-number binary inspection, mobile touch overlay.
 - **File Download & Streaming**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; resilient 60-second blob-URL fallback for Firefox/Safari and mobile OS download managers.
-- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic, Light/Dark/System theme switcher with OS synchronization).
+- **Transactional Email**: Brevo HTTPS REST API (Port 443, Render compatible), Resend REST API, Nodemailer SMTP with Gmail App Passwords.
 - **Testing**: Vitest 5, Supertest (18 test suites, 277 automated integration tests, 100% pass rate).
+- **Deployment**: Vercel (Frontend SPA) + Render (Backend API Web Service with 10GB persistent disk storage).
 
 ### 10-Stage Technical Roadmap
 
@@ -196,7 +144,77 @@ graph TD
 
 ---
 
-## 5. Installation and Local Setup
+## 4. Demo Accounts
+
+The platform has been provisioned with four distinct evaluation accounts representing all platform personas. These credentials are confirmed in the database seed configuration (`backend/scripts/seed.js`) and directly accessible via the **Quick Demo Accounts** buttons on the login portal:
+
+| Name | Login ID / Email | Demo Password | Role | Account Status | Evaluation Purpose |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| **Marcus Vance** | `admin@trustvault.internal` | `TrustVault2026!` | `admin` | Active / Verified | **Chief Security Officer (Administrator)** — Access to the Admin Governance Dashboard, Owner Approval Queue, User Directory, Role Assignment, Temporary Password Resets, and Global Immutable Audit Log Explorer with un-truncated CSV/JSON export. |
+| **Sarah Jenkins** | `sarah.lead@trustvault.internal` | `TrustVault2026!` | `owner` | Active / Verified | **VP of Engineering (Document Owner)** — Uploads confidential documents, selects visibility (`Private`, `Specific Users`, `All Registered Users`), assigns fine-grained Read/Edit ACL permissions, and revokes access instantly. |
+| **Alex Mercer** | `alex.dev@trustvault.internal` | `TrustVault2026!` | `viewer` | Active / Verified | **Platform Engineer (Viewer)** — Standard read-only collaborator. Views and downloads documents explicitly shared with him; edits metadata if granted Edit permissions; strictly blocked from uploading new documents. |
+| **Jordan Lee** | `jordan.req@trustvault.internal` | `TrustVault2026!` | `viewer` | Active / Pending Approval | **Pending Document Owner Requester** — Demonstrates the Owner approval workflow. Retains standard Viewer privileges while an active Owner request is queued for Administrator review in the Governance Dashboard. |
+
+> [!IMPORTANT]
+> **Jordan Lee's Account Workflow**: Jordan's account is intentionally seeded with `role: 'viewer'` and `ownerApprovalStatus: 'pending'` to demonstrate the approval workflow. While pending, Jordan sees a live status banner with submission details and a "Check Status" button. Once an Administrator approves the request in the Admin Dashboard, Jordan's effective role elevates to `owner` and upload privileges unlock immediately.
+
+> [!WARNING]
+> **Security Notice**: These demonstration credentials (`TrustVault2026!`) are provided exclusively for reviewer evaluation, local development, and automated testing. In production deployments with real confidential data, credentials must be generated with cryptographically strong randomness and stored in a secure secret manager.
+
+---
+
+## 5. Quick Demo / Evaluation Guide
+
+### Quick Evaluation Steps
+
+Follow this 8-step sequence to evaluate all core capabilities:
+
+1. **Open the live website**: Navigate to [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/).
+2. **Sign in using an evaluation account**: On the login portal, click any of the **Quick Demo Accounts** buttons (e.g., **Document Owner** for Sarah Jenkins) and click **Sign In to Vault**.
+3. **Explore the role-specific dashboard**: Observe the active workspace, stats cards, recent activity stream, and available navigation tabs for that role.
+4. **Test document upload and visibility (Sarah - Owner)**:
+   - Click **Upload Document**.
+   - Notice the three visibility choices: `Private — Only Me` (default), `Share with Specific Users` (user directory selector with Read/Edit options), and `Share with All Registered Users`.
+   - Select a document, enter title and tags, choose visibility, and click **Upload & Encrypt**.
+5. **Test shared document access (Alex - Viewer)**:
+   - Sign out Sarah and sign in as `alex.dev@trustvault.internal`.
+   - In **Shared with Me**, locate the document shared by Sarah.
+   - Click **Download** to receive the file with its original filename via the File System Access API.
+   - If granted Edit permissions, click **Edit** to update tags and description through the Metadata Editor.
+   - Note that Alex has no upload button, enforcing strict RBAC boundaries.
+6. **Test owner approval, account governance, and audit trails (Marcus - Admin)**:
+   - Sign in as `admin@trustvault.internal`.
+   - Open **Admin Governance** from the sidebar.
+   - In **Pending Document Owner Requests**, review Jordan Lee's pending request. Click **Approve** (elevates Jordan to Owner) or **Reject**.
+   - Inspect the **Global Audit Trail**, apply action or actor filters, and click **Export CSV** or **Export JSON** to verify un-truncated compliance records.
+   - Test user role modification with the **Zero Data Loss Guarantee** dialog.
+7. **Examine the pending owner request workflow (Jordan - Pending Requester)**:
+   - Sign in as `jordan.req@trustvault.internal`.
+   - Inspect the pending status notice: *"Owner access request pending administrator approval — Under Review"*.
+   - Click **Check Status** to test live profile synchronization against the backend.
+8. **Test access revocation and zero-leakage isolation**:
+   - Sign in as Sarah (Owner), open the document sharing modal, and click **Revoke** on Alex's permission grant.
+   - Switch Alex back to the platform: access is revoked immediately with zero cache delay (`403 Forbidden`).
+   - Switch visibility of a shared document back to `Private`: all prior collaborator ACLs are purged instantly.
+
+### Quick Evaluation Checklist
+
+- [x] **Distinct Sign In and Create Account Forms**: Completely separated interfaces with dedicated field schemas, clean state resets, component key isolation, and direct URL routing (`?mode=login` / `?mode=register`).
+- [x] **Role-Based Access Control (RBAC)**: Strictly enforced roles (`admin`, `owner`, `viewer`) with server-side authorization middleware on all routes.
+- [x] **Administrator, Owner, and Viewer Workflows**: Comprehensive role-tailored dashboards and capabilities verified on client and server.
+- [x] **Document Upload, Preview, and Download**: Non-web-root private disk quarantine, UUID filename obfuscation, and native Save-As dialog preserving original filenames via File System Access API.
+- [x] **Three-Tier Visibility Controls**: `Private — Only Me` (default), `Share with Specific Users` (granular Read/Edit ACLs), and `Share with All Registered Users` (authenticated accounts only).
+- [x] **Read/Edit Permissions & Immediate Revocation**: Per-document collaborator permissions with zero-cache-lag direct-to-database revocation.
+- [x] **Owner Approval & Notification Handling**: Viewer self-service escalation, Admin Notification Center, live badge counts, and Zero Data Loss Guarantee on role downgrade.
+- [x] **Email Verification & Dual-Option Password Recovery**: 24-hour cryptographic verification tokens, Admin-assisted temporary resets (`Password@123` with mandatory change policy), and 15-minute self-service email reset links.
+- [x] **Append-Only Immutable Audit Trail**: Pre-save database hooks rejecting PUT/PATCH/DELETE mutations; global audit log explorer with un-truncated CSV/JSON export.
+- [x] **Scoped Search & Zero Metadata Leakage**: Database query pipeline filtering enforcing user ACLs; unauthorized keyword searches return 0 matching results.
+- [x] **Responsive Mobile Layout & Robust Document Selection**: Centered upload dropzone with sufficient height (155px desktop / 140px mobile), fully visible cloud icon, touch-gesture overlay, debounced double-tap protection, and reliable Android document file selection path.
+- [x] **Defensive Security Architecture**: Magic number file signature validation with auto-purge, bcrypt (12 salt rounds), rate limiting, and all 30 threat mitigations cataloged in `THREATS.md` verified.
+
+---
+
+## 6. Installation and Local Setup
 
 ### Prerequisites
 
@@ -255,7 +273,7 @@ graph TD
 
 ---
 
-## 6. Environment Variables and Email Configuration
+## 7. Environment Variables and Email Configuration
 
 ### Local Development Configuration (`backend/.env`)
 
@@ -357,7 +375,9 @@ TrustVault incorporates a unified transactional email engine designed for resili
 
 ---
 
-## 7. Evaluation Accounts and Role Workflows
+## 8. Remaining Technical Documentation
+
+### 8.1 Evaluation Accounts & Role Workflows (RBAC Model)
 
 The TrustVault RBAC model implements three primary roles with strict separation between effective privileges and requested permissions:
 
@@ -393,7 +413,7 @@ The TrustVault RBAC model implements three primary roles with strict separation 
 └────────────────────┴────────────────────────────────────────────────────────┘
 ```
 
-### Strict Separation of Effective vs. Requested Role
+#### Strict Separation of Effective vs. Requested Role
 
 TrustVault distinguishes an account's **effective role** (`role`: `admin`, `owner`, `viewer`) from its **requested role** (`requestedRole`: `owner`, `viewer`, or `null`) and approval lifecycle (`ownerApprovalStatus`: `not_required`, `pending`, `approved`, `rejected`):
 
@@ -410,7 +430,7 @@ TrustVault distinguishes an account's **effective role** (`role`: `admin`, `owne
 
 ---
 
-## 8. Document Visibility and Permission Management
+### 8.2 Document Visibility and Permission Management
 
 When an Owner uploads a document, TrustVault presents the **"Who can access this document?"** selector:
 
@@ -433,7 +453,7 @@ When an Owner uploads a document, TrustVault presents the **"Who can access this
 └────────────────────────────────┴────────────────────────────────────────────┘
 ```
 
-### Dynamic Visibility Modification & Zero-Lag Immediate Revocation
+#### Dynamic Visibility Modification & Zero-Lag Immediate Revocation
 
 - **Real-Time Visibility Updates**: Document owners can update document visibility at any time (`PATCH /api/documents/:id/visibility`).
 - **Immediate Revocation**: Switching visibility from `all_authenticated_users` or `selected_users` to `private` **immediately revokes all collaborator access and clears prior ACL grants**. Subsequent protected requests fail immediately with `403 Forbidden`.
@@ -442,9 +462,9 @@ When an Owner uploads a document, TrustVault presents the **"Who can access this
 
 ---
 
-## 9. Authentication, Profile, and Password Recovery
+### 8.3 Authentication, Profile, and Password Recovery
 
-### Distinct Sign In and Create Account Architecture
+#### Distinct Sign In and Create Account Architecture
 
 TrustVault strictly decouples the Sign In and Create Account interfaces to prevent input cross-contamination or ambiguous modal rendering:
 
@@ -456,7 +476,7 @@ TrustVault strictly decouples the Sign In and Create Account interfaces to preve
   - Component instances utilize distinct React keys (`key={`${authModalMode}-${authModalOpen}`}`), ensuring state re-initialization and preventing retention of stale passwords, confirmation values, or validation errors when switching modes.
 - **Direct Query Parameter & Hash Routing**: Deep-linkable via URL query parameters (`?mode=register` or `?mode=login`) and URL hashes (`#register` or `#login`). Browser navigation events (`popstate`, `hashchange`) dynamically update the active form mode without requiring full page reloads.
 
-### Date of Birth Policy & Minimum Age Enforcement
+#### Date of Birth Policy & Minimum Age Enforcement
 
 - **Minimum Age Rule**: Enforces a strict minimum age requirement (defaulting to **13 years old**).
 - **Exact Calendar Calculation**: Calculates age by evaluating exact birth year, month, and day rather than merely subtracting birth year from current year.
@@ -464,19 +484,19 @@ TrustVault strictly decouples the Sign In and Create Account interfaces to preve
 - **Timezone Drift Defense**: Persisted as a date-only string in `YYYY-MM-DD` format (ISO 8601 calendar date), preventing UTC timezone shifts from altering displayed birthdays.
 - **Privacy Enforcement**: Date of birth is excluded from audit ledgers to protect sensitive PII.
 
-### Terms & Conditions and Privacy Policy Versioning
+#### Terms & Conditions and Privacy Policy Versioning
 
 - **Version Constants**: `CURRENT_TERMS_VERSION = '1.0.0'`, `CURRENT_PRIVACY_VERSION = '1.0.0'`, `TERMS_POLICY_EFFECTIVE_DATE = '2026-10-22'`.
 - **Auditable Server Timestamp**: The user record captures `termsVersionAccepted`, `privacyVersionAcknowledged`, `termsPolicyEffectiveDate`, and a strictly server-generated timestamp `termsAcceptedAt`.
 - **Accessible Legal Modals**: Dedicated accessible modal dialogs with keyboard navigation, `Escape` key dismissal, focus trapping, and scrollable responsive viewports.
 
-### Editable Profile & Immediate Name Synchronization
+#### Editable Profile & Immediate Name Synchronization
 
 - **Self-Service Editing**: Users can edit their display name and date of birth inline or in a dialog with Save/Cancel controls, frontend validation, server-side validation, and instant visual feedback.
 - **Mass Assignment Protection**: Attempts to alter `role`, `isAdmin`, `isEmailVerified`, or permissions via `PUT /api/auth/profile` are strictly rejected or stripped.
 - **Cross-Collection Name Propagation**: When a user updates their name, the backend atomically updates the primary user identity record (`User.name`), owned document records (`Document.ownerName`), collaborator entries in permission lists (`Document.acl[].name`), pending Admin notifications (`AdminNotification.userName`), active password reset requests (`PasswordResetRequest.userName`), and records an immutable `PROFILE_UPDATED` audit log.
 
-### Dual-Option Password Recovery Architecture
+#### Dual-Option Password Recovery Architecture
 
 TrustVault provides two distinct, clearly separated password recovery options:
 
@@ -491,7 +511,7 @@ TrustVault provides two distinct, clearly separated password recovery options:
 | **Enumeration Defense** | Neutral response: *"If this email address is registered..."* | Neutral response: *"If an account exists with this email..."* |
 | **Notification Sync** | Creates persistent `PasswordResetRequest` + `AdminNotification` | Direct email delivery; no Admin notification clutter |
 
-#### Mandatory Temporary-Password Policy (`Password@123`)
+##### Mandatory Temporary-Password Policy (`Password@123`)
 
 When an Administrator clicks **Reset Password** on a pending notification:
 1. The user's password is reset to **`Password@123`**, securely hashed with bcrypt (12 rounds).
@@ -501,7 +521,7 @@ When an Administrator clicks **Reset Password** on a pending notification:
 
 ---
 
-## 10. Security Threat Model
+### 8.4 Security Threat Model
 
 All 30 security attack vectors cataloged in [`THREATS.md`](./THREATS.md) have been systematically mitigated and verified via automated integration tests:
 
@@ -540,7 +560,7 @@ All 30 security attack vectors cataloged in [`THREATS.md`](./THREATS.md) have be
 
 ---
 
-## 11. Testing and Validation
+### 8.5 Testing and Validation
 
 TrustVault maintains a **100% test pass rate across all 18 test suites with 277 automated integration tests**:
 
@@ -549,7 +569,7 @@ cd backend
 npm test
 ```
 
-### Automated Test Coverage Breakdown
+#### Automated Test Coverage Breakdown
 
 | Suite | File | Tests | Key Security Invariants Covered |
 | :--- | :--- | :---: | :--- |
@@ -572,7 +592,7 @@ npm test
 | **Service Health Check** | [`backend/tests/health.test.js`](backend/tests/health.test.js) | 3 | Server uptime, environment state, storage accessibility. |
 | **Immediate Access Revocation** | [`backend/tests/revocation.test.js`](backend/tests/revocation.test.js) | 2 | Zero token caching lag, direct-to-database check. |
 
-### Frontend Production Build Verification
+#### Frontend Production Build Verification
 
 ```bash
 cd frontend
@@ -582,16 +602,16 @@ npm run build
 
 ---
 
-## 12. Deployment — Vercel Frontend and Render Backend
+### 8.6 Deployment — Vercel Frontend and Render Backend
 
 TrustVault is architected for seamless cloud production deployment:
 
-### Production URLs
+#### Production URLs
 
 - **Production Frontend**: [https://trust-vault-9185.vercel.app/](https://trust-vault-9185.vercel.app/) (Vercel)
 - **Production Backend**: `https://trustvault-wkaj.onrender.com/api` (Render)
 
-### Render Infrastructure as Code (`render.yaml`)
+#### Render Infrastructure as Code (`render.yaml`)
 
 The repository includes a verified `render.yaml` blueprint:
 
@@ -617,7 +637,7 @@ services:
 
 ---
 
-## 13. Mobile and Responsive UI
+### 8.7 Mobile and Responsive UI
 
 TrustVault is fully optimized for touchscreens and mobile viewports down to narrow 360–390px screens:
 
@@ -626,7 +646,7 @@ TrustVault is fully optimized for touchscreens and mobile viewports down to narr
 - **Reliable Android Document Selection Path**:
   - The standard file input specifies explicit document extensions (`.pdf, .docx, .xlsx, .pptx, .zip, .txt, .csv, .json, .md, .log, .png, .jpg, .jpeg, .gif`) and concrete MIME types without the wildcard `image/*`. On Android Chromium browsers, removing `image/*` prevents the camera/photos-only bottom sheet from trapping the user and opens the native Android system document picker.
   - A dedicated **"Browse Device Storage"** fallback button triggers an unrestricted file selector (`accept="*/*"`), giving Android users a direct path to the system file manager.
-  - Automatic client-side MIME-to-extension deduction constructs a named `File` object for generic filenames (e.g. `image` or `blob`), preventing `415 UNSUPPORTED_MEDIA_TYPE` rejections.
+  - Automatic client-side MIME-to-extension deduction constructs a named `File` object for generic filenames (e.g., `image` or `blob`), preventing `415 UNSUPPORTED_MEDIA_TYPE` rejections.
 - **Touch Gesture Overlay**: Replaced hidden file inputs (`display: none`) with an absolute transparent overlay (`.upload-dropzone-input`) spanning the entire dropzone, eliminating synthetic `.click()` blocking enforced by mobile WebView/iOS Safari gesture sandboxes.
 - **Double-Tap Debouncing**: Synchronous submission locks (`if (loading) return;`) protect against duplicate multipart uploads triggered by rapid touchscreen taps.
 - **Resilient Blob URL Lifetime**: Download blob object URLs are retained for 60 seconds before invocation of `URL.revokeObjectURL()`, allowing mobile OS download managers sufficient streaming time without premature stream termination.
@@ -634,19 +654,19 @@ TrustVault is fully optimized for touchscreens and mobile viewports down to narr
 
 ---
 
-## 14. Troubleshooting
+### 8.8 Troubleshooting
 
 | Symptom | Cause | Solution |
 | :--- | :--- | :--- |
 | **Brevo returns HTTP 400 Bad Request** | The sender address (`EMAIL_FROM`) is not verified in Brevo. | In the Brevo dashboard, go to **Senders & IP -> Senders** and verify the sender email address or domain. |
 | **Gmail SMTP returns `535 5.7.8 BadCredentials`** | Using your standard Gmail password instead of a Google App Password. | Enable 2-Step Verification in Google Account Security, generate a 16-character App Password at [Google App Passwords](https://myaccount.google.com/apppasswords), and set `SMTP_PASS` without spaces. |
-| **CORS error on API requests** | The requesting origin is not in the allowed origins set. | Ensure `CLIENT_URL` matches the frontend URL exactly (e.g. `http://localhost:5173` or `https://trust-vault-9185.vercel.app/`). |
+| **CORS error on API requests** | The requesting origin is not in the allowed origins set. | Ensure `CLIENT_URL` matches the frontend URL exactly (e.g., `http://localhost:5173` or `https://trust-vault-9185.vercel.app/`). |
 | **MongoDB connection fails locally** | Local MongoDB daemon is not running. | TrustVault automatically falls back to its built-in in-memory repository with zero configuration required. To use MongoDB, start the service or provide a MongoDB Atlas URI. |
 | **Android file picker opens only Photos/Videos** | The file input included `image/*` wildcard in the accept attribute. | Resolved in current version: explicit MIME types and extensions are used alongside a secondary "Browse Device Storage" button. |
 
 ---
 
-## 15. Project Structure
+### 8.9 Project Structure
 
 ```
 TrustVault/
@@ -729,7 +749,7 @@ TrustVault/
 
 ---
 
-## 16. Submission Deliverables & Documentation Index
+### 8.10 Submission Deliverables & Documentation Index
 
 All challenge deliverables are documented in full detail:
 
@@ -744,7 +764,7 @@ All challenge deliverables are documented in full detail:
 
 ---
 
-## 17. License & Submission Metadata
+### 8.11 License & Submission Metadata
 
 - **Author**: Snovasys Fresher Challenge 2026 Candidate
 - **Project**: TrustVault — Enterprise Secure Document Platform
