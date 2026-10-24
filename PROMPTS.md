@@ -813,3 +813,55 @@ This document records the exact progression of development prompts, implementati
   - Commit Hash: `b86b810`
   - Commit Message: `feat: complete TrustVault submission readiness, security audit, and documentation`
 
+---
+
+## Prompt Entry 19: Top-Right Header Control, Theme Selector & Mobile Document Upload/Download Fixes
+
+- **Date / Timestamp**: October 23, 2026, 19:50:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Fix the top-right login page control: inspect its actual purpose and behavior, ensure icon, label, dropdown, and click behavior are consistent and professional. Make theme options clear (Light, Dark, High-Contrast System), ensure the dropdown stays within the viewport on mobile touchscreens, and ensure selected themes apply consistently across the entire app.
+  - 2. Fix mobile document upload and fetch errors: mobile users experienced upload failures, synthetic click blocks on hidden file inputs, and truncated downloads.
+  - 3. Preserve all existing functionality, security boundaries, and API integrations.
+- **What the AI Actually Implemented**:
+  1. Updated `AppHeader.jsx` and `AppHeader.css` with an enterprise Theme Selector supporting Dark, Light, and System High-Contrast modes with persistent local storage, accessible popover menus, outside-click handlers, and touch-screen support.
+  2. Enhanced `UploadModal.jsx` and `UploadModal.css` with a full-surface transparent native file input dropzone overlay, eliminating browser sandbox blocks on synthetic `.click()` invocations on mobile devices.
+  3. Added client-side binary MIME deduction in `UploadModal.jsx` to infer missing file extensions (e.g. camera photo blobs `image/jpeg` -> `.jpg`), preventing 415 Unsupported Media Type rejections.
+  4. Extended blob download URL lifetime from 100ms to 60 seconds across all download handlers to prevent premature garbage collection and truncated file downloads on mobile browsers.
+  5. Implemented debounced upload locking (`if (loading) return;`) to prevent mobile double-tap duplicate submissions.
+- **Problems Discovered During Review**:
+  - Mobile browsers sandboxed programmatic `.click()` events on hidden file inputs and frequently stripped file extensions when capturing from camera/photo gallery.
+- **Corrections Made**:
+  - Transparent full-surface dropzone overlay allowed direct user gesture activation without programmatic dispatch. Added MIME-to-extension fallback mapping.
+- **Real Git Commit Reference**:
+  - Commit Hash: `6b5eda2`
+  - Commit Message: `Improve TrustVault UI and fix mobile upload issues`
+
+---
+
+## Prompt Entry 20: Authentication UI Bug Fix — Distinct Sign In and Create Account Forms with Synchronized State & URL Navigation
+
+- **Date / Timestamp**: October 23, 2026, 20:10:00+05:30
+- **User Prompt / Instructions**:
+  - 1. Fix authentication UI bug: Sign In and Create Account screens are showing the same content instead of their respective forms.
+  - 2. Inspect authentication components, routes, navigation buttons, modal state, and conditional rendering to identify the root cause.
+  - 3. Make Sign In display strictly the login form (email, password, login button, recovery options).
+  - 4. Make Create Account display strictly the registration form (full name, email, date of birth, password checklist, role selection, legal agreements).
+  - 5. Ensure switching between Sign In and Create Account displays the correct form immediately without stale state or duplicated content.
+  - 6. Support direct URL navigation (`?mode=login` / `?mode=register`, `#login` / `#register`) and browser back/forward buttons.
+  - 7. Verify all existing tests pass and zero regressions are introduced.
+- **What the AI Actually Implemented**:
+  1. Root Cause Identification: In both `AuthModals.jsx` and `AuthLandingPortal.jsx`, form mode was initialized via `useState(initialMode)`. Because `<AuthModals>` remained mounted in the React DOM tree with `isOpen={false}`, clicking "Create account" in the header changed the `initialMode` prop, but React preserved the internal `'login'` state, rendering identical login forms for both actions.
+  2. State Synchronization: Added `useEffect` in `AuthModals.jsx` and `AuthLandingPortal.jsx` synchronizing `mode` with `initialMode` whenever `isOpen` or `initialMode` changes.
+  3. Dynamic Unmounting & Keying: Added `key={`${authModalMode}-${authModalOpen}`}` in `App.jsx` to ensure clean DOM re-mounting and state recreation when opening auth modals.
+  4. Form State Sanitization: Updated `switchMode` to clear stale passwords, confirmation fields, error alerts, and field-specific validation states when switching between Sign In and Create Account.
+  5. URL Routing & History Support: Added query parameter (`?mode=register` / `?mode=login`) and hash detection (`#register` / `#login`) in `AuthLandingPortal.jsx`, updating `window.history.replaceState` on tab switches and listening to `popstate` / `hashchange` events.
+  6. Added verification notice state (`register-success`) and `onModeChange` callback prop to coordinate header controls and modal titles.
+- **Problems Discovered During Review**:
+  - Un-scoped CSS in `AuthLandingPortal.css` had a missing standard `line-clamp` definition (`line-clamp: 2` alongside `-webkit-line-clamp: 2`).
+- **Corrections Made**:
+  - Added standard `line-clamp: 2;` property in `AuthLandingPortal.css`.
+  - Verified clean form separation, direct URL routing, and seamless mode switching using automated Chromium subagent and full production build.
+- **Real Git Commit Reference**:
+  - Commit Hash: `e21c24f`
+  - Commit Message: `fix: separate sign-in and account creation forms`
+

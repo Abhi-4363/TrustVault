@@ -31,16 +31,19 @@
 ---
 
 ### ⏱️ [0:30 – 1:15] Three Distinct Roles & Registration Lifecycle
-- **On Screen**: Authentication Portal -> "Create Account" tab.
+- **On Screen**: Authentication Portal -> "Create Account" tab / Modal.
 - **Narrator Script**:
-  > *"TrustVault enforces three distinct corporate roles: Administrator, Document Owner, and Viewer. 
+  > *"TrustVault enforces three distinct corporate roles: Administrator, Document Owner, and Viewer.
+  > In the top right, our Enterprise Theme Selector allows users to toggle seamlessly between Dark, Light, and System High-Contrast modes with persistent local storage.
+  > Notice that our Sign In and Create Account interfaces are strictly isolated. Switching between them dynamically clears credentials and validation states, and the portal synchronizes seamlessly with URL parameters such as ?mode=register or ?mode=login.
   > When a new user registers, our form validates their Full Name, Work Email, Date of Birth—enforcing a strict minimum age policy of 13 years with leap-year calendar validation—and a password complexity checklist.
   > Notice the required Terms & Conditions and Privacy Policy checkbox. Clicking these opens accessible, versioned legal modals covering 15 enterprise terms and 11 privacy sections without toggling the checkbox or resetting form data. Acceptance timestamps are strictly server-generated."*
 - **Action**:
-  1. Click the "Create account" tab.
-  2. Point out Full Name, Work Email, Date of Birth placed directly above the Password fields.
-  3. Click **Terms & Conditions** link; show the modal with version `1.0.0` and close it.
-  4. Switch back to "Sign In", click the **Viewer** demo account card (`alex.dev@trustvault.internal`), and click **Sign In to Vault**.
+  1. Demonstrate the top-right Theme Selector toggling between themes.
+  2. Click the "Create account" tab/button; verify the registration form displays cleanly with zero stale inputs.
+  3. Point out Full Name, Work Email, Date of Birth placed directly above the Password fields.
+  4. Click **Terms & Conditions** link; show the modal with version `1.0.0` and close it.
+  5. Switch back to "Sign In", click the **Viewer** demo account card (`alex.dev@trustvault.internal`), and click **Sign In to Vault**.
 
 ---
 
@@ -105,11 +108,11 @@
 ### ⏱️ [4:30 – 5:00] Automated Testing, Zero Regressions & Conclusion
 - **On Screen**: Terminal showing Vitest test suite execution and test summary table.
 - **Narrator Script**:
-  > *"To ensure that every authorization policy is strictly enforced and verified against regressions, TrustVault includes an automated test suite with 16 test files and 246 automated tests—all passing with a 100% success rate.
+  > *"To ensure that every authorization policy is strictly enforced and verified against regressions, TrustVault includes an automated test suite with 18 test files and 277 automated tests—all passing with a 100% success rate.
   > Our automated security tests verify that unauthorized users cannot read or download private files, magic numbers block disguised executable uploads, profile updates cannot escalate user roles, and revocation takes effect with zero delay.
   > Thank you for reviewing TrustVault."*
 - **Action**:
-  1. Show terminal output: `Test Files: 16 passed (16)`, `Tests: 246 passed (246)`.
+  1. Show terminal output: `Test Files: 18 passed (18)`, `Tests: 277 passed (277)`.
   2. Show frontend production build output: `✓ built in 3.17s` with 0 errors.
 
 ---
@@ -122,4 +125,4 @@
 - [ ] Original filenames preserved during download demonstrated clearly.
 - [ ] Immediate revocation demonstrated with real 403 Forbidden enforcement.
 - [ ] Admin Governance dashboard and CSV audit export shown.
-- [ ] Test suite output displayed verifying 246/246 passing tests.
+- [ ] Test suite output displayed verifying 18 test files and 277 passing tests.

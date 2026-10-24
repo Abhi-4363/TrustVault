@@ -3,8 +3,8 @@
 > **Enterprise-Grade Secure Document-Sharing Platform with Auditable, Zero-Leakage Access Control.**  
 > Built for the Snovasys Fresher Challenge 2026. Fully implemented and verified across all 10 planned stages.
 
-[![Tests](https://img.shields.io/badge/tests-265%20passed-brightgreen.svg)]()
-[![Security](https://img.shields.io/badge/threats%20mitigated-28%2F28%20verified-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-277%20passed-brightgreen.svg)]()
+[![Security](https://img.shields.io/badge/threats%20mitigated-30%2F30%20verified-blue.svg)]()
 [![Vulnerabilities](https://img.shields.io/badge/audit%20vulnerabilities-0-success.svg)]()
 [![Architecture](https://img.shields.io/badge/architecture-Zero--Trust-purple.svg)]()
 
@@ -25,6 +25,8 @@ TrustVault enforces a strict **Zero-Trust** security architecture:
 7. **Secure Download with Original Filename**: Downloads use the browser's File System Access API (`showSaveFilePicker`) to present the original filename (e.g. `Report.pdf`) in a native Save-As dialog, bypassing Chromium's blob-URL UUID fallback. Bearer-token authentication is preserved; tokens are never placed in URLs.
 8. **End-to-End Sharing & Metadata Editing**: Document owners can grant `read` or `edit` permissions. Recipients with Edit permission can modify document titles, descriptions, and discoverability tags through an integrated Metadata Editor modal, with changes reflected in real-time and audited in the immutable log. View recipients remain strictly restricted to read/download access.
 9. **Zero-Trust Password Management**: Self-service change password with current password verification and 12-round bcrypt hashing, plus Admin-initiated single-use token recovery without credential leakage.
+10. **Distinct Authentication Architecture & URL Routing**: Complete decoupling of Sign In and Create Account screens. The modal dialog (`AuthModals`) and full-screen portal (`AuthLandingPortal`) synchronize state dynamically via `initialMode` and `onModeChange` hooks, clearing stale passwords and errors on transition. Supports direct URL routing (`?mode=register` / `?mode=login`) and browser navigation.
+11. **Mobile Ingestion & Resilient Streaming**: Dropzone with transparent touch gesture overlay preventing mobile WebView/iOS Safari synthetic click blocking, automatic client-side MIME-to-extension deduction for camera/photo pickers to avoid 415 rejections, double-tap debounce locks, and a 60-second blob URL retention window supporting mobile OS download managers.
 
 ---
 
@@ -53,8 +55,8 @@ graph TD
 | **Stage 6** | **Tamper-Resistant Audit Trail** | ✅ Complete | Append-only ledger, schema pre-hooks rejecting PUT/DELETE mutations |
 | **Stage 7** | **Search & Upload Validation** | ✅ Complete | Scoped search without metadata leaks, magic number header inspection |
 | **Stage 8** | **Admin Governance Dashboard** | ✅ Complete | System analytics, un-truncated CSV/JSON audit export, user account deactivation |
-| **Stage 9** | **Automated Security Integration** | ✅ Complete | 100% verification of all 16 entries in `THREATS.md` |
-| **Stage 10** | **Production Hardening & Final Finalization** | ✅ Complete | Document visibility cards, self-service & admin password recovery, 0 audit vulnerabilities |
+| **Stage 9** | **Automated Security Integration** | ✅ Complete | 100% verification of all entries in `THREATS.md` |
+| **Stage 10** | **Production Hardening & Final Finalization** | ✅ Complete | Document visibility cards, self-service & admin password recovery, distinct auth forms, 0 audit vulnerabilities |
 
 ---
 
@@ -62,10 +64,10 @@ graph TD
 
 - **Backend API**: Node.js, Express 4, Mongoose (with dual-engine architecture: persistent MongoDB Atlas + resilient zero-configuration in-memory adapter)
 - **Security & Crypto**: bcryptjs (12 salt rounds), jsonwebtoken (HMAC SHA-256), crypto (SHA-256 tokens), defensive HTTP headers, sliding-window rate limiter
-- **File Ingestion**: Multer, private encrypted disk quarantine, magic-number binary signature inspection
-- **File Download**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; blob-URL fallback for Firefox/Safari
-- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic)
-- **Testing**: Vitest 5, Supertest (11 test suites, 151 automated integration tests)
+- **File Ingestion**: Multer, private encrypted disk quarantine, magic-number binary signature inspection, touch-friendly dropzone overlay
+- **File Download**: File System Access API (`showSaveFilePicker`) for native Save-As with original filename; resilient 60-second blob-URL fallback for Firefox/Safari and mobile OS download managers
+- **Frontend SPA**: React 18, Vite 6, Lucide Icons, Pure CSS Design System Tokens (Linear / Stripe aesthetic, Light/Dark/System theme switcher with OS synchronization)
+- **Testing**: Vitest 5, Supertest (18 test suites, 277 automated integration tests)
 
 ---
 
@@ -194,7 +196,7 @@ All 16 threats cataloged in [`THREATS.md`](./THREATS.md) have been systematicall
 
 ## 7. Automated Test Suite
 
-TrustVault maintains a 100% test pass rate across 17 comprehensive test suites with **265 automated integration tests**:
+TrustVault maintains a 100% test pass rate across 18 comprehensive test suites with **277 automated integration tests**:
 
 ```bash
 cd backend
@@ -206,17 +208,18 @@ npm test
 | **Brevo & Multi-Provider Delivery** | `tests/brevo-and-providers.test.js` | 18 | Brevo HTTPS REST API (`api-key` header, Port 443), explicit `EMAIL_PROVIDER` selection (`brevo`, `resend`, `smtp`), single-provider dispatch (duplicate prevention), messageId acceptance verification, unverified sender error handling |
 | **Email Verification & Password Reset** | `tests/email-and-verification.test.js` | 20 | Unverified user blocking (403), 24h verification link token lifecycle, anti-reuse, live Brevo registration dispatch, dual-option password recovery, 15m reset link |
 | **Admin Notifications & Reset** | `tests/admin-notifications-and-password-reset.test.js` | 28 | Role-wide password change, forgot-password request anti-enumeration, Admin Notification Center, temporary Password@123 reset, mandatory password change policy |
-| **Visibility & Password Mgmt** | `tests/visibility-and-password-management.test.js` | 14 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption |
+| **Visibility & Password Mgmt** | `tests/visibility-and-password-management.test.js` | 12 | Default private, cross-user isolation, immediate revocation, self password change, admin password recovery, single-use token consumption |
+| **Visibility & Viewer Edge Cases** | `tests/visibility-and-viewer-bug.test.js` | 12 | Edge-case boundary tests for visibility inheritance, viewer isolation, unshared document concealment, and grant-level revocation |
 | **Admin Governance & Audit** | `tests/admin-governance.test.js` | 32 | System analytics, un-truncated CSV/JSON export, user account deactivation, role updates |
-| **Security Threat Integration**| `tests/security-integration.test.js` | 18 | Automated verification of all 19 entries in `THREATS.md` |
+| **Security Threat Integration**| `tests/security-integration.test.js` | 18 | Automated verification of all cataloged threat vectors in `THREATS.md` |
 | **Upload Signature & Search** | `tests/search-validation.test.js` | 18 | Magic-number binary header inspection, scoped search isolation |
 | **Permissions & Delegation** | `tests/permissions.test.js` | 17 | Per-document ACLs (`read`/`edit`), multi-user collaboration |
 | **Document Access & Streaming**| `tests/document.test.js` | 16 | Private disk storage, UUID obfuscation, download authorization |
 | **Owner Approval Workflow** | `tests/owner-approval-workflow.test.js` | 13 | Viewer-default registration, pending owner queue, approval/rejection lifecycle, downgrade with zero data loss, self-promotion blocking |
 | **Authentication & RBAC** | `tests/auth.test.js` | 13 | bcrypt (12 rounds), HMAC SHA-256 JWT, deactivated account blocking |
-| **Registration & Profile** | `tests/registration-and-profile.test.js` | 19 | Complete registration input validation, profile retrieval, password requirements |
+| **Registration & Profile** | `tests/registration-and-profile.test.js` | 18 | Complete registration input validation, profile retrieval, password requirements |
 | **Visibility Sharing Transitions** | `tests/visibility-sharing-transitions.test.js` | 19 | Dynamic switching between Private, Specific Users, and All Users, ACL preservation and cleanup |
-| **Viewer Owner Request** | `tests/viewer-owner-request.test.js` | 12 | Viewer self-service role escalation request lifecycle and Admin moderation queue |
+| **Viewer Owner Request** | `tests/viewer-owner-request.test.js` | 11 | Viewer self-service role escalation request lifecycle and Admin moderation queue |
 | **Tamper-Resistant Audit** | `tests/audit.test.js` | 7 | Append-only ledger, mutation rejection, chronological ordering |
 | **Service Health Check** | `tests/health.test.js` | 3 | Server uptime, environment state, storage accessibility |
 | **Immediate Access Revocation**| `tests/revocation.test.js` | 2 | Zero token caching lag, direct-to-database check |
@@ -434,6 +437,31 @@ The public registration form presents fields in the following deliberate sequenc
 - **Compliance Scope**: Collecting a date of birth and recording terms acceptance satisfies application policy requirements but does not by itself certify compliance with every global jurisdiction (e.g. COPPA, GDPR, CCPA).
 - **Placeholders**: Corporate entity registration details, physical headquarters address, and official legal counsel contact email are marked with explicit placeholders (`[TrustVault Legal Entity Placeholder]`, `legal@trustvault.internal`) pending formal corporate formation.
 
+### 6. Authentication Architecture: Distinct Forms & Direct URL Routing
+TrustVault strictly decouples the Sign In and Create Account interfaces to prevent input cross-contamination or ambiguous modal rendering:
+- **Dedicated Field Schemas**:
+  - **Sign In**: Displays solely Work Email, Password (with toggle), inline "Forgot Password?" trigger, "Verify email / Resend?" link, "Sign In to Vault" submission, and quick-access verified Demo Role selection cards. All registration-specific inputs (Full Name, Date of Birth, Confirm Password, Role selection, Terms & Privacy checkbox) are completely absent.
+  - **Create Account**: Displays Full Name, Work Email, Date of Birth (minimum age 13 enforcement), Password, Confirm Password, Requested Account Role (`Viewer` or `Document Owner`), Terms & Privacy acceptance checkbox, and "Create Account" submission. Login-only controls and demo role cards are strictly excluded.
+- **State Synchronization & Component Keys**:
+  - The authentication dialog (`AuthModals.jsx`) and landing portal (`AuthLandingPortal.jsx`) maintain dynamic synchronization with parent state via `initialMode` and `onModeChange` callbacks.
+  - Component instances utilize distinct React keys (`key={`${authModalMode}-${authModalOpen}`}`), ensuring state re-initialization and preventing retention of stale passwords, confirmation values, or validation errors when switching modes.
+- **Direct Query Parameter & Hash Routing**:
+  - Deep-linkable via URL query parameters (`?mode=register` or `?mode=login`) and URL hashes (`#register` or `#login`).
+  - Browser navigation events (`popstate`, `hashchange`) dynamically update the active form mode without requiring full page reloads.
+
+### 7. Mobile Document Ingestion & Download Resilience
+To guarantee reliable enterprise collaboration on mobile devices and touchscreens:
+- **Native Gesture Dropzone Overlay**: Replaced hidden file input elements (`display: none`) with an absolute transparent overlay (`.upload-dropzone-input`) spanning the dropzone. This eliminates synthetic `.click()` blocking enforced by iOS Safari and Android WebView gesture security sandbox models.
+- **MIME-to-Extension Deduction**: Mobile device camera and photo pickers frequently assign generic filenames (e.g., `image` or `blob`) without file extensions. TrustVault inspects incoming MIME types (e.g., `image/jpeg` -> `.jpg`, `application/pdf` -> `.pdf`) and constructs a sanitized, properly named `File` object before dispatching multipart requests to the backend, preventing `415 UNSUPPORTED_MEDIA_TYPE` rejections.
+- **Double-Tap Debouncing**: Synchronous submission locks (`if (loading) return;`) protect against duplicate multipart uploads triggered by rapid touchscreen taps.
+- **Resilient Blob URL Lifetime**: Download blob object URLs are retained for 60 seconds before invocation of `URL.revokeObjectURL()`, allowing mobile OS download managers sufficient streaming time without premature stream termination.
+- **Session Expiry Recovery**: Intercepts `401 Unauthorized` responses during vault document polling and triggers graceful re-authentication rather than silent failure.
+
+### 8. Enterprise Appearance Theme Selector
+- **Three Core Modes**: Light Theme, Dark Theme, and System Default.
+- **Dynamic OS Synchronization**: When set to "System", TrustVault listens to `window.matchMedia('(prefers-color-scheme: dark)')` to reflect operating system appearance changes in real time.
+- **Persistence & Accessibility**: User preferences persist in `localStorage` (`trustvault_theme`). Dropdown menus enforce right-aligned viewport clamping (`right: 0`, `min-width: 230px`) to prevent horizontal screen overflow on narrow mobile viewports (< 375px), backed by touch-outside dismiss listeners.
+
 ---
 
 ## 11. Evaluator Interactive Walkthrough Guide
@@ -493,8 +521,6 @@ To experience all enterprise security capabilities in the live browser:
 
 ---
 
----
-
 ## 12. Submission Deliverables & Documentation Index
 
 All required hiring challenge deliverables are documented in full detail:
@@ -503,8 +529,8 @@ All required hiring challenge deliverables are documented in full detail:
 | :--- | :--- |
 | **[`TECHNICAL_WRITEUP.md`](file:///c:/TrustVault/TECHNICAL_WRITEUP.md)** | Architectural deep-dive: permission model rationale, private storage quarantine, revocation mechanics, AI collaboration review, and deliberate omissions. |
 | **[`DEMO_SCRIPT.md`](file:///c:/TrustVault/DEMO_SCRIPT.md)** | Minute-by-minute 5-minute video demonstration walkthrough script, click actions, and recording checklist. |
-| **[`THREATS.md`](file:///c:/TrustVault/THREATS.md)** | Complete threat model catalog covering 28 security attack vectors, code mitigations, and automated test citations. |
-| **[`PROMPTS.md`](file:///c:/TrustVault/PROMPTS.md)** | Dated chronological prompt and development audit log with 18 entries, AI mistakes identified during review, corrections, and commit references. |
+| **[`THREATS.md`](file:///c:/TrustVault/THREATS.md)** | Complete threat model catalog covering 30 security attack vectors, code mitigations, and automated test citations. |
+| **[`PROMPTS.md`](file:///c:/TrustVault/PROMPTS.md)** | Dated chronological prompt and development audit log with 20 entries, AI mistakes identified during review, corrections, and commit references. |
 | **[`docs/API_DOCUMENTATION.md`](file:///c:/TrustVault/docs/API_DOCUMENTATION.md)** | Exhaustive REST API specification documenting all endpoints, RBAC permissions, JSON request/response formats, and error codes. |
 | **[`docs/DEPLOYMENT.md`](file:///c:/TrustVault/docs/DEPLOYMENT.md)** | Clean-clone quickstart instructions, environment configuration, database seeding, and production cloud deployment on Render. |
 
@@ -515,6 +541,6 @@ All required hiring challenge deliverables are documented in full detail:
 - **Author**: Snovasys Fresher Challenge 2026 Candidate
 - **Architecture**: Zero-Trust Document Security & Governance
 - **Repository**: [https://github.com/Abhi-4363/TrustVault](https://github.com/Abhi-4363/TrustVault)
-- **Automated Test Results**: 17 test files passed, 265/265 tests passing (100% pass rate)
+- **Automated Test Results**: 18 test files passed, 277/277 tests passing (100% pass rate)
 - **Production Build**: 0 errors, Vite 6 production bundle verified
 

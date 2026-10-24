@@ -18,6 +18,7 @@ graph TD
     S7 --> S8[Stage 8: Administrator Governance Dashboard]
     S8 --> S9[Stage 9: Automated Security Integration Tests]
     S9 --> S10[Stage 10: Production Hardening, Seed Data & Final Demo]
+    S10 --> S11[Stage 11: Enterprise Theme, Mobile Resilience & Unified Auth]
 ```
 
 ---
@@ -153,3 +154,17 @@ graph TD
   - [x] Seed script executes idempotently and populates clean test data.
   - [x] Security audit (`npm audit`) shows 0 critical or high vulnerabilities.
   - [x] Final documentation completely reflects the verified implementation.
+
+---
+
+## Stage 11: Enterprise Appearance, Mobile Resilience & Unified Authentication Experience
+- **Primary Goal**: Deliver a state-of-the-art UI/UX transformation with accessible enterprise themes, mobile gesture resilience, and strictly isolated authentication forms with zero state leakage.
+- **Deliverables**:
+  1. Top-Right Enterprise Theme Selector: Dark, Light, and System High-Contrast modes with persistent local storage, accessible popover menus, and dynamic CSS token switching.
+  2. Mobile Document Ingestion Resilience: Transparent full-surface touch dropzones, binary MIME extension deduction for camera/gallery uploads (preventing 415 rejections), and 60-second retention on download blob URLs to eliminate truncated downloads on mobile browsers.
+  3. Distinct Authentication Forms & State Synchronization: Direct-access URL search parameters (`?mode=register` / `?mode=login`), deep synchronization between props and internal modal state on mode changes, stale input and error notification clearing, and full browser navigation history handling.
+- **Completion Checks**:
+  - [x] Sign In and Create Account screens consistently render their respective forms with zero stale inputs or state leakage.
+  - [x] Direct navigation via `?mode=register` opens the Create Account form directly without modal race conditions.
+  - [x] Document upload succeeds smoothly on both desktop drag-and-drop and mobile touch environments.
+  - [x] All 277 automated tests in the test suite pass (100% pass rate).

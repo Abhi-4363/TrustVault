@@ -80,7 +80,7 @@ The database seed (`backend/scripts/seed.js`) provisions realistic identities fo
 cd backend
 npm test
 ```
-*Expected Result*: 16 test files passed, 246/246 tests passing.
+*Expected Result*: 18 test files passed, 277/277 tests passing.
 
 ### Run Frontend Production Build
 ```bash

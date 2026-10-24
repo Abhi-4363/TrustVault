@@ -83,6 +83,8 @@ Every component, endpoint, and test was scrutinized against real application exe
 2. **Global CSS Input Overlap**: In `AuthModals.jsx`, icons overlapped placeholder text. We traced the root cause to an un-scoped `.form-input` selector in `UploadModal.css` (`padding: 8px 12px`) that was loaded after `AuthModals.css` and overriding its `padding-left: 40px`. We scoped `UploadModal.css` to `.upload-modal-container` and enforced `padding: 0 12px 0 40px !important;` on all input wrappers.
 3. **Keyboard Search Shortcut Leak**: Unauthenticated visitors could press `Ctrl + K` to trigger the search dialog. We corrected this in `AppShell.jsx` by checking authentication state (`if (!user) return;`) before handling the shortcut.
 4. **Client Timestamp Forgery Defense**: Ensured `termsAcceptedAt` in registration is strictly assigned server-side (`new Date().toISOString()`), discarding any client-supplied timestamps.
+5. **Authentication Modal State Cross-Contamination & Stale Inputs**: React preserved internal `'login'` state when navigating to Create Account because `useState(initialMode)` was only evaluated on initial component mount and the modal persisted in the virtual DOM. We resolved this by adding `useEffect` synchronization, clearing stale passwords and validation errors on mode switch, keying the modal with `${authModalMode}-${authModalOpen}`, and synchronizing URL query parameters (`?mode=register` / `?mode=login`).
+6. **Mobile File Upload Sandboxing & Truncated Downloads**: Mobile browsers sandboxed programmatic `.click()` events on hidden file inputs and frequently stripped file extensions when capturing from camera/photo gallery. We resolved this by implementing a transparent full-surface dropzone overlay, client-side MIME-to-extension deduction (preventing 415 errors), and extending blob download URL lifetimes to 60 seconds to support mobile background download managers.
 
 ---
 
@@ -113,6 +115,6 @@ Every component, endpoint, and test was scrutinized against real application exe
 
 ## 8. Verification & Test Metrics
 
-- **Automated Integration Tests**: **16 test files passed, 246/246 tests passing (100% pass rate)**.
+- **Automated Integration Tests**: **18 test files passed, 277/277 tests passing (100% pass rate)**.
 - **Frontend Production Build**: **1633 modules compiled cleanly via Vite with 0 errors**.
-- **Security Catalog**: **28 threats analyzed, mitigated, and verified in `THREATS.md`**.
+- **Security Catalog**: **30 threats analyzed, mitigated, and verified in `THREATS.md`**.
