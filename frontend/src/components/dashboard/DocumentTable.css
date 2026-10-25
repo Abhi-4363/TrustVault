@@ -5,7 +5,7 @@
    ============================================================================== */
 
 .document-table-container {
-  background-color: #ffffff;
+  background-color: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
@@ -21,7 +21,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   border-bottom: 1px solid var(--border-light);
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(180deg, var(--bg-surface, #ffffff) 0%, var(--bg-hover, #f7f5ef) 100%);
   flex-wrap: wrap;
 }
 
@@ -42,7 +42,7 @@
 .table-count-badge {
   font-size: 11px;
   font-weight: 700;
-  background-color: var(--color-slate-100);
+  background-color: var(--color-warm-100, #eeebe2);
   color: var(--text-secondary);
   border: 1px solid var(--border-light);
   padding: 2px 8px;
@@ -83,8 +83,8 @@
 
 .table-search-input:focus {
   outline: none;
-  border-color: var(--color-primary-600);
-  background-color: #ffffff;
+  border-color: var(--color-primary);
+  background-color: var(--bg-surface, #ffffff);
   box-shadow: 0 0 0 3px var(--border-focus-ring);
   width: 250px;
 }
@@ -115,13 +115,13 @@
 }
 
 .table-filter-select:hover {
-  background-color: #ffffff;
+  background-color: var(--bg-surface, #ffffff);
   border-color: var(--border-medium);
 }
 
 .table-filter-select:focus {
   outline: none;
-  border-color: var(--color-primary-600);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--border-focus-ring);
 }
 
@@ -134,7 +134,7 @@
   font-weight: 600;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
-  background-color: #ffffff;
+  background-color: var(--bg-surface, #ffffff);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -172,7 +172,7 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background-color: #f8fafc;
+  background-color: var(--bg-hover, #f7f5ef);
   border-bottom: 1px solid var(--border-light);
   white-space: nowrap;
 }
@@ -188,7 +188,7 @@
 }
 
 .table-row:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-hover, #f7f5ef);
 }
 
 .table-row:last-child td {
@@ -210,13 +210,13 @@
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  background-color: var(--color-slate-100);
+  background-color: var(--color-warm-50, #f7f5ef);
   flex-shrink: 0;
   border: 1px solid var(--border-light);
 }
 
 .file-icon-pdf { color: #dc2626; }
-.file-icon-doc { color: #2563eb; }
+.file-icon-doc { color: #176B52; }
 .file-icon-sheet { color: #16a34a; }
 
 .doc-meta {
@@ -247,9 +247,9 @@
   font-weight: 700;
   padding: 1px 7px;
   border-radius: var(--radius-full);
-  background-color: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background-color: var(--color-warm-50, #f7f5ef);
+  color: var(--color-primary-700, #176B52);
+  border: 1px solid var(--color-primary-200, #d1e2dc);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -271,7 +271,7 @@
   width: 26px;
   height: 26px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, var(--color-primary-800, #103D32) 0%, var(--color-primary, #176B52) 100%);
   color: #ffffff;
   font-size: 10px;
   font-weight: 700;
@@ -330,9 +330,9 @@
 }
 
 .row-action-edit:hover {
-  color: #2563eb;
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
+  color: var(--color-primary, #176B52);
+  background-color: var(--color-warm-50, #f7f5ef);
+  border-color: var(--color-primary-200, #d1e2dc);
 }
 
 .row-action-delete:hover {
@@ -393,7 +393,7 @@
   .enterprise-table tr.table-row {
     display: flex;
     flex-direction: column;
-    background-color: #ffffff;
+    background-color: var(--bg-surface, #ffffff);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
     padding: var(--space-4);

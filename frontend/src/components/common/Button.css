@@ -1,155 +1,151 @@
 /* ==============================================================================
-   TrustVault — Button Design System Component
-   Clean enterprise buttons with distinct hierarchy, micro-interactions, and focus rings.
+   TrustVault — Button Component Styles
+   Forest green primary palette with semantic variants
    ============================================================================== */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  font-family: var(--font-family-base);
-  font-weight: var(--font-medium);
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    color var(--transition-fast),
+    transform 80ms ease;
+  text-decoration: none;
   white-space: nowrap;
   user-select: none;
-  border: 1px solid transparent;
-  text-decoration: none;
-  cursor: pointer;
-  position: relative;
+  letter-spacing: -0.01em;
 }
 
-.btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--border-focus-ring);
-}
+.btn:active { transform: scale(0.975); }
 
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn:disabled {
-  opacity: 0.55;
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.45;
   cursor: not-allowed;
   pointer-events: none;
+  transform: none;
 }
 
 /* ── Sizes ───────────────────────────────────────────────────────────────── */
-.btn-sm {
-  padding: 5px 10px;
-  font-size: var(--text-xs);
-  height: 32px;
-  border-radius: var(--radius-sm);
+.btn-xs  { padding: 3px 10px;   font-size: var(--text-xs);   line-height: 1.7; }
+.btn-sm  { padding: 5px 12px;   font-size: var(--text-sm);   line-height: 1.6; }
+.btn-md  { padding: 7px 16px;   font-size: var(--text-base); line-height: 1.5; }
+.btn-lg  { padding: 10px 22px;  font-size: var(--text-md);   line-height: 1.5; }
+.btn-xl  { padding: 13px 28px;  font-size: var(--text-lg);   line-height: 1.5; }
+
+/* ── Primary — Forest Green ──────────────────────────────────────────────── */
+.btn-primary {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(23, 107, 82, 0.25), 0 0 0 0 transparent;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  box-shadow: var(--shadow-primary);
+}
+.btn-primary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--border-focus-ring);
 }
 
-.btn-md {
-  padding: 8px 16px;
-  font-size: var(--text-sm);
-  height: 38px;
+/* ── Secondary — Soft Primary Tint ──────────────────────────────────────── */
+.btn-secondary {
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+  border-color: rgba(23, 107, 82, 0.25);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-primary-subtle);
+  border-color: rgba(23, 107, 82, 0.40);
+}
+
+/* ── Outline ─────────────────────────────────────────────────────────────── */
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary-dark);
+}
+
+/* ── Ghost ───────────────────────────────────────────────────────────────── */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* ── Danger — Error Red ──────────────────────────────────────────────────── */
+.btn-danger {
+  background: var(--color-error);
+  color: #FFFFFF;
+  border-color: var(--color-error);
+}
+.btn-danger:hover:not(:disabled) {
+  background: #9C3A3A;
+  border-color: #9C3A3A;
+  box-shadow: 0 4px 12px rgba(181, 71, 71, 0.30);
+}
+
+/* ── Copper — Accent ─────────────────────────────────────────────────────── */
+.btn-copper {
+  background: var(--color-copper);
+  color: #FFFFFF;
+  border-color: var(--color-copper);
+}
+.btn-copper:hover:not(:disabled) {
+  background: var(--color-copper-dark);
+  border-color: var(--color-copper-dark);
+}
+
+/* ── Icon Container ──────────────────────────────────────────────────────── */
+.btn-icon-only {
+  padding: 8px;
   border-radius: var(--radius-md);
 }
+.btn-icon-only.btn-sm { padding: 6px; }
+.btn-icon-only.btn-lg { padding: 10px; }
 
-.btn-lg {
-  padding: 11px 20px;
-  font-size: var(--text-base);
-  height: 44px;
-  border-radius: var(--radius-lg);
-  font-weight: var(--font-semibold);
-}
+.btn-icon-leading  { margin-right: 4px; flex-shrink: 0; }
+.btn-icon-trailing { margin-left: 4px; flex-shrink: 0; }
 
-/* ── Primary Variant ──────────────────────────────────────────────────────── */
-.btn-primary {
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-  color: var(--text-inverse);
-  border-color: #1d4ed8;
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
-  border-color: #1e40af;
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.btn-primary:active:not(:disabled) {
-  background: #1e40af;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-/* ── Secondary Variant ────────────────────────────────────────────────────── */
-.btn-secondary {
-  background-color: var(--bg-card);
-  color: var(--text-main);
-  border-color: var(--border-medium);
-  box-shadow: var(--shadow-xs);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--bg-hover);
-  border-color: var(--color-slate-400);
-  color: var(--color-slate-900);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-secondary:active:not(:disabled) {
-  background-color: var(--bg-active);
-}
-
-/* ── Outline Variant ──────────────────────────────────────────────────────── */
-.btn-outline {
-  background-color: transparent;
-  color: var(--color-primary-600);
-  border-color: var(--color-primary-200);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background-color: var(--color-primary-50);
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-700);
-}
-
-/* ── Ghost Variant ────────────────────────────────────────────────────────── */
-.btn-ghost {
-  background-color: transparent;
-  color: var(--text-secondary);
-}
-
-.btn-ghost:hover:not(:disabled) {
-  background-color: var(--bg-hover);
-  color: var(--text-main);
-}
-
-/* ── Danger Variant ───────────────────────────────────────────────────────── */
-.btn-danger {
-  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
-  color: var(--text-inverse);
-  border-color: #dc2626;
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
-  border-color: #b91c1c;
-}
-
-.btn-icon {
+.btn svg {
+  display: inline-block;
+  vertical-align: middle;
   flex-shrink: 0;
 }
 
-/* ── Mobile Responsive Adjustments ────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .btn {
-    min-height: 40px;
-  }
-  .btn-sm {
-    min-height: 34px;
-    padding: 6px 12px;
-  }
-  .btn-md {
-    min-height: 42px;
-  }
-  .btn-lg {
-    min-height: 46px;
-  }
+.btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1.2;
 }
+
+.btn-text svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ── Full Width ──────────────────────────────────────────────────────────── */
+.btn-full { width: 100%; }

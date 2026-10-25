@@ -3,7 +3,6 @@ import {
   Share2, 
   UserPlus, 
   Trash2, 
-  ShieldCheck, 
   X, 
   AlertCircle, 
   CheckCircle2, 

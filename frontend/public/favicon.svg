@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Document base -->
+  <path d="M7 6C7 4.89543 7.89543 4 9 4H27L33 10V34C33 35.1046 32.1046 36 31 36H9C7.89543 36 7 35.1046 7 34V6Z" fill="#176B52" opacity="0.15"/>
+  <path d="M7 6C7 4.89543 7.89543 4 9 4H27L33 10V34C33 35.1046 32.1046 36 31 36H9C7.89543 36 7 35.1046 7 34V6Z" stroke="#176B52" stroke-width="1.8" fill="none"/>
+  <!-- Corner fold -->
+  <path d="M27 4L33 10H29C27.8954 10 27 9.10457 27 8V4Z" fill="#176B52" opacity="0.55"/>
+  <!-- Content lines -->
+  <line x1="12" y1="16" x2="28" y2="16" stroke="#176B52" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+  <line x1="12" y1="20.5" x2="24" y2="20.5" stroke="#176B52" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+  <line x1="12" y1="25" x2="26" y2="25" stroke="#176B52" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+  <!-- Verification badge -->
+  <circle cx="28" cy="28" r="6" fill="#176B52"/>
+  <path d="M25 28.2L27.2 30.4L31 26.5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

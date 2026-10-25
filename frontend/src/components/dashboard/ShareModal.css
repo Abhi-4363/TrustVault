@@ -5,7 +5,7 @@
 .share-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.65);
+  background-color: rgba(36, 42, 39, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
@@ -17,7 +17,7 @@
 }
 
 .share-modal-container {
-  background-color: var(--bg-card);
+  background-color: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
@@ -53,9 +53,9 @@
   font-weight: var(--font-medium);
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  background-color: var(--color-purple-bg);
-  color: var(--color-purple-text);
-  border: 1px solid var(--color-purple-border);
+  background-color: var(--color-warm-50, #f7f5ef);
+  color: var(--color-primary-700, #176B52);
+  border: 1px solid var(--color-primary-200, #d1e2dc);
   width: fit-content;
   margin-bottom: var(--space-1);
 }
@@ -159,7 +159,7 @@
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
-  background-color: var(--color-slate-50);
+  background-color: var(--color-warm-50, #f7f5ef);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -169,14 +169,14 @@
 }
 
 .visibility-card:hover {
-  border-color: var(--color-primary-400);
-  background-color: var(--color-primary-50);
+  border-color: var(--color-primary);
+  background-color: var(--color-warm-100, #eeebe2);
 }
 
 .visibility-card.active {
-  border-color: var(--color-primary-600);
-  background-color: var(--color-primary-50);
-  box-shadow: 0 0 0 1px var(--color-primary-600);
+  border-color: var(--color-primary);
+  background-color: var(--color-warm-100, #eeebe2);
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 
 .visibility-card-header {
@@ -313,7 +313,7 @@
 
 /* Grant Form */
 .share-grant-form {
-  background-color: var(--color-slate-50);
+  background-color: var(--color-warm-50, #f7f5ef);
   border: 1px solid var(--border-light);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
@@ -348,7 +348,7 @@
 .share-level-select:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px var(--border-focus-ring);
 }
 
 .share-level-select {

@@ -2,11 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, 
   Search, 
-  User, 
   ChevronRight, 
   HelpCircle,
   LogOut,
-  Shield,
   ChevronDown,
   Sun,
   Moon,
@@ -15,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
+import { Logo } from '../components/common/Logo';
 import './AppHeader.css';
 
 /**
@@ -118,12 +117,7 @@ export function AppHeader({
       <div className="header-left">
         {!showMenuToggle ? (
           <div className="header-unauth-brand">
-            <div className="brand-icon-shield">
-              <Shield size={16} />
-            </div>
-            <span className="brand-text-logo">
-              TrustVault
-            </span>
+            <Logo variant="horizontal" size={26} />
           </div>
         ) : (
           <button

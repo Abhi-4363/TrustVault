@@ -45,7 +45,7 @@
 }
 
 .app-footer {
-  background-color: #ffffff;
+  background-color: var(--bg-surface);
   border-top: 1px solid var(--border-light);
   padding: var(--space-4) var(--space-8);
   font-size: var(--text-xs);
@@ -93,7 +93,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: var(--color-slate-100);
+  background-color: var(--color-warm-50, #f7f5ef);
   border: 1px solid var(--border-light);
   padding: 3px 9px;
   border-radius: var(--radius-sm);

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  ShieldAlert, 
   Lock, 
   Eye, 
   EyeOff, 
@@ -88,7 +87,7 @@ export function ForcedPasswordChangeModal({ user, token, onPasswordChanged, onLo
         {/* Header with Security Badge */}
         <div className="forced-pwd-header">
           <div className="forced-pwd-icon-box">
-            <ShieldAlert size={26} className="text-warning" />
+            <Lock size={26} className="text-warning" />
           </div>
           <h2 id="forced-pwd-title" className="forced-pwd-title">
             Temporary Password Detected
@@ -236,15 +235,15 @@ export function ForcedPasswordChangeModal({ user, token, onPasswordChanged, onLo
               disabled={loading || !isFormValid}
             >
               {loading ? (
-                <>
+                <span className="btn-content-row">
                   <Loader2 size={16} className="spinner" />
                   <span>Updating Password...</span>
-                </>
+                </span>
               ) : (
-                <>
+                <span className="btn-content-row">
                   <span>Set New Password & Unlock</span>
                   <ArrowRight size={16} />
-                </>
+                </span>
               )}
             </Button>
 

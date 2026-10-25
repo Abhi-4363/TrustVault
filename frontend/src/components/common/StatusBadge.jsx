@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Eye, Edit3, Lock, Users, Clock, AlertCircle } from 'lucide-react';
+import { UserCheck, Eye, Edit3, Lock, Users, Clock, AlertCircle } from 'lucide-react';
 import './StatusBadge.css';
 
 /**
@@ -17,7 +17,7 @@ export function StatusBadge({ status, variant }) {
   switch (cleanStatus.toLowerCase()) {
     case 'owner':
     case 'document owner':
-      icon = <Shield size={12} aria-hidden="true" />;
+      icon = <UserCheck size={12} aria-hidden="true" />;
       resolvedVariant = 'owner';
       break;
     case 'can edit':

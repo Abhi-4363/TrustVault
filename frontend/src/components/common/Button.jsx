@@ -17,9 +17,11 @@ export function Button({
   ariaLabel,
   className = '',
   title,
+  id,
 }) {
   return (
     <button
+      id={id}
       type={type}
       className={`btn btn-${variant} btn-${size} ${className}`}
       onClick={onClick}

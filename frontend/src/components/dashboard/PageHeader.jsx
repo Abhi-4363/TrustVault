@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Users, ShieldCheck, UserPlus, Clock } from 'lucide-react';
+import { Upload, Users, FileCheck, UserPlus, Clock } from 'lucide-react';
 import { Button } from '../common/Button';
 import './PageHeader.css';
 
@@ -22,8 +22,8 @@ export function PageHeader({
     <section className="page-header" aria-labelledby="page-title">
       <div className="page-header-text">
         <div className="page-header-badge">
-          <ShieldCheck size={14} className="badge-icon" aria-hidden="true" />
-          <span>Zero-Trust Document Vault</span>
+          <FileCheck size={14} className="badge-icon" aria-hidden="true" />
+          <span>Every Access. Verified.</span>
         </div>
         <h1 id="page-title" className="page-header-title">{title}</h1>
         <p className="page-header-description">{description}</p>

@@ -4,7 +4,7 @@ import {
   UserPlus, 
   RefreshCw, 
   UserX, 
-  ShieldCheck, 
+  History, 
   Clock 
 } from 'lucide-react';
 import './ActivityList.css';
@@ -36,8 +36,8 @@ export function ActivityList({ activities = [], onViewAllClick, isLive = false }
     <div className="activity-panel">
       <div className="activity-panel-header">
         <div className="activity-title-row">
-          <ShieldCheck size={16} className="audit-shield-icon" aria-hidden="true" />
-          <h2 className="activity-title">Recent security activity</h2>
+          <History size={16} className="audit-header-icon" aria-hidden="true" />
+          <h2 className="activity-title">Recent activity record</h2>
         </div>
         <span 
           className={`demo-indicator-pill ${isLive ? 'live-ledger-pill' : ''}`} 

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Info, ShieldAlert } from 'lucide-react';
+import { X, Info, AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
 import './Modal.css';
 
@@ -52,7 +52,7 @@ export function Modal({
           <div className="modal-header-text">
             {badge && (
               <span className={`modal-badge badge-${type}`}>
-                {type === 'info' ? <Info size={12} /> : <ShieldAlert size={12} />}
+                {type === 'info' ? <Info size={12} /> : <AlertTriangle size={12} />}
                 {badge}
               </span>
             )}

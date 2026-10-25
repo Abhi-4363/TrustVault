@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
-import { ShieldCheck, GitBranch, Cpu } from 'lucide-react';
+import { FileCheck, Cpu } from 'lucide-react';
 import './AppShell.css';
 
 /**
@@ -28,8 +28,20 @@ export function AppShell({
 }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
+  // Safeguard: AppShell only renders application chrome (sidebar, app header, app footer) for authenticated sessions.
+  // Unauthenticated visitors (landing, auth portals) render their own dedicated single layout.
+  if (!isAuthenticated) {
+    return (
+      <div className="app-shell unauthenticated">
+        <main className="app-content-container" id="main-content" tabIndex="-1">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className={`app-shell ${!isAuthenticated ? 'unauthenticated' : ''}`}>
+    <div className="app-shell">
       {isAuthenticated && (
         <AppSidebar
           activeNav={activeNav}
@@ -67,19 +79,19 @@ export function AppShell({
             <div className="footer-left">
               <span className="footer-brand">TrustVault</span>
               <span className="footer-divider">•</span>
-              <span className="footer-status">Zero-Trust Protected</span>
+              <span className="footer-status">Every Access. Verified.</span>
               <span className="footer-divider">•</span>
               <span className="footer-copyright">Enterprise Document Governance</span>
             </div>
 
             <div className="footer-right">
               <div className="footer-badge">
-                <ShieldCheck size={13} className="text-primary" />
-                <span>Zero-Trust Architecture</span>
+                <FileCheck size={13} className="text-primary" />
+                <span>Document-Level Authorization</span>
               </div>
               <div className="footer-badge">
-                <GitBranch size={13} />
-                <span>SOC2 &amp; ISO 27001 Ready</span>
+                <Cpu size={13} />
+                <span>Auditable Activity Records</span>
               </div>
             </div>
           </div>

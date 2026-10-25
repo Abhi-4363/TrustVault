@@ -5,12 +5,12 @@ import {
   Share2, 
   Activity, 
   Settings, 
-  ShieldCheck, 
-  ShieldAlert,
+  UserCog,
   Lock, 
   User, 
   X 
 } from 'lucide-react';
+import { Logo } from '../components/common/Logo';
 import './AppSidebar.css';
 
 /**
@@ -68,7 +68,7 @@ export function AppSidebar({
   if (isAdmin) {
     const adminTag = pendingRequestsCount > 0 ? `${pendingRequestsCount} PENDING` : 'ADMIN';
     navItems = [
-      { id: 'admin', label: 'Admin Governance', icon: ShieldAlert, tag: adminTag, isPendingBadge: pendingRequestsCount > 0 },
+      { id: 'admin', label: 'Admin Governance', icon: UserCog, tag: adminTag, isPendingBadge: pendingRequestsCount > 0 },
       { id: 'overview', label: 'Overview', icon: LayoutDashboard, tag: null },
       { id: 'my-documents', label: 'My Documents', icon: Files, tag: myDocsCount !== null ? String(myDocsCount) : null },
       { id: 'shared-with-me', label: 'Shared with Me', icon: Share2, tag: sharedDocsCount !== null ? String(sharedDocsCount) : null },
@@ -111,8 +111,8 @@ export function AppSidebar({
       <aside className={`app-sidebar ${isMobileOpen ? 'mobile-open' : ''}`} aria-label="Main Navigation">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="brand-icon-wrapper" aria-hidden="true">
-              <ShieldCheck size={20} className="brand-shield" />
+            <div className="brand-mark-sidebar" aria-hidden="true">
+              <Logo variant="icon" size={20} theme="dark" />
             </div>
             <div className="brand-text-group">
               <span className="brand-name">TrustVault</span>
@@ -166,14 +166,14 @@ export function AppSidebar({
           <div className="security-status-card">
             <div className="security-status-header">
               <Lock size={14} className="security-lock-icon" aria-hidden="true" />
-              <span className="security-status-title">Zero-Trust Vault</span>
+              <span className="security-status-title">Every Access. Verified.</span>
             </div>
             <p className="security-status-text">
-              Zero static exposure. Download streaming authorized per request.
+              Per-document ACL. Download streaming authorized on request.
             </p>
             <div className="security-status-meta">
               <span className="status-dot" aria-hidden="true" />
-              <span>Zero-Trust Active</span>
+              <span>Access Controls Active</span>
             </div>
           </div>
         </div>

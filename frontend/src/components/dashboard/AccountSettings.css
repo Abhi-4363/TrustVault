@@ -11,7 +11,7 @@
 }
 
 .settings-card {
-  background-color: var(--bg-card);
+  background-color: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -24,12 +24,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  background-color: var(--bg-hover);
+  background-color: var(--bg-hover, #f7f5ef);
 }
 
 .header-icon-box {
-  background-color: var(--color-primary-100);
-  color: var(--color-primary-700);
+  background-color: var(--color-warm-50, #f7f5ef);
+  color: var(--color-primary-700, #176B52);
+  border: 1px solid var(--color-primary-200, #d1e2dc);
   padding: var(--space-2);
   border-radius: var(--radius-lg);
   display: flex;
@@ -105,15 +106,15 @@
 }
 
 .user-role-badge.role-owner {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+  background-color: var(--color-warm-50, #f7f5ef);
+  color: var(--color-primary-700, #176B52);
+  border: 1px solid var(--color-primary-200, #d1e2dc);
 }
 
 .user-role-badge.role-viewer {
-  background-color: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background-color: var(--color-warm-100, #eeebe2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
 }
 
 .status-badge-pending {

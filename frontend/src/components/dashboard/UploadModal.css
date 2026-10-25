@@ -6,7 +6,7 @@
 .upload-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.65);
+  background-color: rgba(36, 42, 39, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
@@ -18,7 +18,7 @@
 }
 
 .upload-modal-container {
-  background-color: var(--bg-card);
+  background-color: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
@@ -54,9 +54,9 @@
   font-weight: var(--font-medium);
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  background-color: var(--color-primary-50);
-  color: var(--color-primary-700);
-  border: 1px solid var(--color-primary-200);
+  background-color: var(--color-warm-50, #f7f5ef);
+  color: var(--color-primary-700, #176B52);
+  border: 1px solid var(--color-primary-200, #d1e2dc);
   width: fit-content;
   margin-bottom: var(--space-1);
 }
@@ -122,7 +122,7 @@
   border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-4);
   text-align: center;
-  background-color: var(--color-slate-50);
+  background-color: var(--color-warm-50, #f7f5ef);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -151,13 +151,13 @@
 }
 
 .upload-dropzone:hover {
-  border-color: var(--color-primary-500);
-  background-color: var(--color-primary-50);
+  border-color: var(--color-primary);
+  background-color: var(--color-warm-100, #eeebe2);
 }
 
 .upload-dropzone.dropzone-active {
-  border-color: var(--color-primary-600);
-  background-color: var(--color-primary-100);
+  border-color: var(--color-primary);
+  background-color: var(--color-warm-100, #eeebe2);
   transform: scale(1.01);
 }
 

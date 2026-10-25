@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Calendar, Eye, EyeOff, UserCog, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, User, AlertCircle, Loader2, Calendar, Eye, EyeOff, UserCog, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { TermsAndPrivacyModals } from '../legal/TermsAndPrivacyModals';
@@ -148,7 +148,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login', onModeChang
       >
         <div className="auth-header">
           <div className="auth-brand-badge">
-            <ShieldCheck size={16} className="text-primary" />
+            <CheckCircle2 size={16} className="text-primary" />
             <span>TrustVault Secure Identity</span>
           </div>
           <button
@@ -236,7 +236,7 @@ export function AuthModals({ isOpen, onClose, initialMode = 'login', onModeChang
               role="status"
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
-                <ShieldCheck size={18} className="text-success" />
+                <CheckCircle2 size={18} className="text-success" />
                 <span>Request Submitted to Administrator</span>
               </div>
               <p style={{ margin: 0, lineHeight: 1.5 }}>{forgotNotice}</p>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ShieldCheck, 
   Key, 
   Lock, 
   Eye, 
@@ -9,7 +8,6 @@ import {
   AlertCircle, 
   User, 
   Mail, 
-  Shield, 
   Clock, 
   Check, 
   X,
@@ -502,7 +500,7 @@ export function AccountSettings({
               <div className="profile-field">
                 <span className="field-label">Governance & Terms Policy</span>
                 <span className="field-value terms-accepted-record">
-                  <ShieldCheck size={13} className="terms-icon" />
+                  <CheckCircle2 size={13} className="terms-icon" />
                   <span>
                     {user?.termsVersionAccepted ? `Terms v${user.termsVersionAccepted}` : 'Standard Policy'}
                     {user?.termsAcceptedAt &&
@@ -546,7 +544,7 @@ export function AccountSettings({
           <div className="settings-card">
             <div className="settings-card-header">
               <div className="header-icon-box">
-                <ShieldCheck size={20} className="header-icon" />
+                <Lock size={20} className="header-icon" />
               </div>
               <div>
                 <h2 className="settings-card-title">Account Security Configuration</h2>
@@ -560,7 +558,7 @@ export function AccountSettings({
               <div className="profile-details-grid">
                 <div className="profile-field">
                   <span className="field-label">Authentication Tier</span>
-                  <span className="field-value"><strong>Zero-Trust Protocol (Active)</strong></span>
+                  <span className="field-value"><strong>Verified Access Protocol (Active)</strong></span>
                 </div>
 
                 <div className="profile-field">

@@ -38,9 +38,9 @@ export function DemoDataBanner({ onCheckHealth, healthStatus }) {
         <div id="demo-details" className="demo-details-body">
           <div className="demo-details-grid">
             <div className="demo-detail-col">
-              <h4>Zero-Trust Platform</h4>
+              <h4>Document Security Platform</h4>
               <p>
-                TrustVault establishes zero-trust access controls, tamper-resistant audit logs, and hardware-isolated byte streaming.
+                TrustVault enforces document-level permissions, private storage outside public roots, and comprehensive activity records.
               </p>
             </div>
             <div className="demo-detail-col">

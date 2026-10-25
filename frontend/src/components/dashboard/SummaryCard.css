@@ -1,21 +1,22 @@
 /* ==============================================================================
    TrustVault — SummaryCard Design System Component
-   Enterprise metric display cards with theme accents, bold figures, and hover depth.
+   Forest green metric display cards with restrained accent bars
    ============================================================================== */
 
 .summary-card {
-  background-color: #ffffff;
+  background-color: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   padding: var(--space-5);
   box-shadow: var(--shadow-sm);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all var(--transition-smooth);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
 }
 
+/* Accent bar on top */
 .summary-card::before {
   content: '';
   position: absolute;
@@ -27,17 +28,19 @@
   transition: opacity 0.2s ease;
 }
 
-.card-primary::before { background: linear-gradient(90deg, #3b82f6, #2563eb); }
-.card-success::before { background: linear-gradient(90deg, #10b981, #059669); }
-.card-purple::before  { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
-.card-warning::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.card-primary::before { background: var(--color-primary); }
+.card-success::before { background: var(--color-success); }
+.card-copper::before  { background: var(--color-copper); }
+.card-warning::before { background: var(--color-warning); }
+.card-purple::before  { background: #8B5CF6; }
 
 .summary-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--border-medium);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
+/* Header */
 .summary-card-header {
   display: flex;
   align-items: center;
@@ -45,48 +48,55 @@
   margin-bottom: var(--space-3);
 }
 
+/* Icon wrapper */
 .summary-card-icon-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-lg);
-  background-color: var(--color-slate-100);
-  color: var(--color-slate-700);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
   transition: all var(--transition-fast);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .card-primary .summary-card-icon-wrapper {
-  background-color: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary-light);
 }
 
 .card-success .summary-card-icon-wrapper {
-  background-color: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid var(--color-success-border);
 }
 
-.card-purple .summary-card-icon-wrapper {
-  background-color: #f5f3ff;
-  color: #7c3aed;
-  border: 1px solid #ddd6fe;
+.card-copper .summary-card-icon-wrapper {
+  background-color: var(--color-copper-light);
+  color: var(--color-copper);
+  border: 1px solid rgba(193, 123, 82, 0.25);
 }
 
 .card-warning .summary-card-icon-wrapper {
-  background-color: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning-border);
 }
 
+.card-purple .summary-card-icon-wrapper {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+  border: 1px solid #DDD6FE;
+}
+
+/* Demo badge */
 .summary-card-demo-badge {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: var(--font-bold);
   color: var(--text-muted);
-  background-color: var(--color-slate-100);
+  background-color: var(--bg-hover);
   padding: 2px 7px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-light);
@@ -94,12 +104,13 @@
   letter-spacing: 0.06em;
 }
 
+/* Text content */
 .summary-card-title {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: var(--font-bold);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   margin-bottom: 4px;
 }
 
@@ -111,8 +122,8 @@
 }
 
 .summary-card-value {
-  font-size: 2rem;
-  font-weight: 800;
+  font-size: 1.875rem;
+  font-weight: var(--font-extrabold);
   color: var(--text-main);
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -121,21 +132,17 @@
 .summary-card-trend {
   font-size: var(--text-xs);
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: var(--font-semibold);
 }
 
 .summary-card-description {
   font-size: var(--text-xs);
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: var(--leading-relaxed);
   margin: 0;
 }
 
 @media (max-width: 480px) {
-  .summary-card {
-    padding: var(--space-4);
-  }
-  .summary-card-value {
-    font-size: 1.75rem;
-  }
+  .summary-card { padding: var(--space-4); }
+  .summary-card-value { font-size: 1.625rem; }
 }

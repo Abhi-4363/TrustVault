@@ -6,11 +6,10 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Lock, 
-  ShieldCheck,
-  Tag,
-  Users,
-  Globe,
-  Plus
+  Tag, 
+  Users, 
+  Globe, 
+  Plus 
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -334,7 +333,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess, onOpenAuth }) {
         <div className="upload-modal-header">
           <div className="upload-modal-title-area">
             <span className="upload-badge">
-              <ShieldCheck size={13} />
+              <Lock size={13} />
               Private Storage Ingestion
             </span>
             <h2 id="upload-modal-title" className="upload-modal-title">Upload Confidential Document</h2>

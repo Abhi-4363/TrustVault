@@ -1,20 +1,21 @@
 /* ==============================================================================
    TrustVault — StatusBadge Design System Component
-   Clean enterprise badges for access levels, roles, and security states.
+   Forest green brand palette for access levels, roles, and security states.
    ============================================================================== */
 
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   border: 1px solid transparent;
   white-space: nowrap;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
   transition: all var(--transition-fast);
+  line-height: 1.6;
 }
 
 .badge-icon {
@@ -26,53 +27,51 @@
 
 /* ── Variants ────────────────────────────────────────────────────────────── */
 
-/* Owner */
+/* Owner — Forest Green */
 .badge-owner {
-  background-color: #faf5ff;
-  color: #6b21a8;
-  border-color: #e9d5ff;
-  box-shadow: 0 1px 2px rgba(107, 33, 168, 0.05);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-text);
+  border-color: rgba(23, 107, 82, 0.25);
 }
 
-/* Edit / Editor */
+/* Edit / Editor — Copper */
 .badge-edit {
-  background-color: #eff6ff;
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.05);
+  background-color: var(--color-copper-light);
+  color: var(--color-copper-dark);
+  border-color: rgba(193, 123, 82, 0.30);
 }
 
-/* Read / Viewer */
+/* Read / Viewer — Neutral */
 .badge-read {
-  background-color: #f8fafc;
-  color: #334155;
-  border-color: #cbd5e1;
+  background-color: var(--bg-card-subtle);
+  color: var(--text-secondary);
+  border-color: var(--border-light);
 }
 
 /* Confidential / Warning */
 .badge-confidential {
-  background-color: #fffbeb;
-  color: #92400e;
-  border-color: #fde68a;
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning-border);
 }
 
-/* Shared */
+/* Shared / Success */
 .badge-shared {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border-color: #bbf7d0;
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
 }
 
 /* Danger / Revoked */
 .badge-danger {
-  background-color: #fff1f2;
-  color: #9f1239;
-  border-color: #fecdd3;
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+  border-color: var(--color-error-border);
 }
 
 /* Default / Neutral */
 .badge-default {
-  background-color: #f1f5f9;
-  color: #475569;
-  border-color: #e2e8f0;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border-color: var(--border-light);
 }

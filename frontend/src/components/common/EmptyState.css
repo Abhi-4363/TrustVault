@@ -1,6 +1,7 @@
 /* ==============================================================================
    TrustVault — EmptyState Design System Component
    Balanced, non-empty placeholder states with clear call-to-actions.
+   Warm ivory & forest green palette with subtle dashed borders.
    ============================================================================== */
 
 .empty-state {
@@ -12,7 +13,7 @@
   padding: var(--space-10) var(--space-6);
   border: 1.5px dashed var(--border-medium);
   border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(180deg, var(--bg-surface, #ffffff) 0%, var(--bg-hover, #f7f5ef) 100%);
   transition: all var(--transition-fast);
 }
 
@@ -23,8 +24,8 @@
   width: 58px;
   height: 58px;
   border-radius: var(--radius-full);
-  background-color: #ffffff;
-  color: var(--color-primary-600);
+  background-color: var(--bg-surface, #ffffff);
+  color: var(--color-primary, #176B52);
   margin-bottom: var(--space-4);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-light);

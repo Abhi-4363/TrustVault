@@ -6,8 +6,7 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Lock, 
-  Tag, 
-  Shield 
+  Tag 
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { StatusBadge } from '../common/StatusBadge';

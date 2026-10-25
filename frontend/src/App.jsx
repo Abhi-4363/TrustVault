@@ -5,7 +5,6 @@ import {
   UserCheck, 
   Activity, 
   Upload, 
-  ShieldCheck, 
   Lock, 
   HelpCircle,
   AlertTriangle,
@@ -739,7 +738,6 @@ export function App() {
 
   // Determine current page title
   const getPageTitle = () => {
-    if (!user) return 'Welcome to TrustVault';
     switch (activeNav) {
       case 'my-documents':
         return 'My Documents';
@@ -757,6 +755,43 @@ export function App() {
         return 'Overview';
     }
   };
+
+  // Unauthenticated visitor layout: dedicated single navigation & portal
+  if (!user) {
+    return (
+      <>
+        <AuthLandingPortal
+          initialMode={authModalMode}
+          onModeChange={(newMode) => setAuthModalMode(newMode)}
+          backendConnected={backendConnected}
+          onHelpClick={handleHelpClick}
+        />
+
+        {/* Accessible Informational Modal (e.g. TrustVault Guide) */}
+        <Modal
+          isOpen={modalConfig.isOpen}
+          onClose={closeModal}
+          title={modalConfig.title}
+          subtitle={modalConfig.subtitle}
+          badge={modalConfig.badge}
+          type={modalConfig.type}
+          confirmLabel="Understood"
+          onConfirm={closeModal}
+        >
+          {modalConfig.content}
+        </Modal>
+
+        {/* Authentication Dialog (if explicitly opened) */}
+        <AuthModals
+          key={`${authModalMode}-${authModalOpen}`}
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          initialMode={authModalMode}
+          onModeChange={(newMode) => setAuthModalMode(newMode)}
+        />
+      </>
+    );
+  }
 
   return (
     <AppShell
@@ -778,15 +813,10 @@ export function App() {
       myDocsCount={myDocsCount}
       sharedDocsCount={sharedDocsCount}
       userRole={user?.role}
-      isAuthenticated={Boolean(user)}
+      isAuthenticated={true}
       pendingRequestsCount={pendingRequestsCount}
     >
-      {!user ? (
-        <AuthLandingPortal
-          initialMode={authModalMode}
-          onModeChange={(newMode) => setAuthModalMode(newMode)}
-        />
-      ) : user.mustChangePassword ? (
+      {user.mustChangePassword ? (
         <ForcedPasswordChangeModal
           user={user}
           token={token}
@@ -840,7 +870,7 @@ export function App() {
             >
               <div className="banner-icon-box">
                 {ownerRequestNotice.type === 'success' ? (
-                  <ShieldCheck size={20} className="text-info" />
+                  <CheckCircle2 size={20} className="text-info" />
                 ) : (
                   <AlertTriangle size={20} className="text-danger" />
                 )}
@@ -929,7 +959,7 @@ export function App() {
           {user.role === 'viewer' && user.roleChangeReason && user.ownerApprovalStatus !== 'pending' && user.ownerApprovalStatus !== 'rejected' && (
             <div className="viewer-role-banner viewer-banner-downgraded" role="status">
               <div className="banner-icon-box">
-                <ShieldCheck size={20} className="text-info" />
+                <CheckCircle2 size={20} className="text-info" />
               </div>
               <div className="banner-content">
                 <div className="banner-title-row">

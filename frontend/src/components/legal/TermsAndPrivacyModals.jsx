@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { X, ShieldCheck, FileText, Lock, AlertCircle } from 'lucide-react';
+import { X, FileText, Lock, AlertCircle } from 'lucide-react';
 import './TermsAndPrivacyModals.css';
 
 export const TERMS_VERSION = '1.0.0';
@@ -59,7 +59,7 @@ export function TermsAndPrivacyModals({
         <div className="legal-modal-header">
           <div className="legal-modal-header-info">
             <div className="legal-modal-badge">
-              {isTerms ? <FileText size={16} /> : <ShieldCheck size={16} />}
+              {isTerms ? <FileText size={16} /> : <Lock size={16} />}
               <span>
                 {isTerms ? `Terms of Service v${TERMS_VERSION}` : `Privacy Policy v${PRIVACY_VERSION}`}
               </span>

@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ShieldAlert,
-  ShieldCheck,
   Users,
   FileText,
   Activity,
@@ -664,7 +662,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       <div className="admin-rbac-denied" role="alert">
         <div className="admin-denied-card">
           <div className="denied-icon-badge">
-            <ShieldAlert size={44} className="text-danger" />
+            <AlertTriangle size={44} className="text-danger" />
           </div>
           <h2 className="denied-title">403 Forbidden — Administrator Governance Boundary</h2>
           <p className="denied-description">
@@ -707,7 +705,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
       {/* Notifications */}
       {successMsg && (
         <div className="admin-alert admin-alert-success" role="status">
-          <ShieldCheck size={18} />
+          <CheckCircle2 size={18} />
           <span>{successMsg}</span>
         </div>
       )}
@@ -902,7 +900,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
 
                 <div className="admin-panel-card">
                   <h3 className="panel-card-title">
-                    <ShieldCheck size={16} /> Governance Compliance Health
+                    <CheckCircle2 size={16} /> Governance Compliance Health
                   </h3>
                   <div className="compliance-meta-list">
                     <div className="compliance-item">
@@ -1844,7 +1842,7 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
             <div className="admin-modal-body">
               <div className="modal-guarantee-box">
                 <div className="guarantee-header">
-                  <ShieldCheck size={16} className="text-success" />
+                  <CheckCircle2 size={16} className="text-success" />
                   <strong>Zero Data Loss Guarantee</strong>
                 </div>
                 <p>
@@ -1983,8 +1981,8 @@ export function AdminDashboard({ user, token, onNavigateToLogin, onPendingCountC
 
                   <div className="modal-guarantee-box">
                     <div className="guarantee-header">
-                      <ShieldCheck size={16} className="text-success" />
-                      <strong>Zero-Trust Credential Security</strong>
+                      <CheckCircle2 size={16} className="text-success" />
+                      <strong>Verified Credential Security</strong>
                     </div>
                     <p>
                       Only a SHA-256 hash of the recovery token is stored in the database. The token is automatically invalidated upon first use or expiration.
